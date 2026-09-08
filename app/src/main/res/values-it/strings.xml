@@ -47,4 +47,14 @@
     <string name="bulletin_empty">Nessun bollettino caricato.</string>
     <string name="bulletin_issued">Emesso alle %1$s · Servizio Meteo provinciale</string>
     <string name="bulletin_district">BURGRAVIATO – MERANO E DINTORNI</string>
+    <string name="nav_home">Oggi</string>
+    <string name="nav_compare">Confronto</string>
+    <string name="nav_bulletin">Bollettino</string>
+    <string name="settings">Impostazioni</string>
+    <string name="setting_language">LINGUA</string>
+    <string name="lang_system">Sistema</string>
+    <string name="setting_wind">UNITÀ VENTO</string>
+    <string name="setting_animations">Anima il cielo</string>
+    <string name="refresh_now">Aggiorna ora</string>
+    <string name="about">Apex Weather %1$s · Tirolo / Merano · consenso di 7 modelli meteo</string>
 </resources>

@@ -47,4 +47,14 @@
     <string name="bulletin_empty">Kein Wetterbericht geladen.</string>
     <string name="bulletin_issued">Ausgegeben %1$s · Landeswetterdienst</string>
     <string name="bulletin_district">BURGGRAFENAMT – MERAN UND UMGEBUNG</string>
+    <string name="nav_home">Heute</string>
+    <string name="nav_compare">Vergleich</string>
+    <string name="nav_bulletin">Bericht</string>
+    <string name="settings">Einstellungen</string>
+    <string name="setting_language">SPRACHE</string>
+    <string name="lang_system">System</string>
+    <string name="setting_wind">WINDEINHEIT</string>
+    <string name="setting_animations">Himmel animieren</string>
+    <string name="refresh_now">Jetzt aktualisieren</string>
+    <string name="about">Apex Weather %1$s · Dorf Tirol / Meran · Konsens aus 7 Wettermodellen</string>
 </resources>
