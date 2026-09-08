@@ -41,10 +41,12 @@ class SettingsRepositoryTest {
         repo.setCompareSources(setOf(Source.ICON_D2))
         repo.setCompareVariable(CompareVariable.WIND)
         repo.setAnimations(false)
+        repo.setWindUnit(WindUnit.MS)
         val s = repo.settings.first()
         assertEquals(LanguageSetting.IT, s.language)
         assertEquals(setOf(Source.ICON_D2), s.compareSources)
         assertEquals(CompareVariable.WIND, s.compareVariable)
         assertEquals(false, s.animations)
+        assertEquals(WindUnit.MS, s.windUnit)
     }
 }
