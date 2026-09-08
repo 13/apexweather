@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Apex Weather</string>
+    <string name="cond_clear">Sereno</string>
+    <string name="cond_mostly_clear">Poco nuvoloso</string>
+    <string name="cond_partly_cloudy">Nuvoloso</string>
+    <string name="cond_cloudy">Coperto</string>
+    <string name="cond_fog">Nebbia</string>
+    <string name="cond_drizzle">Pioggia debole</string>
+    <string name="cond_rain">Pioggia</string>
+    <string name="cond_heavy_rain">Pioggia forte</string>
+    <string name="cond_sleet">Nevischio</string>
+    <string name="cond_snow">Neve</string>
+    <string name="cond_heavy_snow">Neve forte</string>
+    <string name="cond_thunderstorm">Temporale</string>
 </resources>

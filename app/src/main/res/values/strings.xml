@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Apex Weather</string>
+    <string name="cond_clear">Klar</string>
+    <string name="cond_mostly_clear">Heiter</string>
+    <string name="cond_partly_cloudy">Wolkig</string>
+    <string name="cond_cloudy">Bedeckt</string>
+    <string name="cond_fog">Nebel</string>
+    <string name="cond_drizzle">Leichter Regen</string>
+    <string name="cond_rain">Regen</string>
+    <string name="cond_heavy_rain">Starker Regen</string>
+    <string name="cond_sleet">Schneeregen</string>
+    <string name="cond_snow">Schnee</string>
+    <string name="cond_heavy_snow">Starker Schneefall</string>
+    <string name="cond_thunderstorm">Gewitter</string>
 </resources>
