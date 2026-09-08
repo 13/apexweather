@@ -17,8 +17,12 @@ object Format {
     }
     fun tempDecimal(c: Double): String = String.format(Locale.ROOT, "%.1f°", c)
     fun wind(kmh: Double, unit: WindUnit): String = when (unit) {
-        WindUnit.KMH -> "${kmh.roundToInt()} km/h"
-        WindUnit.MS -> String.format(Locale.ROOT, "%.1f m/s", kmh / 3.6)
+        WindUnit.KMH -> "${unit.fromKmh(kmh).roundToInt()} km/h"
+        WindUnit.MS -> String.format(Locale.ROOT, "%.1f m/s", unit.fromKmh(kmh))
+    }
+    fun windUnitLabel(unit: WindUnit): String = when (unit) {
+        WindUnit.KMH -> " km/h"
+        WindUnit.MS -> " m/s"
     }
     fun mm(mm: Double): String = when {
         abs(mm) < 0.05 -> "0 mm"

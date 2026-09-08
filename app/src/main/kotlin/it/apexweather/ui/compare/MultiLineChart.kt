@@ -26,6 +26,8 @@ fun MultiLineChart(
     from: Instant,
     hours: Long,
     unitLabel: String,
+    /** True for variables that cannot go below zero (precipitation, wind): keeps the axis from showing negatives. */
+    nonNegative: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val labelPaint = remember {
@@ -34,19 +36,21 @@ fun MultiLineChart(
     Canvas(modifier.testTag("compare_chart")) {
         val all = series.values.flatten().map { it.value } + consensus.map { it.value } + band.flatMap { listOf(it.min, it.max) }
         if (all.isEmpty()) return@Canvas
-        val lo = floor(all.min() - 1)
+        val lo = if (nonNegative) floor(all.min()).coerceAtLeast(0.0) else floor(all.min() - 1)
         val hi = ceil(all.max() + 1).coerceAtLeast(lo + 2)
-        val left = 64f; val right = size.width - 12f; val top = 12f; val bottom = size.height - 36f
+        val steps = 4
+        val yLabels = (0..steps).map { s -> "${(lo + (hi - lo) * s / steps).toInt()}$unitLabel" }
+        val left = 8f + yLabels.maxOf { labelPaint.measureText(it) }
+        val right = size.width - 12f; val top = 12f; val bottom = size.height - 36f
         val spanMs = hours * 3_600_000.0
         fun x(t: Instant) = left + ((t.toEpochMilli() - from.toEpochMilli()) / spanMs * (right - left)).toFloat()
         fun y(v: Double) = bottom - ((v - lo) / (hi - lo) * (bottom - top)).toFloat()
 
         // grid + y labels
-        val steps = 4
         for (s in 0..steps) {
             val v = lo + (hi - lo) * s / steps
             drawLine(Color.White.copy(alpha = 0.10f), Offset(left, y(v)), Offset(right, y(v)), strokeWidth = 1f)
-            drawContext.canvas.nativeCanvas.drawText("${v.toInt()}$unitLabel", 4f, y(v) + 10f, labelPaint)
+            drawContext.canvas.nativeCanvas.drawText(yLabels[s], 4f, y(v) + 10f, labelPaint)
         }
         // x labels every 12 h
         var t = from

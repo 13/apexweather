@@ -2,6 +2,7 @@ package it.apexweather.ui.compare
 
 import it.apexweather.data.AppSettings
 import it.apexweather.data.CompareVariable
+import it.apexweather.data.WindUnit
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.forecast
 import it.apexweather.domain.hour
@@ -40,6 +41,14 @@ class CompareStateBuilderTest {
         assertEquals(14.0, temp.series.getValue(Source.ICON_D2).first().value, 0.0)
         assertEquals(20.0, wind.series.getValue(Source.ICON_D2).first().value, 0.0)
         assertEquals(3.0, precip.series.getValue(Source.ICON_D2).first().value, 0.0)
+    }
+
+    @Test
+    fun `wind series and consensus line follow the wind unit setting`() {
+        val settings = AppSettings(compareVariable = CompareVariable.WIND, windUnit = WindUnit.MS)
+        val s = CompareStateBuilder.build(snapshot, settings, consensus, hour(0))
+        assertEquals(20.0 / 3.6, s.series.getValue(Source.ICON_D2).first().value, 1e-9)
+        assertEquals(15.0 / 3.6, s.consensusLine.first().value, 1e-9)
     }
 
     @Test

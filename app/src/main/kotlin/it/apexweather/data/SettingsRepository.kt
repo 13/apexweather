@@ -19,7 +19,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 enum class LanguageSetting(val tag: String?) { SYSTEM(null), DE("de"), IT("it"), EN("en") }
-enum class WindUnit { KMH, MS }
+enum class WindUnit {
+    KMH, MS;
+
+    /** Converts a km/h value into this unit. */
+    fun fromKmh(kmh: Double): Double = when (this) {
+        KMH -> kmh
+        MS -> kmh / 3.6
+    }
+}
 enum class CompareVariable { TEMPERATURE, PRECIPITATION, WIND }
 
 data class AppSettings(

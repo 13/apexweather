@@ -58,7 +58,7 @@ object CompareStateBuilder {
         fun HourlyPoint.value() = when (settings.compareVariable) {
             CompareVariable.TEMPERATURE -> tempC
             CompareVariable.PRECIPITATION -> precipMm
-            CompareVariable.WIND -> windKmh
+            CompareVariable.WIND -> settings.windUnit.fromKmh(windKmh)
         }
         val series = snapshot.forecasts
             .filterKeys { it in settings.compareSources }
@@ -69,7 +69,7 @@ object CompareStateBuilder {
             SeriesPoint(h.time, when (settings.compareVariable) {
                 CompareVariable.TEMPERATURE -> h.tempC
                 CompareVariable.PRECIPITATION -> h.precipMm
-                CompareVariable.WIND -> h.windKmh
+                CompareVariable.WIND -> settings.windUnit.fromKmh(h.windKmh)
             })
         }
         val band = if (settings.compareVariable == CompareVariable.TEMPERATURE) window.map { BandPoint(it.time, it.tempMinC, it.tempMaxC) } else emptyList()

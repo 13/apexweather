@@ -82,7 +82,12 @@ fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVa
                 MultiLineChart(
                     series = state.series, consensus = state.consensusLine, band = state.band,
                     from = state.now.truncatedTo(ChronoUnit.HOURS), hours = 72,
-                    unitLabel = when (state.variable) { CompareVariable.TEMPERATURE -> "°"; CompareVariable.PRECIPITATION -> "mm"; CompareVariable.WIND -> "" },
+                    unitLabel = when (state.variable) {
+                        CompareVariable.TEMPERATURE -> "°"
+                        CompareVariable.PRECIPITATION -> " mm"
+                        CompareVariable.WIND -> Format.windUnitLabel(state.settings.windUnit)
+                    },
+                    nonNegative = state.variable != CompareVariable.TEMPERATURE,
                     modifier = Modifier.fillMaxWidth().height(240.dp),
                 )
                 Spacer(Modifier.height(10.dp))
