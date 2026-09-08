@@ -6,9 +6,11 @@ import it.apexweather.domain.SiagCodes
 import it.apexweather.domain.model.Source
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.double
+import kotlinx.serialization.json.intOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -33,6 +35,28 @@ class SiagMappersTest {
         assertEquals(prec0 / 3.0, fc.hourly[0].precipMm, 1e-9)
         assertEquals(resp.municipality.tempMax24!!.data.size, fc.daily.size)
         assertEquals(OffsetDateTime.parse(resp.info.currentModelRun!!).toInstant(), fc.issuedAt)
+    }
+
+    @Test
+    fun `kmos precipProb comes from precProb3`() {
+        val resp = Fixtures.json.decodeFromString(KmosResponse.serializer(), Fixtures.read("siag_kmos.json"))
+        val fc = SiagMappers.mapKmos(resp, fetchedAt)
+        assertEquals(resp.municipality.precProb3!!.data[0].value!!.intOrNull, fc.hourly[0].precipProb)
+    }
+
+    @Test
+    fun `kmos without temp3 fails loudly`() {
+        val resp = KmosResponse(info = KmosInfo(), municipality = KmosMunicipality(code = "021101"))
+        val ex = assertThrows(IllegalStateException::class.java) { SiagMappers.mapKmos(resp, fetchedAt) }
+        assertTrue(ex.message!!.contains("temp3"))
+    }
+
+    @Test
+    fun `bulletin evolution normalises CRLF`() {
+        val w = OdhWeatherResponse(date = "2026-09-08T11:00:00", evolutionTitle = "T", evolution = "a\r\nb")
+        val d = OdhDistrictResponse()
+        val b = SiagMappers.mapBulletin(w, d, "de")
+        assertEquals("a\nb", b.evolution)
     }
 
     @Test
