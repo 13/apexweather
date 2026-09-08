@@ -25,7 +25,10 @@ class SkyBackgroundTest {
             SkyPaletteSelector.select(Condition.PARTLY_CLOUDY, SunPhase.DAY, 0.0),
         )
         val current = mutableStateOf(palettes.first())
+        rule.mainClock.autoAdvance = false
         rule.setContent { ApexTheme { SkyBackground(palette = current.value, animationsEnabled = true) } }
+        rule.mainClock.advanceTimeBy(500)
+        rule.onNodeWithTag("sky").assertIsDisplayed()
         palettes.forEach { p ->
             rule.runOnIdle { current.value = p }
             rule.mainClock.advanceTimeBy(500)
