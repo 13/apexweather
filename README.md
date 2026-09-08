@@ -6,9 +6,10 @@ the median line with the min/max band of the models, so the spread between them 
 hidden. The home screen shows the current conditions (the live Meran station drives the hero temperature
 while its reading is under 90 minutes old), the next 48 hours and the next 7 days, over an animated sky
 whose colours follow the real sun position and the forecast condition. A compare tab puts every source on
-one chart with its model run time, a bulletin tab shows the Landeswetterdienst text and district maps in
-German, Italian or English, and a home-screen widget carries the same consensus. Everything is cached in
-Room, so the app renders offline and says how old its data is.
+one chart, labelled with its model run time where the source publishes one and with the fetch time where it
+does not, a bulletin tab shows the Landeswetterdienst text and district maps in German, Italian or English,
+and a home-screen widget carries the same consensus. Everything is cached in Room, so the app renders
+offline and says how old its data is.
 
 ## Data sources
 

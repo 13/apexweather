@@ -41,6 +41,7 @@
     <string name="var_wind">Wind</string>
     <string name="status_none">never loaded</string>
     <string name="status_ok">run %1$s</string>
+    <string name="status_fetched">Fetched %1$s</string>
     <string name="status_stale">stale (%1$s)</string>
     <string name="status_failed">error: %1$s</string>
     <string name="bulletin_title">South Tyrol bulletin</string>

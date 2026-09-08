@@ -41,6 +41,7 @@
     <string name="var_wind">Vento</string>
     <string name="status_none">mai caricato</string>
     <string name="status_ok">run %1$s</string>
+    <string name="status_fetched">Scaricato %1$s</string>
     <string name="status_stale">obsoleto (%1$s)</string>
     <string name="status_failed">errore: %1$s</string>
     <string name="bulletin_title">Bollettino Alto Adige</string>

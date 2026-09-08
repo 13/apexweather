@@ -145,7 +145,7 @@ fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVa
                             Box(Modifier.size(8.dp).clip(CircleShape).background(SourceColors.of(s)))
                             Text(s.displayName, style = MaterialTheme.typography.bodyMedium, color = Color.White)
                         }
-                        Text(statusText(st), style = MaterialTheme.typography.labelSmall, color = statusColor(st))
+                        Text(statusText(s, st), style = MaterialTheme.typography.labelSmall, color = statusColor(st))
                     }
                 }
             }
@@ -168,9 +168,13 @@ private fun variableLabel(v: CompareVariable) = stringResource(
 )
 
 @Composable
-private fun statusText(st: SourceStatus?): String = when (st) {
+private fun statusText(source: Source, st: SourceStatus?): String = when (st) {
     null -> stringResource(R.string.status_none)
-    is SourceStatus.Ok -> stringResource(R.string.status_ok, Format.time(st.issuedAt, DorfTirol.ZONE))
+    // Only the sources that publish a run time can claim one; for the rest the timestamp is the fetch time.
+    is SourceStatus.Ok -> stringResource(
+        if (source.hasRunTime) R.string.status_ok else R.string.status_fetched,
+        Format.time(st.issuedAt, DorfTirol.ZONE),
+    )
     is SourceStatus.Stale -> stringResource(R.string.status_stale, Format.time(st.issuedAt, DorfTirol.ZONE))
     is SourceStatus.Failed -> stringResource(R.string.status_failed, st.reason.take(40))
 }
