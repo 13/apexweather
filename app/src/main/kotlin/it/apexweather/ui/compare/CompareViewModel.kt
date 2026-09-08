@@ -60,8 +60,9 @@ object CompareStateBuilder {
             CompareVariable.PRECIPITATION -> precipMm
             CompareVariable.WIND -> settings.windUnit.fromKmh(windKmh)
         }
+        // KMOS carries no wind at all (the mapper stores 0.0), so it must not draw a flat zero line.
         val series = snapshot.forecasts
-            .filterKeys { it in settings.compareSources }
+            .filterKeys { it in settings.compareSources && !(settings.compareVariable == CompareVariable.WIND && it == Source.SIAG_KMOS) }
             .mapValues { (_, fc) -> fc.hourly.filter { !it.time.isBefore(from) && it.time.isBefore(to) }.map { SeriesPoint(it.time, it.value()) } }
             .filterValues { it.isNotEmpty() }
         val window = consensus.hourly.filter { !it.time.isBefore(from) && it.time.isBefore(to) }

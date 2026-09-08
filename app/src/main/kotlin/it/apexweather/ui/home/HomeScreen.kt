@@ -44,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.apexweather.R
 import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.model.ConsensusHour
+import it.apexweather.domain.model.Source
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.label
 import it.apexweather.ui.theme.fromArgb
@@ -136,7 +137,9 @@ private fun HourDetail(hour: ConsensusHour, state: HomeUiState) {
         hour.perSource.entries.sortedBy { it.key.ordinal }.forEach { (source, p) ->
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(source.displayName, style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                Text("${Format.tempDecimal(p.tempC)}  ${Format.mm(p.precipMm)}  ${Format.wind(p.windKmh, state.settings.windUnit)}", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
+                // KMOS has no wind parameter; showing its 0.0 would read as "calm".
+                val wind = if (source == Source.SIAG_KMOS) "\u2013" else Format.wind(p.windKmh, state.settings.windUnit)
+                Text("${Format.tempDecimal(p.tempC)}  ${Format.mm(p.precipMm)}  $wind", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
             }
         }
     }

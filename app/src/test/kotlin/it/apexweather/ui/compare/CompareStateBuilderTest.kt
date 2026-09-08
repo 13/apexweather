@@ -11,6 +11,7 @@ import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.WeatherSnapshot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -35,12 +36,17 @@ class CompareStateBuilderTest {
 
     @Test
     fun `variable picks the right value`() {
-        val temp = CompareStateBuilder.build(snapshot, AppSettings(compareVariable = CompareVariable.TEMPERATURE), consensus, hour(0))
-        val wind = CompareStateBuilder.build(snapshot, AppSettings(compareVariable = CompareVariable.WIND), consensus, hour(0))
-        val precip = CompareStateBuilder.build(snapshot, AppSettings(compareVariable = CompareVariable.PRECIPITATION), consensus, hour(0))
+        // KMOS reports no wind (the mapper stores 0.0), so the wind chart must leave it out.
+        val withKmos = snapshot.copy(forecasts = forecasts + (Source.SIAG_KMOS to forecast(Source.SIAG_KMOS, (0 until 72).map { point(it, 13.0, precip = 2.0) })))
+        val temp = CompareStateBuilder.build(withKmos, AppSettings(compareVariable = CompareVariable.TEMPERATURE), consensus, hour(0))
+        val wind = CompareStateBuilder.build(withKmos, AppSettings(compareVariable = CompareVariable.WIND), consensus, hour(0))
+        val precip = CompareStateBuilder.build(withKmos, AppSettings(compareVariable = CompareVariable.PRECIPITATION), consensus, hour(0))
         assertEquals(14.0, temp.series.getValue(Source.ICON_D2).first().value, 0.0)
         assertEquals(20.0, wind.series.getValue(Source.ICON_D2).first().value, 0.0)
         assertEquals(3.0, precip.series.getValue(Source.ICON_D2).first().value, 0.0)
+        // KMOS has no wind: it must not draw a fabricated flat line, but it stays for temperature.
+        assertTrue(Source.SIAG_KMOS in temp.series)
+        assertFalse(Source.SIAG_KMOS in wind.series)
     }
 
     @Test
