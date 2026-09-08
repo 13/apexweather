@@ -32,24 +32,50 @@ Out of scope for v1: other locations, GPS, notifications/alerts, weather radar, 
 
 All free, no API key, verified live on 2026-09-08 for the Dorf Tirol coordinates.
 
-### 3.1 Landeswetterdienst Südtirol (SIAG) via Open Data Hub
+### 3.1 Landeswetterdienst Südtirol (SIAG)
 
-- Bulletin: `GET https://tourism.opendatahub.com/v1/Weather?language={de|it|en}`
-  Fields used: `Date`, `EvolutionTitle`, `Evolution`, `Conditions[]` (`date`, `Weatherdesc`,
-  `WeatherImgurl`, temps where present), `Forecast[]`/district block for district 2
-  ("Burggrafenamt - Meran und Umgebung") when present.
-- Live station: `GET https://mobility.api.opendatahub.com/v2/flat/MeteoStation/*/latest?where=scode.eq.23200MS`
-  Station "Merano" (23200MS). Fields: air temperature, relative humidity, wind speed, precipitation,
-  pressure if published. Exact type names are confirmed against the live response during
-  implementation and recorded as fixtures.
-- Role: official narrative text and day icons; live "now" observation. Not blended numerically.
+Three endpoints, all free and keyless, verified live on 2026-09-08:
+
+- Municipality forecast (numeric, model "KMOS-ECMWF-V2", the province's own MOS):
+  `GET https://api-weather.services.siag.it/api/v2/municipality/MunicipalityBulletin/021101`
+  (021101 = ISTAT code of Dorf Tirol). Series: `temp3`, `precSum3`, `precProb3`, `symbols3`
+  (3-hourly, 6 days, symbol like `a_d`/`a_n` = letter code + day/night), `tempMin24`,
+  `tempMax24`, `precSum24`, `precProb24`, `symbols24`, `ssd24` (daily). `windDir3`/`windSpd3`
+  are present but null. Dates carry a `+02:00`/`+01:00` offset. This is the `SIAG_KMOS` numeric
+  source and takes part in the consensus at its native 3-hour resolution.
+- Bulletin text and day icons (open data mirror):
+  `GET https://tourism.opendatahub.com/v1/Weather?language={de|it|en}` — `EvolutionTitle`,
+  `Evolution`, `Conditions[]` (`Date`, `Title`, `WeatherDesc`, `Temperatures`, `WeatherImgUrl`),
+  `Forecast[]` (`Date`, `WeatherCode`, `WeatherDesc`, `TempMaxmax`, `TempMinmin`, `Reliability`).
+  District 2 day forecast: `GET https://tourism.opendatahub.com/v1/Weather/District/2?language=..`
+  (`BezirksForecast[]`: `Date`, `WeatherCode`, `WeatherDesc`, `WeatherImgUrl`, `MaxTemp`,
+  `MinTemp`, `RainFrom`, `RainTo`, `Thunderstorm`, `Part1..Part4`).
+- Live station Meran (23200MS, 330 m, ~1.5 km from Dorf Tirol):
+  `GET https://api-weather.services.siag.it/api/v2/station?categoryId=1&visibility=11`
+  returns `rows[]`; pick `code == "23200MS"`. Fields are strings, `"--"` means missing:
+  `t` (°C), `rh` (%), `p` (hPa), `ff` (wind m/s), `dd` (compass letters), `wMax` (gust m/s),
+  `n` (precipitation mm), `lastUpdated` (local time, no offset). The Open Data Hub mirror of this
+  station (`mobility.api.opendatahub.com`) is stale and is not used.
+
+SIAG weather letter codes map to icons `icon_<n>.png` with n = position in the alphabet
+(a=1 … z=26). Verified table (from bulletin history and the icon set):
+a clear, b mostly clear, c partly cloudy, d cloudy, e overcast, f sun+cloud moderate rain,
+g sun+cloud heavy rain, h overcast moderate rain, i overcast heavy rain, j overcast light rain,
+k thin high cloud, l sun+cloud light snow, m sun+cloud moderate snow, n overcast light snow,
+o overcast moderate snow, p overcast heavy snow, q sun+cloud sleet, r overcast sleet,
+s fog with sun (high fog), t valley fog, u sun+cloud thunderstorm rain, v overcast thunderstorm
+heavy rain, w sun+cloud thunderstorm sleet, x overcast thunderstorm sleet, y sun+cloud
+thunderstorm snow, z overcast thunderstorm snow.
 
 ### 3.2 GeoSphere Austria (formerly ZAMG), AROME 2.5 km
 
 - `GET https://dataset.api.hub.geosphere.at/v1/timeseries/forecast/nwp-v1-1h-2500m?lat_lon=46.691,11.155&parameters=...`
-- Parameters: 2 m temperature, accumulated precipitation, 2 m relative humidity, 10 m wind u/v
-  (converted to speed/direction), total cloud cover, weather symbol, gusts if available. The
-  parameter codes are taken from the dataset's `/metadata` endpoint at implementation time.
+- Parameters (verified from `/metadata`): `t2m` (°C), `rr_acc` (kg m-2, cumulative since
+  reference time → hourly = difference), `snow_acc` (cumulative), `rh2m` (%), `u10m`/`v10m`
+  (m/s, converted to speed km/h and direction), `ugust`/`vgust` (m/s), `tcc` (0..1), `sp` (Pa),
+  `cape`. The `sy` weather symbol uses undocumented GeoSphere codes and is ignored; the condition
+  is derived from cloud cover, hourly precipitation, snowfall share, temperature and CAPE.
+- Response: `reference_time`, `timestamps[]` (ISO with offset), `features[0].properties.parameters.<name>.data[]`.
 - Horizon 60 h hourly, updated every 3 h. Licence CC-BY 4.0 (attribution shown in app).
 
 ### 3.3 Open-Meteo multi-model (single request)
@@ -64,8 +90,9 @@ All free, no API key, verified live on 2026-09-08 for the Dorf Tirol coordinates
 
 ### 3.4 Source enum
 
-`SIAG`, `GEOSPHERE_AROME`, `ICON_CH1`, `ICON_CH2`, `ICON_2I`, `ICON_D2`, `ECMWF`.
-Regional set = all except `SIAG` and `ECMWF`.
+`SIAG_KMOS`, `GEOSPHERE_AROME`, `ICON_CH1`, `ICON_CH2`, `ICON_2I`, `ICON_D2`, `ECMWF`.
+Regional set = all except `ECMWF`. The SIAG bulletin and station observation are not sources in
+this enum; they are separate domain objects.
 
 ## 4. Architecture
 
@@ -169,8 +196,9 @@ Per hourly timestamp (union of all timestamps, aligned to full hours in Europe/R
 Daily: aggregated from consensus hourly (min/max temp, precip sum, condition = worst condition
 during 06:00–22:00 local, agreement = mean). Sunrise/sunset from any Open-Meteo daily series.
 
-SIAG is never blended numerically. The station observation is not part of the consensus; it is
-shown as "now" and overrides the current-hour hero values.
+`SIAG_KMOS` only has values every third hour; it contributes to the hours it covers and is simply
+absent elsewhere. The SIAG bulletin is never blended. The station observation is not part of the
+consensus; it is shown as "now" and overrides the current-hour hero values.
 
 ### 4.4 Sky system
 
@@ -253,7 +281,7 @@ modal bottom sheet from the top app bar.
 
 - JVM unit tests (`src/test`):
   - Each DTO mapper against recorded JSON fixtures captured from the real endpoints on
-    2026-09-08 (stored under `src/test/resources/fixtures/`).
+    2026-09-08 (stored under `app/src/test/resources/fixtures/`).
   - `ConsensusBlender`: median/band, ECMWF inclusion rule, precipitation probability fallback,
     condition vote and tie-break, daily aggregation, single-source and empty inputs.
   - `SunPhaseCalculator` and `SkyPaletteSelector`.
