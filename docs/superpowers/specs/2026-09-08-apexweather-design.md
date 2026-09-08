@@ -299,3 +299,14 @@ modal bottom sheet from the top app bar.
   system default JDK 25 is not supported by AGP.
 - Gradle wrapper pinned to a version compatible with the chosen AGP; Kotlin 2.x with the Compose
   compiler Gradle plugin; version catalog in `gradle/libs.versions.toml`.
+
+## 10. Implementation deviations (recorded 2026-09-09, branch feat/v1)
+
+- compileSdk is 37 (current AndroidX releases require it); targetSdk stays 36.
+- SIAG KMOS counts as stale after 16 h, not 6 h, because the model runs only twice a day.
+- Cards use a translucent gradient plus border instead of a real backdrop blur (Compose has no stable backdrop blur).
+- The widget background is a runtime-generated gradient bitmap (Glance has no gradient brush).
+- Compare source chips wrap in a FlowRow instead of scrolling horizontally; the settings sheet opens fully expanded.
+- Open-Meteo returns no model run time, so `issuedAt` for the five Open-Meteo models is the fetch time and the status list says "fetched" rather than "run" for them.
+- KMOS publishes no wind; its points carry `windKmh = 0.0`. The UI hides KMOS wind on the compare chart and in the hour detail, but the consensus wind median still includes the zero. Follow-up: make `HourlyPoint.windKmh` nullable end to end.
+- Reduce-motion honours the system animator duration scale (0 = off); the accessibility "remove animations" toggle maps to the same setting on Android 12+.
