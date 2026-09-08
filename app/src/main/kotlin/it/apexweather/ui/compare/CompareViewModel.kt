@@ -19,7 +19,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -107,10 +106,7 @@ class CompareViewModel @Inject constructor(
         }
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CompareUiState())
 
-    fun toggleSource(source: Source) = viewModelScope.launch {
-        val current = settingsRepository.settings.first().compareSources
-        settingsRepository.setCompareSources(if (source in current) current - source else current + source)
-    }
+    fun toggleSource(source: Source) = viewModelScope.launch { settingsRepository.toggleCompareSource(source) }
 
     fun setVariable(v: CompareVariable) = viewModelScope.launch { settingsRepository.setCompareVariable(v) }
 }

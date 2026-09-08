@@ -2,6 +2,7 @@ package it.apexweather.ui.compare
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -27,7 +28,9 @@ fun MultiLineChart(
     unitLabel: String,
     modifier: Modifier = Modifier,
 ) {
-    val labelPaint = android.graphics.Paint().apply { color = android.graphics.Color.argb(160, 255, 255, 255); textSize = 28f; isAntiAlias = true }
+    val labelPaint = remember {
+        android.graphics.Paint().apply { color = android.graphics.Color.argb(160, 255, 255, 255); textSize = 28f; isAntiAlias = true }
+    }
     Canvas(modifier.testTag("compare_chart")) {
         val all = series.values.flatten().map { it.value } + consensus.map { it.value } + band.flatMap { listOf(it.min, it.max) }
         if (all.isEmpty()) return@Canvas

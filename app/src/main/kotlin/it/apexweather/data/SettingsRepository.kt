@@ -68,4 +68,11 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     suspend fun setAnimations(v: Boolean) = context.settingsStore.edit { it[Keys.animations] = v }
     suspend fun setCompareSources(v: Set<Source>) = context.settingsStore.edit { it[Keys.compareSources] = v.map { s -> s.name }.toSet() }
     suspend fun setCompareVariable(v: CompareVariable) = context.settingsStore.edit { it[Keys.compareVariable] = v.name }
+
+    suspend fun toggleCompareSource(source: Source) = context.settingsStore.edit { prefs ->
+        val current = prefs[Keys.compareSources]?.mapNotNull { runCatching { Source.valueOf(it) }.getOrNull() }?.toSet()
+            ?: Source.entries.toSet()
+        val updated = if (source in current) current - source else current + source
+        prefs[Keys.compareSources] = updated.map { it.name }.toSet()
+    }
 }
