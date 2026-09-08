@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.WorkRequest
 import java.util.concurrent.TimeUnit
 
 object RefreshScheduler {
@@ -17,18 +18,19 @@ object RefreshScheduler {
 
     private val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
+    private fun <B : WorkRequest.Builder<B, *>> B.withRefreshPolicy(): B =
+        setConstraints(constraints).setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.MINUTES)
+
     fun ensureScheduled(context: Context) {
         val request = PeriodicWorkRequestBuilder<RefreshWorker>(60, TimeUnit.MINUTES)
-            .setConstraints(constraints)
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.MINUTES)
+            .withRefreshPolicy()
             .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(PERIODIC_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
     }
 
     fun refreshNow(context: Context) {
         val request = OneTimeWorkRequestBuilder<RefreshWorker>()
-            .setConstraints(constraints)
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.MINUTES)
+            .withRefreshPolicy()
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(ONESHOT_NAME, ExistingWorkPolicy.REPLACE, request)
     }
