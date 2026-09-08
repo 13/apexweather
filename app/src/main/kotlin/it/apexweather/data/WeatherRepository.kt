@@ -1,5 +1,6 @@
 package it.apexweather.data
 
+import android.util.Log
 import it.apexweather.data.local.BulletinEntity
 import it.apexweather.data.local.ObservationEntity
 import it.apexweather.data.local.RefreshMetaEntity
@@ -24,11 +25,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.supervisorScope
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.util.Collections
+import kotlin.coroutines.cancellation.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -53,16 +56,19 @@ class WeatherRepository @Inject constructor(
             val status = mutableMapOf<Source, SourceStatus>()
             rows.forEach { row ->
                 val source = runCatching { Source.valueOf(row.source) }.getOrNull() ?: return@forEach
-                val fc = row.json?.let { runCatching { json.decodeFromString(SourceForecast.serializer(), it) }.getOrNull() }
+                val fc = row.json?.let { decode("forecast for ${row.source}", SourceForecast.serializer(), it) }
                 if (fc != null) forecasts[source] = fc
+                // A row whose JSON no longer decodes still knows when it was issued; keep that timestamp visible.
                 status[source] = statusOf(
-                    hasData = fc != null, issuedAt = fc?.issuedAt, fetchedAtMs = row.fetchedAtMs,
+                    hasData = fc != null,
+                    issuedAt = fc?.issuedAt ?: row.issuedAtMs?.let(Instant::ofEpochMilli),
+                    fetchedAtMs = row.fetchedAtMs,
                     lastError = row.lastError, lastErrorAtMs = row.lastErrorAtMs,
                     staleAfter = Duration.ofHours(source.staleAfterHours.toLong()), now = now,
                 )
             }
-            val bulletin = bulletinRow?.json?.let { runCatching { json.decodeFromString(Bulletin.serializer(), it) }.getOrNull() }
-            val observation = obsRow?.json?.let { runCatching { json.decodeFromString(StationObservation.serializer(), it) }.getOrNull() }
+            val bulletin = bulletinRow?.json?.let { decode("bulletin", Bulletin.serializer(), it) }
+            val observation = obsRow?.json?.let { decode("observation", StationObservation.serializer(), it) }
             WeatherSnapshot(
                 forecasts = forecasts,
                 bulletin = bulletin,
@@ -79,6 +85,15 @@ class WeatherRepository @Inject constructor(
             )
         }
 
+    /** Cached JSON can outlive a model change; a row that no longer decodes is reported, never fatal. */
+    private fun <T> decode(what: String, serializer: KSerializer<T>, text: String): T? =
+        try {
+            json.decodeFromString(serializer, text)
+        } catch (e: Exception) {
+            Log.w("WeatherRepository", "cannot decode cached $what", e)
+            null
+        }
+
     /** Fetches every source in parallel; a failure in one never affects the others. */
     suspend fun refresh(language: String): RefreshResult {
         val now = clock.instant()
@@ -87,42 +102,71 @@ class WeatherRepository @Inject constructor(
         val succeeded = Collections.synchronizedList(mutableListOf<String>())
         val failed = Collections.synchronizedMap(linkedMapOf<String, String>())
 
+        // Cancellation (WorkManager stopping the worker) must propagate: a cancelled refresh is not a failed one.
         suspend fun <T> attempt(name: String, block: suspend () -> T): T? =
-            runCatching { block() }
-                .onSuccess { succeeded += name }
-                .onFailure { failed[name] = it.message ?: it.javaClass.simpleName }
-                .getOrNull()
+            try {
+                val value = block()
+                succeeded += name
+                value
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                failed[name] = e.message ?: e.javaClass.simpleName
+                null
+            }
+
+        // Persistence is fallible too (Room, serialisation). One source failing to store must not abort the
+        // others via await(), and must not skip the meta row, so nothing escapes an async body but cancellation.
+        suspend fun isolate(name: String, block: suspend () -> Unit) {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                failed[name] = "store: ${e.message ?: e.javaClass.simpleName}"
+            }
+        }
 
         supervisorScope {
             val om = async {
-                val mapped = attempt("OPEN_METEO") { OpenMeteoMapper.map(openMeteo.forecast(), now) }
-                OpenMeteoMapper.MODELS.keys.forEach { source ->
-                    storeForecast(source, mapped?.get(source), failed["OPEN_METEO"], now)
+                isolate("OPEN_METEO") {
+                    val mapped = attempt("OPEN_METEO") { OpenMeteoMapper.map(openMeteo.forecast(), now) }
+                    OpenMeteoMapper.MODELS.keys.forEach { source ->
+                        storeForecast(source, mapped?.get(source), failed["OPEN_METEO"], now)
+                    }
                 }
             }
             val gs = async {
-                val fc = attempt("GEOSPHERE_AROME") { GeoSphereMapper.map(geoSphere.forecast(), now) }
-                storeForecast(Source.GEOSPHERE_AROME, fc, failed["GEOSPHERE_AROME"], now)
+                isolate("GEOSPHERE_AROME") {
+                    val fc = attempt("GEOSPHERE_AROME") { GeoSphereMapper.map(geoSphere.forecast(), now) }
+                    storeForecast(Source.GEOSPHERE_AROME, fc, failed["GEOSPHERE_AROME"], now)
+                }
             }
             val km = async {
-                val fc = attempt("SIAG_KMOS") { SiagMappers.mapKmos(siag.municipality(), now) }
-                storeForecast(Source.SIAG_KMOS, fc, failed["SIAG_KMOS"], now)
+                isolate("SIAG_KMOS") {
+                    val fc = attempt("SIAG_KMOS") { SiagMappers.mapKmos(siag.municipality(), now) }
+                    storeForecast(Source.SIAG_KMOS, fc, failed["SIAG_KMOS"], now)
+                }
             }
             val bl = async {
-                val b = attempt("SIAG_BULLETIN") { SiagMappers.mapBulletin(odh.weather(language), odh.district(language = language), language) }
-                val prev = dao.bulletinOnce(language)
-                dao.upsertBulletin(
-                    if (b != null) BulletinEntity(language, json.encodeToString(Bulletin.serializer(), b), now.toEpochMilli(), null, null)
-                    else BulletinEntity(language, prev?.json, prev?.fetchedAtMs, failed["SIAG_BULLETIN"], now.toEpochMilli())
-                )
+                isolate("SIAG_BULLETIN") {
+                    val b = attempt("SIAG_BULLETIN") { SiagMappers.mapBulletin(odh.weather(language), odh.district(language = language), language) }
+                    val prev = dao.bulletinOnce(language)
+                    dao.upsertBulletin(
+                        if (b != null) BulletinEntity(language, json.encodeToString(Bulletin.serializer(), b), now.toEpochMilli(), null, null)
+                        else BulletinEntity(language, prev?.json, prev?.fetchedAtMs, failed["SIAG_BULLETIN"], now.toEpochMilli())
+                    )
+                }
             }
             val ob = async {
-                val o = attempt("SIAG_STATION") { SiagMappers.mapObservation(siag.stations()) ?: error("station ${DorfTirol.STATION_CODE} not in response") }
-                val prev = dao.observationOnce()
-                dao.upsertObservation(
-                    if (o != null) ObservationEntity(0, json.encodeToString(StationObservation.serializer(), o), now.toEpochMilli(), null, null)
-                    else ObservationEntity(0, prev?.json, prev?.fetchedAtMs, failed["SIAG_STATION"], now.toEpochMilli())
-                )
+                isolate("SIAG_STATION") {
+                    val o = attempt("SIAG_STATION") { SiagMappers.mapObservation(siag.stations()) ?: error("station ${DorfTirol.STATION_CODE} not in response") }
+                    val prev = dao.observationOnce()
+                    dao.upsertObservation(
+                        if (o != null) ObservationEntity(0, json.encodeToString(StationObservation.serializer(), o), now.toEpochMilli(), null, null)
+                        else ObservationEntity(0, prev?.json, prev?.fetchedAtMs, failed["SIAG_STATION"], now.toEpochMilli())
+                    )
+                }
             }
             om.await(); gs.await(); km.await(); bl.await(); ob.await()
         }
@@ -166,8 +210,9 @@ class WeatherRepository @Inject constructor(
             hasData: Boolean, issuedAt: Instant?, fetchedAtMs: Long?,
             lastError: String?, lastErrorAtMs: Long?, staleAfter: Duration, now: Instant,
         ): SourceStatus {
-            if (!hasData) return SourceStatus.Failed(lastError ?: "no data", null)
-            val failedAfterFetch = lastErrorAtMs != null && lastErrorAtMs > (fetchedAtMs ?: 0L)
+            if (!hasData) return SourceStatus.Failed(lastError ?: "no data", issuedAt)
+            // >= so that a failure recorded in the same millisecond as the fetch still counts as a failure.
+            val failedAfterFetch = lastErrorAtMs != null && lastErrorAtMs >= (fetchedAtMs ?: 0L)
             if (failedAfterFetch) return SourceStatus.Failed(lastError ?: "error", issuedAt)
             val issued = issuedAt ?: return SourceStatus.Failed("no timestamp", null)
             return if (Duration.between(issued, now) > staleAfter) SourceStatus.Stale(issued) else SourceStatus.Ok(issued)

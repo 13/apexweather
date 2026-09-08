@@ -172,7 +172,7 @@ data class ConsensusForecast(val hourly: List<ConsensusHour>, val daily: List<Co
 change) and `suspend fun refresh(language: String): RefreshResult`. `refresh` launches the three
 network calls in a `supervisorScope`; each result is written to Room independently, and a failure
 in one source only marks that source `Failed`, keeping its last cached data. Sources whose
-`issuedAt` is older than 6 h (regional), 14 h (SIAG KMOS, two runs per day) or 12 h (ECMWF) are marked `Stale`.
+`issuedAt` is older than 6 h (regional), 16 h (SIAG KMOS, two runs per day) or 12 h (ECMWF) are marked `Stale`.
 
 Room entities store one row per source with the mapped domain data serialised as JSON (single
 `TEXT` column) plus `issuedAt`, `fetchedAt`, `status`. Bulletin and observation each get one row.

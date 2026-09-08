@@ -14,9 +14,10 @@ enum class Source(val displayName: String, val regional: Boolean) {
     ICON_D2("DWD ICON-D2", true),
     ECMWF("ECMWF IFS", false);
 
-    /** Hours after the model run at which a cached forecast counts as stale. KMOS runs only twice a day. */
+    /** Hours after the model run at which a cached forecast counts as stale. KMOS runs only twice a day
+     * (02:00 and 14:00 local), so its threshold is the 12 h cadence plus margin for the publication delay. */
     val staleAfterHours: Int get() = when (this) {
-        SIAG_KMOS -> 14
+        SIAG_KMOS -> 16
         ECMWF -> 12
         else -> 6
     }

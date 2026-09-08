@@ -15,7 +15,7 @@
 - Fixed location: Dorf Tirol, lat `46.691`, lon `11.155`, ISTAT `021101`, SIAG station `23200MS`, SIAG district `2`, zone `Europe/Rome`.
 - Sources enum exactly: `SIAG_KMOS, GEOSPHERE_AROME, ICON_CH1, ICON_CH2, ICON_2I, ICON_D2, ECMWF`; regional = all but `ECMWF`.
 - Consensus rules (spec §4.3): median temp/wind/precip, band = min..max, ECMWF only when < 2 regional sources at that hour, precip prob = max of model probs else `round(100 * count(precip > 0.1) / count)`, condition = majority vote with tie → more severe, `agreement = 1 - clamp(spread/6, 0, 1)`, single source → agreement 0.5.
-- Stale thresholds: regional 6 h, SIAG KMOS 14 h (two runs per day), ECMWF 12 h. Station observation used as "now" only if fresher than 90 min. Auto-refresh on app open if cache older than 30 min. WorkManager period 60 min.
+- Stale thresholds: regional 6 h, SIAG KMOS 16 h (two runs per day), ECMWF 12 h. Station observation used as "now" only if fresher than 90 min. Auto-refresh on app open if cache older than 30 min. WorkManager period 60 min.
 - Languages: German default, Italian, English. All user-facing strings in `res/values`, `values-it`, `values-en` (German in default `values`).
 - Attribution text must appear on Home: "Daten: Landeswetterdienst Südtirol · GeoSphere Austria (CC BY 4.0) · MeteoSwiss, DWD, ARPAE, ECMWF via Open-Meteo".
 - Build machine: SDK at `/home/ben/Android/Sdk`, JDK `/usr/lib/jvm/java-21-openjdk`. `ANDROID_HOME` in the shell points at a broken SDK; always rely on `local.properties`.

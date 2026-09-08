@@ -3,6 +3,8 @@ package it.apexweather.data
 import androidx.test.core.app.ApplicationProvider
 import it.apexweather.Fixtures
 import it.apexweather.data.local.AppDatabase
+import it.apexweather.data.local.SourceForecastEntity
+import it.apexweather.data.local.WeatherDao
 import it.apexweather.data.remote.GeoSphereApi
 import it.apexweather.data.remote.GeoSphereResponse
 import it.apexweather.data.remote.KmosResponse
@@ -32,6 +34,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlin.coroutines.cancellation.CancellationException
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -43,8 +46,9 @@ class WeatherRepositoryTest {
             return Fixtures.json.decodeFromString(OpenMeteoResponse.serializer(), Fixtures.read("openmeteo.json"))
         }
     }
-    private class FakeGeoSphere(var fail: Boolean = false) : GeoSphereApi {
+    private class FakeGeoSphere(var fail: Boolean = false, var cancel: Boolean = false) : GeoSphereApi {
         override suspend fun forecast(latLon: String, parameters: String): GeoSphereResponse {
+            if (cancel) throw CancellationException("worker stopped")
             if (fail) throw IOException("geosphere down")
             return Fixtures.json.decodeFromString(GeoSphereResponse.serializer(), Fixtures.read("geosphere.json"))
         }
@@ -59,11 +63,23 @@ class WeatherRepositoryTest {
             return Fixtures.json.decodeFromString(SiagStationsResponse.serializer(), Fixtures.read("siag_stations.json"))
         }
     }
-    private class FakeOdh : OdhApi {
-        override suspend fun weather(language: String) =
-            Fixtures.json.decodeFromString(OdhWeatherResponse.serializer(), Fixtures.read("odh_weather_de.json"))
-        override suspend fun district(id: Int, language: String) =
-            Fixtures.json.decodeFromString(OdhDistrictResponse.serializer(), Fixtures.read("odh_district2_de.json"))
+    private class FakeOdh(var fail: Boolean = false) : OdhApi {
+        override suspend fun weather(language: String): OdhWeatherResponse {
+            if (fail) throw IOException("odh down")
+            return Fixtures.json.decodeFromString(OdhWeatherResponse.serializer(), Fixtures.read("odh_weather_de.json"))
+        }
+        override suspend fun district(id: Int, language: String): OdhDistrictResponse {
+            if (fail) throw IOException("odh down")
+            return Fixtures.json.decodeFromString(OdhDistrictResponse.serializer(), Fixtures.read("odh_district2_de.json"))
+        }
+    }
+
+    /** Stores everything except one source, which fails the way a full disk or a corrupt row would. */
+    private class FailingStoreDao(private val delegate: WeatherDao, private val failFor: String) : WeatherDao by delegate {
+        override suspend fun upsertForecast(entity: SourceForecastEntity) {
+            if (entity.source == failFor) throw IOException("disk full")
+            delegate.upsertForecast(entity)
+        }
     }
 
     private class MutableClock(var now: Instant) : Clock() {
@@ -76,12 +92,13 @@ class WeatherRepositoryTest {
     private val openMeteo = FakeOpenMeteo()
     private val geoSphere = FakeGeoSphere()
     private val siag = FakeSiag()
+    private val odh = FakeOdh()
     private val clock = MutableClock(Instant.parse("2026-09-08T14:00:00Z"))
     private lateinit var repo: WeatherRepository
 
     @Before fun setUp() {
         db = AppDatabase.inMemory(ApplicationProvider.getApplicationContext())
-        repo = WeatherRepository(db.weatherDao(), openMeteo, geoSphere, siag, FakeOdh(), Fixtures.json, clock)
+        repo = WeatherRepository(db.weatherDao(), openMeteo, geoSphere, siag, odh, Fixtures.json, clock)
     }
 
     @After fun tearDown() = db.close()
@@ -124,12 +141,52 @@ class WeatherRepositoryTest {
     @Test
     fun `all sources failing marks the refresh failed but keeps data`() = runTest {
         repo.refresh("de")
-        openMeteo.fail = true; geoSphere.fail = true; siag.fail = true
+        val firstRefresh = clock.now
+        openMeteo.fail = true; geoSphere.fail = true; siag.fail = true; odh.fail = true
+        clock.now = clock.now.plus(Duration.ofMinutes(30))
         val result = repo.refresh("de")
-        assertTrue(result.failed.size >= 3)
+        assertTrue(result.succeeded.isEmpty())
+        assertTrue(result.allFailed)
         val s = repo.snapshot("de").first()
-        assertEquals(Source.entries.toSet(), s.forecasts.keys)
-        assertNotNull(s.bulletin) // ODH still works
+        assertTrue(s.lastRefreshFailed)
+        assertEquals(firstRefresh, s.lastSuccessfulRefresh) // the failed attempt must not move it forward
+        assertEquals(Source.entries.toSet(), s.forecasts.keys) // cached forecasts survive
+        assertNotNull(s.bulletin)
+        assertTrue(s.status.values.all { it is SourceStatus.Failed })
+    }
+
+    @Test
+    fun `a store failure is isolated and the refresh still records its meta`() = runTest {
+        val failing = WeatherRepository(
+            FailingStoreDao(db.weatherDao(), Source.GEOSPHERE_AROME.name),
+            openMeteo, geoSphere, siag, odh, Fixtures.json, clock,
+        )
+        val result = failing.refresh("de")
+        assertEquals("store: disk full", result.failed["GEOSPHERE_AROME"])
+        val s = failing.snapshot("de").first()
+        assertEquals(Source.entries.toSet() - Source.GEOSPHERE_AROME, s.forecasts.keys) // the others still stored
+        assertNotNull(s.bulletin)
+        assertNotNull(s.observation)
+        assertEquals(clock.now, s.lastSuccessfulRefresh) // upsertMeta was not skipped
+        assertFalse(s.lastRefreshFailed)
+    }
+
+    @Test
+    fun `cancellation propagates and is never recorded as a failed refresh`() = runTest {
+        repo.refresh("de")
+        val firstRefresh = clock.now
+        geoSphere.cancel = true
+        clock.now = clock.now.plus(Duration.ofMinutes(30))
+        var thrown: Throwable? = null
+        try {
+            repo.refresh("de")
+        } catch (e: CancellationException) {
+            thrown = e
+        }
+        assertNotNull(thrown)
+        val s = repo.snapshot("de").first()
+        assertFalse(s.lastRefreshFailed) // no bogus Failed state from a cancelled worker
+        assertEquals(firstRefresh, s.lastSuccessfulRefresh)
     }
 
     @Test
