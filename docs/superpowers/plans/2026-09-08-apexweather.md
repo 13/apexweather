@@ -20,6 +20,7 @@
 - Attribution text must appear on Home: "Daten: Landeswetterdienst Südtirol · GeoSphere Austria (CC BY 4.0) · MeteoSwiss, DWD, ARPAE, ECMWF via Open-Meteo".
 - Build machine: SDK at `/home/ben/Android/Sdk`, JDK `/usr/lib/jvm/java-21-openjdk`. `ANDROID_HOME` in the shell points at a broken SDK; always rely on `local.properties`.
 - No `kapt`. KSP only. Do not apply `org.jetbrains.kotlin.android` to the app module (AGP 9 built-in Kotlin).
+- Device tests run on the phone only: prefix every `connectedDebugAndroidTest` invocation with `ANDROID_SERIAL=RZCXA1ZEXJE` (the attached emulator fails with an unrelated `InputManager.getInstance` error). Any Compose test that renders `SkyBackground` (directly or via `MainActivity`) must set `rule.mainClock.autoAdvance = false` before `setContent`/launch and advance the clock manually, because the sky's frame loop never lets the test rule become idle.
 - Commit after every task with a conventional-commit message. Test files live in `app/src/test` (JVM) and `app/src/androidTest` (device).
 
 ---
@@ -3595,7 +3596,7 @@ class SkyBackgroundTest {
 Run:
 ```bash
 ./gradlew :app:testDebugUnitTest --tests 'it.apexweather.ui.common.FormatTest' :app:assembleDebug --console=plain 2>&1 | tail -10
-./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.sky.SkyBackgroundTest --console=plain 2>&1 | tail -10
+ANDROID_SERIAL=RZCXA1ZEXJE ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.sky.SkyBackgroundTest --console=plain 2>&1 | tail -10
 ```
 Expected: both `BUILD SUCCESSFUL`. (If both the phone and the emulator are attached, Gradle runs on both; that is fine.)
 
@@ -4427,7 +4428,7 @@ class HomeScreenTest {
 Run:
 ```bash
 ./gradlew :app:testDebugUnitTest :app:assembleDebug --console=plain 2>&1 | tail -10
-./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.home.HomeScreenTest --console=plain 2>&1 | tail -10
+ANDROID_SERIAL=RZCXA1ZEXJE ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.home.HomeScreenTest --console=plain 2>&1 | tail -10
 adb -s RZCXA1ZEXJE install -r app/build/outputs/apk/debug/app-debug.apk && adb -s RZCXA1ZEXJE shell am start -n it.apexweather/.MainActivity
 sleep 8 && adb -s RZCXA1ZEXJE exec-out screencap -p > /tmp/apex_home.png
 ```
@@ -5014,7 +5015,7 @@ class CompareScreenTest {
 Run:
 ```bash
 ./gradlew :app:testDebugUnitTest --tests 'it.apexweather.ui.compare.*' :app:assembleDebug --console=plain 2>&1 | tail -8
-./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.compare.CompareScreenTest --console=plain 2>&1 | tail -8
+ANDROID_SERIAL=RZCXA1ZEXJE ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.compare.CompareScreenTest --console=plain 2>&1 | tail -8
 ```
 Expected: `BUILD SUCCESSFUL` for both.
 
@@ -5240,7 +5241,7 @@ class BulletinScreenTest {
 Run:
 ```bash
 ./gradlew :app:assembleDebug --console=plain 2>&1 | tail -6
-./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.bulletin.BulletinScreenTest --console=plain 2>&1 | tail -6
+ANDROID_SERIAL=RZCXA1ZEXJE ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.bulletin.BulletinScreenTest --console=plain 2>&1 | tail -6
 ```
 Expected: `BUILD SUCCESSFUL` for both.
 
@@ -5649,15 +5650,21 @@ class NavigationTest {
     @get:Rule(order = 0) val hilt = HiltAndroidRule(this)
     @get:Rule(order = 1) val rule = createAndroidComposeRule<MainActivity>()
 
-    @Before fun setUp() = hilt.inject()
+    @Before fun setUp() {
+        hilt.inject()
+        rule.mainClock.autoAdvance = false // the sky's frame loop never idles
+    }
+
+    private fun settle() = rule.mainClock.advanceTimeBy(1_000)
 
     @Test
     fun bottomBarSwitchesScreensAndSettingsOpens() {
-        rule.onNodeWithTag("nav_compare").performClick()
+        settle()
+        rule.onNodeWithTag("nav_compare").performClick(); settle()
         rule.onNodeWithTag("compare_chart").assertIsDisplayed()
-        rule.onNodeWithTag("nav_bulletin").performClick()
-        rule.onNodeWithTag("nav_home").performClick()
-        rule.onNodeWithTag("settings_button").performClick()
+        rule.onNodeWithTag("nav_bulletin").performClick(); settle()
+        rule.onNodeWithTag("nav_home").performClick(); settle()
+        rule.onNodeWithTag("settings_button").performClick(); settle()
         rule.onNodeWithTag("settings_sheet").assertIsDisplayed()
     }
 }
@@ -5668,7 +5675,7 @@ class NavigationTest {
 Run:
 ```bash
 ./gradlew :app:testDebugUnitTest :app:assembleDebug --console=plain 2>&1 | tail -8
-./gradlew :app:connectedDebugAndroidTest --console=plain 2>&1 | tail -12
+ANDROID_SERIAL=RZCXA1ZEXJE ./gradlew :app:connectedDebugAndroidTest --console=plain 2>&1 | tail -12
 adb -s RZCXA1ZEXJE install -r app/build/outputs/apk/debug/app-debug.apk && adb -s RZCXA1ZEXJE shell am start -n it.apexweather/.MainActivity
 sleep 8 && adb -s RZCXA1ZEXJE exec-out screencap -p > /tmp/apex_home.png
 adb -s RZCXA1ZEXJE shell input tap 540 2250 && sleep 2 && adb -s RZCXA1ZEXJE exec-out screencap -p > /tmp/apex_compare.png
@@ -6253,7 +6260,7 @@ git add -A && git commit -m "feat(widget): Glance home-screen widget in two size
 Run:
 ```bash
 ./gradlew clean :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease --console=plain 2>&1 | tail -15
-./gradlew :app:connectedDebugAndroidTest --console=plain 2>&1 | tail -15
+ANDROID_SERIAL=RZCXA1ZEXJE ./gradlew :app:connectedDebugAndroidTest --console=plain 2>&1 | tail -15
 ```
 Expected: `BUILD SUCCESSFUL` for all; the release APK builds with R8 (unsigned is fine). If R8 strips a kotlinx.serialization class, add the class to `proguard-rules.pro` with `-keep class it.apexweather.data.remote.** { *; }`.
 
@@ -6280,7 +6287,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Build/install: `./gradlew :app:assembleDebug` then `adb -s RZCXA1ZEXJE install -r app/build/outputs/apk/debug/app-debug.apk`
 - JVM tests: `./gradlew :app:testDebugUnitTest` (single class: `--tests 'it.apexweather.domain.ConsensusBlenderTest'`)
-- Device tests: `./gradlew :app:connectedDebugAndroidTest` (single class: `-Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.home.HomeScreenTest`)
+- Device tests: `ANDROID_SERIAL=RZCXA1ZEXJE ./gradlew :app:connectedDebugAndroidTest` (single class: `-Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.home.HomeScreenTest`)
 - Toolchain is pinned in `gradle.properties` (`org.gradle.java.home` = JDK 21) and `local.properties` (`sdk.dir`); the shell's `ANDROID_HOME` points at an incomplete SDK, ignore it.
 - AGP 9 built-in Kotlin: never apply `org.jetbrains.kotlin.android` in `app/build.gradle.kts`; KSP only, no kapt.
 
