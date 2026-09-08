@@ -23,6 +23,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -187,6 +188,17 @@ class WeatherRepositoryTest {
         val s = repo.snapshot("de").first()
         assertFalse(s.lastRefreshFailed) // no bogus Failed state from a cancelled worker
         assertEquals(firstRefresh, s.lastSuccessfulRefresh)
+    }
+
+    @Test
+    fun `the bulletin cache is per language`() = runTest {
+        repo.refresh("de")
+        assertNull(repo.snapshot("it").first().bulletin) // a German refresh never fills the Italian row
+        repo.refresh("it")
+        val italian = repo.snapshot("it").first().bulletin
+        assertNotNull(italian)
+        assertEquals("it", italian!!.language)
+        assertNotNull(repo.snapshot("de").first().bulletin) // the German row survives
     }
 
     @Test

@@ -106,7 +106,7 @@ fun ApexApp() {
         SettingsSheet(
             settings = settings,
             onLanguage = { l ->
-                settingsVm.setLanguage(l)
+                settingsVm.setLanguage(l) { homeVm.refresh() }
                 AppCompatDelegate.setApplicationLocales(l.tag?.let { LocaleListCompat.forLanguageTags(it) } ?: LocaleListCompat.getEmptyLocaleList())
             },
             onWindUnit = settingsVm::setWindUnit,

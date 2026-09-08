@@ -16,7 +16,12 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(private val repo: SettingsRepository) : ViewModel() {
     val settings: StateFlow<AppSettings> = repo.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
-    fun setLanguage(l: LanguageSetting) = viewModelScope.launch { repo.setLanguage(l) }
+    /** Persists the language and only then runs [then]; callers refresh from there, because the
+     * bulletin cache is keyed by language and a refresh started before the write would use the old one. */
+    fun setLanguage(l: LanguageSetting, then: () -> Unit = {}) = viewModelScope.launch {
+        repo.setLanguage(l)
+        then()
+    }
     fun setWindUnit(u: WindUnit) = viewModelScope.launch { repo.setWindUnit(u) }
     fun setAnimations(b: Boolean) = viewModelScope.launch { repo.setAnimations(b) }
 }
