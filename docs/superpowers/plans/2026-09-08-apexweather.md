@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Package / applicationId: `it.apexweather`. App name shown to users: `Apex Weather`.
-- `minSdk = 31`, `compileSdk = 36`, `targetSdk = 36`.
+- `minSdk = 31`, `compileSdk = 37` (newest libs require it), `targetSdk = 36`.
 - Fixed location: Dorf Tirol, lat `46.691`, lon `11.155`, ISTAT `021101`, SIAG station `23200MS`, SIAG district `2`, zone `Europe/Rome`.
 - Sources enum exactly: `SIAG_KMOS, GEOSPHERE_AROME, ICON_CH1, ICON_CH2, ICON_2I, ICON_D2, ECMWF`; regional = all but `ECMWF`.
 - Consensus rules (spec §4.3): median temp/wind/precip, band = min..max, ECMWF only when < 2 regional sources at that hour, precip prob = max of model probs else `round(100 * count(precip > 0.1) / count)`, condition = majority vote with tie → more severe, `agreement = 1 - clamp(spread/6, 0, 1)`, single source → agreement 0.5.
@@ -251,7 +251,7 @@ plugins {
 
 android {
     namespace = "it.apexweather"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "it.apexweather"

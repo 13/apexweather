@@ -20,7 +20,7 @@ Out of scope for v1: other locations, GPS, notifications/alerts, weather radar, 
 | Location | Dorf Tirol only, hardcoded |
 | Content | Now + 48 h hourly + 7 d daily; per-source comparison; official bulletin; widget |
 | Stack | Kotlin, Jetpack Compose, Material 3, Hilt, Retrofit + OkHttp + kotlinx.serialization, Room, WorkManager, Glance |
-| Min SDK | 31 (Android 12); target/compile SDK latest stable available locally (36) |
+| Min SDK | 31 (Android 12); compileSdk 37 (required by current AndroidX releases), targetSdk 36 |
 | Languages | German (default), Italian, English via `values-*` resources; bulletin fetched in app language |
 | Visual | Dynamic sky backgrounds (animated gradients + particles), dark-first, frosted cards |
 | Blending | Consensus median + min/max spread band |
