@@ -3501,7 +3501,7 @@ fun SkyBackground(palette: SkyPalette, animationsEnabled: Boolean, modifier: Mod
     val accent = Color.fromArgb(palette.accent)
 
     val system = remember(palette.particle, palette.density) { ParticleSystem(palette.particle, palette.density) }
-    var frame by mutableLongStateOf(0L)
+    var frame by remember { mutableLongStateOf(0L) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     if (animationsEnabled) {
