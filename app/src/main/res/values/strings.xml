@@ -43,4 +43,8 @@
     <string name="status_ok">Lauf %1$s</string>
     <string name="status_stale">veraltet (%1$s)</string>
     <string name="status_failed">Fehler: %1$s</string>
+    <string name="bulletin_title">Wetterbericht Südtirol</string>
+    <string name="bulletin_empty">Kein Wetterbericht geladen.</string>
+    <string name="bulletin_issued">Ausgegeben %1$s · Landeswetterdienst</string>
+    <string name="bulletin_district">BURGGRAFENAMT – MERAN UND UMGEBUNG</string>
 </resources>

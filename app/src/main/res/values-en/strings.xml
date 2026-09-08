@@ -43,4 +43,8 @@
     <string name="status_ok">run %1$s</string>
     <string name="status_stale">stale (%1$s)</string>
     <string name="status_failed">error: %1$s</string>
+    <string name="bulletin_title">South Tyrol bulletin</string>
+    <string name="bulletin_empty">No bulletin loaded.</string>
+    <string name="bulletin_issued">Issued %1$s · South Tyrol weather service</string>
+    <string name="bulletin_district">BURGGRAFENAMT – MERAN AND SURROUNDINGS</string>
 </resources>

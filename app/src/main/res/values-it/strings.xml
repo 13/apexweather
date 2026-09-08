@@ -43,4 +43,8 @@
     <string name="status_ok">run %1$s</string>
     <string name="status_stale">obsoleto (%1$s)</string>
     <string name="status_failed">errore: %1$s</string>
+    <string name="bulletin_title">Bollettino Alto Adige</string>
+    <string name="bulletin_empty">Nessun bollettino caricato.</string>
+    <string name="bulletin_issued">Emesso alle %1$s · Servizio Meteo provinciale</string>
+    <string name="bulletin_district">BURGRAVIATO – MERANO E DINTORNI</string>
 </resources>
