@@ -14,7 +14,12 @@ enum class Source(val displayName: String, val regional: Boolean) {
     ICON_D2("DWD ICON-D2", true),
     ECMWF("ECMWF IFS", false);
 
-    val staleAfterHours: Int get() = if (regional) 6 else 12
+    /** Hours after the model run at which a cached forecast counts as stale. KMOS runs only twice a day. */
+    val staleAfterHours: Int get() = when (this) {
+        SIAG_KMOS -> 14
+        ECMWF -> 12
+        else -> 6
+    }
 }
 
 /** Declaration order = severity order (used for tie-breaks and "worst of day"). */

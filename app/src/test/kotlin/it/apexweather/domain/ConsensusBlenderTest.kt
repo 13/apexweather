@@ -10,6 +10,13 @@ class ConsensusBlenderTest {
     private val blender = ConsensusBlender(ROME)
 
     @Test
+    fun `staleAfterHours is per source`() {
+        assertEquals(14, Source.SIAG_KMOS.staleAfterHours)
+        assertEquals(12, Source.ECMWF.staleAfterHours)
+        assertEquals(6, Source.ICON_D2.staleAfterHours)
+    }
+
+    @Test
     fun `median temperature and min max band from regional sources`() {
         val f = mapOf(
             Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))),

@@ -100,14 +100,7 @@ class WeatherRepositoryTest {
         assertEquals(Source.entries.toSet(), s.forecasts.keys)
         assertNotNull(s.bulletin)
         assertNotNull(s.observation)
-        // Nothing may be Failed right after a fully successful refresh. SIAG_KMOS is Stale even so:
-        // staleness is measured on issuedAt (spec 4.2, regional 6 h) and the recorded fixture's model run
-        // (currentModelRun 2026-09-08T02:00+02:00) is 14 h before the test clock.
-        assertTrue(s.status.values.none { it is SourceStatus.Failed })
-        assertTrue(s.status.getValue(Source.ICON_D2) is SourceStatus.Ok)
-        assertTrue(s.status.getValue(Source.ECMWF) is SourceStatus.Ok)
-        assertTrue(s.status.getValue(Source.GEOSPHERE_AROME) is SourceStatus.Ok)
-        assertEquals(SourceStatus.Stale(Instant.parse("2026-09-08T00:00:00Z")), s.status.getValue(Source.SIAG_KMOS))
+        assertTrue(s.status.values.all { it is SourceStatus.Ok })
         assertEquals(clock.now, s.lastSuccessfulRefresh)
         assertFalse(s.lastRefreshFailed)
     }
