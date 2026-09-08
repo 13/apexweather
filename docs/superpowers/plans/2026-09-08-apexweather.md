@@ -4178,7 +4178,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.apexweather.R
 import it.apexweather.domain.DorfTirol
@@ -4561,11 +4561,13 @@ import it.apexweather.domain.model.HourlyPoint
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.WeatherSnapshot
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -4649,7 +4651,7 @@ class CompareViewModel @Inject constructor(
         repository.snapshot(s.bulletinLanguage(Locale.getDefault().toLanguageTag())).map { snap ->
             CompareStateBuilder.build(snap, s, blender.blend(snap.forecasts), clock.instant())
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CompareUiState())
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CompareUiState())
 
     fun toggleSource(source: Source) = viewModelScope.launch {
         val current = settingsRepository.settings.first().compareSources
@@ -4782,7 +4784,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.apexweather.R
 import it.apexweather.data.CompareVariable
@@ -5104,7 +5106,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import it.apexweather.R
@@ -5281,6 +5283,7 @@ import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.SkyPalette
 import it.apexweather.ui.home.HomeStateBuilder
 import it.apexweather.ui.home.HomeUiState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
@@ -5288,6 +5291,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.Clock
@@ -5313,7 +5317,7 @@ class SkyViewModel @Inject constructor(
     ) { (settings, snapshot), _ ->
         val home = HomeStateBuilder.build(snapshot, settings, blender.blend(snapshot.forecasts), clock.instant())
         SkyUiState(home.palette, settings.animations)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SkyUiState())
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SkyUiState())
 }
 ```
 
@@ -5429,7 +5433,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.os.LocaleListCompat
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
