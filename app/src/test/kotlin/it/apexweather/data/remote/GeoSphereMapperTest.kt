@@ -4,6 +4,7 @@ import it.apexweather.Fixtures
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.Source
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -58,5 +59,52 @@ class GeoSphereMapperTest {
     fun `daily aggregated from hourly`() {
         assertTrue(fc.daily.size >= 2)
         assertTrue(fc.daily.all { it.maxC >= it.minC })
+    }
+
+    @Test
+    fun `all-null t2m fails loudly`() {
+        val allNullResp = GeoSphereResponse(
+            referenceTime = "2026-09-08T12:00+00:00",
+            timestamps = listOf("2026-09-08T13:00+00:00", "2026-09-08T14:00+00:00"),
+            features = listOf(
+                GeoSphereFeature(
+                    properties = GeoSphereProperties(
+                        parameters = mapOf(
+                            "t2m" to GeoSphereParam(data = listOf(null, null)),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val ex = assertThrows(IllegalStateException::class.java) {
+            GeoSphereMapper.map(allNullResp, fetchedAt)
+        }
+        assertTrue(ex.message.orEmpty().contains("t2m"))
+    }
+
+    @Test
+    fun `accumulated precipitation skips null entries without double counting`() {
+        val resp = GeoSphereResponse(
+            referenceTime = "2026-09-08T12:00+00:00",
+            timestamps = listOf(
+                "2026-09-08T13:00+00:00",
+                "2026-09-08T14:00+00:00",
+                "2026-09-08T15:00+00:00",
+            ),
+            features = listOf(
+                GeoSphereFeature(
+                    properties = GeoSphereProperties(
+                        parameters = mapOf(
+                            "t2m" to GeoSphereParam(data = listOf(10.0, 10.0, 10.0)),
+                            "rr_acc" to GeoSphereParam(data = listOf(1.0, null, 3.0)),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val result = GeoSphereMapper.map(resp, fetchedAt)
+        assertEquals(1.0, result.hourly[0].precipMm, 1e-9)
+        assertEquals(0.0, result.hourly[1].precipMm, 1e-9)
+        assertEquals(2.0, result.hourly[2].precipMm, 1e-9)
     }
 }

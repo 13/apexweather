@@ -43,9 +43,10 @@ object GeoSphereMapper {
         val zone = DorfTirol.ZONE
         val p = resp.features.firstOrNull()?.properties?.parameters ?: error("GeoSphere: no features")
         fun series(name: String): List<Double?> = p[name]?.data ?: emptyList()
-        val t2m = series("t2m").ifEmpty { error("GeoSphere: missing t2m") }
-        val rrAcc = series("rr_acc")
-        val snowAcc = series("snow_acc")
+        val t2m = series("t2m")
+        if (t2m.none { it != null }) error("GeoSphere: missing t2m")
+        val rrHourly = hourlyFromAccumulated(series("rr_acc"))
+        val snowHourly = hourlyFromAccumulated(series("snow_acc"))
         val rh = series("rh2m")
         val u = series("u10m"); val v = series("v10m")
         val ug = series("ugust"); val vg = series("vgust")
@@ -55,10 +56,11 @@ object GeoSphereMapper {
 
         val hourly = times.indices.mapNotNull { i ->
             val temp = t2m.getOrNull(i) ?: return@mapNotNull null
-            val precip = hourlyFromAccumulated(rrAcc, i)
-            val snow = hourlyFromAccumulated(snowAcc, i)
+            val precip = rrHourly.getOrNull(i) ?: 0.0
+            val snow = snowHourly.getOrNull(i) ?: 0.0
             val (wind, dir) = if (u.getOrNull(i) != null && v.getOrNull(i) != null) windFromUV(u[i]!!, v[i]!!) else 0.0 to null
             val gust = if (ug.getOrNull(i) != null && vg.getOrNull(i) != null) windFromUV(ug[i]!!, vg[i]!!).first else null
+            // tcc missing for an hour: assume half-covered sky rather than biasing clear or overcast.
             val cloud = tcc.getOrNull(i) ?: 0.5
             HourlyPoint(
                 time = times[i],
@@ -81,10 +83,23 @@ object GeoSphereMapper {
         )
     }
 
-    private fun hourlyFromAccumulated(acc: List<Double?>, i: Int): Double {
-        val cur = acc.getOrNull(i) ?: return 0.0
-        val prev = if (i == 0) 0.0 else (acc.getOrNull(i - 1) ?: 0.0)
-        return (cur - prev).coerceAtLeast(0.0)
+    /**
+     * Derives per-hour values from a monotonically accumulated series in one pass, tracking the
+     * last known accumulated value as a baseline. A null entry contributes 0.0 for that hour and
+     * leaves the baseline unchanged, so a later value diffs against the last real reading instead
+     * of treating the gap as zero accumulation.
+     */
+    private fun hourlyFromAccumulated(acc: List<Double?>): List<Double> {
+        var lastKnown = 0.0
+        return acc.map { cur ->
+            if (cur == null) {
+                0.0
+            } else {
+                val hourly = (cur - lastKnown).coerceAtLeast(0.0)
+                lastKnown = cur
+                hourly
+            }
+        }
     }
 
     /** u = eastward, v = northward component in m/s. Returns speed in km/h and meteorological "from" direction. */
