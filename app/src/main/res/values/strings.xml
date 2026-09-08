@@ -57,4 +57,5 @@
     <string name="setting_animations">Himmel animieren</string>
     <string name="refresh_now">Jetzt aktualisieren</string>
     <string name="about">Apex Weather %1$s · Dorf Tirol / Meran · Konsens aus 7 Wettermodellen</string>
+    <string name="widget_description">Aktuelle Temperatur und die nächsten Stunden für Dorf Tirol</string>
 </resources>

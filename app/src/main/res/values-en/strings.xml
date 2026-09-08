@@ -57,4 +57,5 @@
     <string name="setting_animations">Animate the sky</string>
     <string name="refresh_now">Refresh now</string>
     <string name="about">Apex Weather %1$s · Dorf Tirol / Meran · consensus of 7 weather models</string>
+    <string name="widget_description">Current temperature and next hours for Dorf Tirol</string>
 </resources>

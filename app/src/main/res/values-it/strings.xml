@@ -57,4 +57,5 @@
     <string name="setting_animations">Anima il cielo</string>
     <string name="refresh_now">Aggiorna ora</string>
     <string name="about">Apex Weather %1$s · Tirolo / Merano · consenso di 7 modelli meteo</string>
+    <string name="widget_description">Temperatura attuale e prossime ore per Tirolo</string>
 </resources>
