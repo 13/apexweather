@@ -94,7 +94,7 @@ fun BulletinContent(state: BulletinUiState) {
                 c.temperatures?.let { Spacer(Modifier.height(4.dp)); Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.75f)) }
                 c.mapImageUrl?.let {
                     Spacer(Modifier.height(10.dp))
-                    AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)))
+                    AsyncImage(model = it, contentDescription = c.title, contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)))
                 }
             }
         }
