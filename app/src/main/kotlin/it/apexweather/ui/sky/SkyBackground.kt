@@ -1,5 +1,6 @@
 package it.apexweather.ui.sky
 
+import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -18,6 +19,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -27,7 +29,9 @@ import it.apexweather.ui.theme.fromArgb
 
 /**
  * Full-screen animated sky: crossfading gradient, weather particles, ridge silhouette.
- * Particles only run while the lifecycle is RESUMED and [animationsEnabled] is true.
+ * Particles only run while the lifecycle is RESUMED, [animationsEnabled] is true and the system
+ * is not asking for reduced motion. The gradient crossfade always runs: it is a colour change,
+ * not motion.
  */
 @Composable
 fun SkyBackground(palette: SkyPalette, animationsEnabled: Boolean, modifier: Modifier = Modifier) {
@@ -42,7 +46,15 @@ fun SkyBackground(palette: SkyPalette, animationsEnabled: Boolean, modifier: Mod
     var frame by remember { mutableLongStateOf(0L) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    if (animationsEnabled) {
+    // Developer options "animator duration scale = off" and the accessibility "remove animations"
+    // setting both zero this scale; either one means the user asked for no motion.
+    val context = LocalContext.current
+    val reduceMotion = remember(context) {
+        runCatching { Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) }
+            .getOrDefault(1f) == 0f
+    }
+
+    if (animationsEnabled && !reduceMotion) {
         LaunchedEffect(system, lifecycleOwner) {
             lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 var last = 0L
