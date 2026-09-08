@@ -1,0 +1,54 @@
+package it.apexweather.ui.compare
+
+import it.apexweather.data.AppSettings
+import it.apexweather.data.CompareVariable
+import it.apexweather.domain.ConsensusBlender
+import it.apexweather.domain.forecast
+import it.apexweather.domain.hour
+import it.apexweather.domain.point
+import it.apexweather.domain.model.Source
+import it.apexweather.domain.model.SourceStatus
+import it.apexweather.domain.model.WeatherSnapshot
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class CompareStateBuilderTest {
+    private val forecasts = mapOf(
+        Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 72).map { point(it, 10.0, precip = 1.0, wind = 10.0) }),
+        Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 72).map { point(it, 14.0, precip = 3.0, wind = 20.0) }),
+        Source.ECMWF to forecast(Source.ECMWF, (0 until 168).map { point(it, 12.0) }),
+    )
+    private val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = forecasts, status = forecasts.keys.associateWith { SourceStatus.Ok(hour(0)) })
+    private val consensus = ConsensusBlender().blend(forecasts)
+
+    @Test
+    fun `series limited to selected sources and 72h window from now`() {
+        val settings = AppSettings(compareSources = setOf(Source.ICON_CH1, Source.ECMWF))
+        val s = CompareStateBuilder.build(snapshot, settings, consensus, hour(2).plusSeconds(1))
+        assertEquals(setOf(Source.ICON_CH1, Source.ECMWF), s.series.keys)
+        assertEquals(hour(2), s.series.getValue(Source.ICON_CH1).first().time)
+        assertTrue(s.series.getValue(Source.ECMWF).size <= 72)
+        assertEquals(hour(2), s.consensusLine.first().time)
+    }
+
+    @Test
+    fun `variable picks the right value`() {
+        val temp = CompareStateBuilder.build(snapshot, AppSettings(compareVariable = CompareVariable.TEMPERATURE), consensus, hour(0))
+        val wind = CompareStateBuilder.build(snapshot, AppSettings(compareVariable = CompareVariable.WIND), consensus, hour(0))
+        val precip = CompareStateBuilder.build(snapshot, AppSettings(compareVariable = CompareVariable.PRECIPITATION), consensus, hour(0))
+        assertEquals(14.0, temp.series.getValue(Source.ICON_D2).first().value, 0.0)
+        assertEquals(20.0, wind.series.getValue(Source.ICON_D2).first().value, 0.0)
+        assertEquals(3.0, precip.series.getValue(Source.ICON_D2).first().value, 0.0)
+    }
+
+    @Test
+    fun `day table has a row per consensus day and a cell per source`() {
+        val s = CompareStateBuilder.build(snapshot, AppSettings(), consensus, hour(0))
+        assertEquals(consensus.daily.size, s.dayRows.size)
+        val row0 = s.dayRows.first()
+        assertTrue(row0.cells.containsKey(Source.ICON_D2))
+        assertEquals(14.0, row0.cells.getValue(Source.ICON_D2).maxC, 0.0)
+        assertEquals(3, s.statuses.size)
+    }
+}

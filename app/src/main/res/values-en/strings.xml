@@ -32,4 +32,15 @@
     <string name="open_hour_details">Open hour details</string>
     <string name="per_source">PER SOURCE</string>
     <string name="attribution">Data: Landeswetterdienst Südtirol · GeoSphere Austria (CC BY 4.0) · MeteoSwiss, DWD, ARPAE, ECMWF via Open-Meteo</string>
+    <string name="compare_title">Source comparison</string>
+    <string name="compare_table">DAILY VALUES PER SOURCE (MIN / MAX, PRECIPITATION)</string>
+    <string name="compare_status">SOURCE STATUS</string>
+    <string name="consensus">Consensus</string>
+    <string name="var_temperature">Temperature</string>
+    <string name="var_precipitation">Precipitation</string>
+    <string name="var_wind">Wind</string>
+    <string name="status_none">never loaded</string>
+    <string name="status_ok">run %1$s</string>
+    <string name="status_stale">stale (%1$s)</string>
+    <string name="status_failed">error: %1$s</string>
 </resources>
