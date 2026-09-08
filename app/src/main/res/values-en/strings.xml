@@ -13,4 +13,21 @@
     <string name="cond_snow">Snow</string>
     <string name="cond_heavy_snow">Heavy snow</string>
     <string name="cond_thunderstorm">Thunderstorm</string>
+    <string name="feels_like">Feels like %1$s</string>
+    <string name="now_from_station">Now: station %1$s, %2$s</string>
+    <string name="now_from_consensus">Consensus of %1$d models</string>
+    <string name="updated_at">Updated %1$s</string>
+    <string name="section_hourly">NEXT 48 HOURS</string>
+    <string name="section_daily">7 DAYS</string>
+    <string name="section_bulletin">SOUTH TYROL WEATHER SERVICE</string>
+    <string name="now">Now</string>
+    <string name="today">Today</string>
+    <string name="offline_banner">Data from %1$s · offline</string>
+    <string name="offline_banner_no_time">No connection</string>
+    <string name="empty_title">No data yet</string>
+    <string name="empty_body">Apex Weather needs internet once to load the forecasts for Dorf Tirol.</string>
+    <string name="retry">Retry</string>
+    <string name="hour_summary">%1$s (%2$s to %3$s) · %4$s · %5$d %% · wind %6$s</string>
+    <string name="per_source">PER SOURCE</string>
+    <string name="attribution">Data: Landeswetterdienst Südtirol · GeoSphere Austria (CC BY 4.0) · MeteoSwiss, DWD, ARPAE, ECMWF via Open-Meteo</string>
 </resources>

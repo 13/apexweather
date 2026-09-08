@@ -13,4 +13,21 @@
     <string name="cond_snow">Neve</string>
     <string name="cond_heavy_snow">Neve forte</string>
     <string name="cond_thunderstorm">Temporale</string>
+    <string name="feels_like">Percepita %1$s</string>
+    <string name="now_from_station">Ora: stazione %1$s, %2$s</string>
+    <string name="now_from_consensus">Consenso di %1$d modelli</string>
+    <string name="updated_at">Aggiornato %1$s</string>
+    <string name="section_hourly">PROSSIME 48 ORE</string>
+    <string name="section_daily">7 GIORNI</string>
+    <string name="section_bulletin">SERVIZIO METEO PROVINCIALE</string>
+    <string name="now">Ora</string>
+    <string name="today">Oggi</string>
+    <string name="offline_banner">Dati delle %1$s · offline</string>
+    <string name="offline_banner_no_time">Nessuna connessione</string>
+    <string name="empty_title">Ancora nessun dato</string>
+    <string name="empty_body">Apex Weather ha bisogno di internet una volta per caricare le previsioni per Tirolo.</string>
+    <string name="retry">Riprova</string>
+    <string name="hour_summary">%1$s (da %2$s a %3$s) · %4$s · %5$d %% · vento %6$s</string>
+    <string name="per_source">PER FONTE</string>
+    <string name="attribution">Dati: Servizio Meteo Alto Adige · GeoSphere Austria (CC BY 4.0) · MeteoSwiss, DWD, ARPAE, ECMWF via Open-Meteo</string>
 </resources>

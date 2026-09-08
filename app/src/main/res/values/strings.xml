@@ -13,4 +13,21 @@
     <string name="cond_snow">Schnee</string>
     <string name="cond_heavy_snow">Starker Schneefall</string>
     <string name="cond_thunderstorm">Gewitter</string>
+    <string name="feels_like">Gefühlt %1$s</string>
+    <string name="now_from_station">Jetzt: Station %1$s, %2$s</string>
+    <string name="now_from_consensus">Konsens aus %1$d Modellen</string>
+    <string name="updated_at">Aktualisiert %1$s</string>
+    <string name="section_hourly">NÄCHSTE 48 STUNDEN</string>
+    <string name="section_daily">7 TAGE</string>
+    <string name="section_bulletin">LANDESWETTERDIENST</string>
+    <string name="now">Jetzt</string>
+    <string name="today">Heute</string>
+    <string name="offline_banner">Daten von %1$s · offline</string>
+    <string name="offline_banner_no_time">Keine Verbindung</string>
+    <string name="empty_title">Noch keine Daten</string>
+    <string name="empty_body">Apex Weather braucht einmal Internet, um die Vorhersagen für Dorf Tirol zu laden.</string>
+    <string name="retry">Erneut versuchen</string>
+    <string name="hour_summary">%1$s (%2$s bis %3$s) · %4$s · %5$d %% · Wind %6$s</string>
+    <string name="per_source">PRO QUELLE</string>
+    <string name="attribution">Daten: Landeswetterdienst Südtirol · GeoSphere Austria (CC BY 4.0) · MeteoSwiss, DWD, ARPAE, ECMWF via Open-Meteo</string>
 </resources>
