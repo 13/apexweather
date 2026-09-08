@@ -3,11 +3,15 @@ package it.apexweather.ui.home
 import it.apexweather.data.AppSettings
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.ParticleKind
+import it.apexweather.domain.ROME
+import it.apexweather.domain.SunPhase
+import it.apexweather.domain.T0
 import it.apexweather.domain.forecast
 import it.apexweather.domain.hour
 import it.apexweather.domain.point
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.ConsensusForecast
+import it.apexweather.domain.model.DailyPoint
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.StationObservation
 import it.apexweather.domain.model.WeatherSnapshot
@@ -17,6 +21,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Duration
+import java.time.LocalDate
 
 class HomeStateBuilderTest {
     private val blender = ConsensusBlender()
@@ -59,6 +64,23 @@ class HomeStateBuilderTest {
         val s = HomeStateBuilder.build(snapshot, AppSettings(), consensus, now = hour(5).plusSeconds(1))
         assertEquals(hour(5), s.upcomingHours.first().time)
         assertTrue(s.upcomingHours.size <= 48)
+    }
+
+    @Test
+    fun `phase at an hour tomorrow uses tomorrow sunrise and sunset`() {
+        val today = T0.atZone(ROME).toLocalDate()
+        val tomorrow = today.plusDays(1)
+        fun daily(d: LocalDate) = DailyPoint(
+            date = d, minC = 8.0, maxC = 20.0, precipMm = 0.0, condition = Condition.CLEAR,
+            sunrise = d.atTime(6, 0).atZone(ROME).toInstant(),
+            sunset = d.atTime(20, 0).atZone(ROME).toInstant(),
+        )
+        val withSun = forecasts.mapValues { (_, f) -> f.copy(daily = listOf(daily(today), daily(tomorrow))) }
+        val s = HomeStateBuilder.build(
+            WeatherSnapshot.EMPTY.copy(forecasts = withSun), AppSettings(), blender.blend(withSun), now = hour(3),
+        )
+        assertEquals(SunPhase.DAY, s.phaseAt(tomorrow.atTime(12, 0).atZone(ROME).toInstant()))
+        assertEquals(SunPhase.NIGHT, s.phaseAt(tomorrow.atTime(3, 0).atZone(ROME).toInstant()))
     }
 
     @Test

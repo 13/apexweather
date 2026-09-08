@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,6 +49,7 @@ import it.apexweather.ui.common.GlassCard
 import it.apexweather.ui.common.icon
 import it.apexweather.ui.common.label
 import it.apexweather.ui.theme.fromArgb
+import java.time.Instant
 import kotlin.math.roundToInt
 
 @Composable
@@ -85,8 +88,10 @@ fun AgreementBadge(halfWidth: Double, agreement: Float) {
         agreement >= 0.45f -> Color(0xFFFFD166)
         else -> Color(0xFFFF8A80)
     }
+    val description = stringResource(R.string.agreement_desc, (agreement * 100).roundToInt())
     Row(
-        Modifier.clip(CircleShape).background(color.copy(alpha = 0.18f)).padding(horizontal = 10.dp, vertical = 3.dp).testTag("agreement_badge"),
+        Modifier.clip(CircleShape).background(color.copy(alpha = 0.18f)).padding(horizontal = 10.dp, vertical = 3.dp)
+            .semantics { contentDescription = description }.testTag("agreement_badge"),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(Modifier.size(7.dp).clip(CircleShape).background(color))
@@ -97,7 +102,7 @@ fun AgreementBadge(halfWidth: Double, agreement: Float) {
 private val HourColumnWidth = 58.dp
 
 @Composable
-fun HourlySection(hours: List<ConsensusHour>, phaseAt: (java.time.Instant) -> SunPhase, accent: Color, onHourClick: (Int) -> Unit) {
+fun HourlySection(hours: List<ConsensusHour>, phaseAt: (Instant) -> SunPhase, accent: Color, onHourClick: (Instant) -> Unit) {
     if (hours.isEmpty()) return
     GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text(stringResource(R.string.section_hourly), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
@@ -105,15 +110,17 @@ fun HourlySection(hours: List<ConsensusHour>, phaseAt: (java.time.Instant) -> Su
         val scroll = rememberScrollState()
         Column(Modifier.horizontalScroll(scroll).testTag("hourly_strip")) {
             TemperatureCurve(hours, accent, Modifier.width(HourColumnWidth * hours.size).height(90.dp))
+            val openLabel = stringResource(R.string.open_hour_details)
             Row {
                 hours.forEachIndexed { i, h ->
                     Column(
-                        Modifier.width(HourColumnWidth).clickable { onHourClick(i) }.padding(vertical = 6.dp).testTag("hour_column_$i"),
+                        Modifier.width(HourColumnWidth).clickable(onClickLabel = openLabel) { onHourClick(h.time) }
+                            .padding(vertical = 6.dp).testTag("hour_column_$i"),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(if (i == 0) stringResource(R.string.now) else Format.hour(h.time, DorfTirol.ZONE), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.75f))
                         Spacer(Modifier.height(6.dp))
-                        Icon(h.condition.icon(phaseAt(h.time)), null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(h.condition.icon(phaseAt(h.time)), contentDescription = h.condition.label(), tint = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.height(6.dp))
                         Text(Format.temp(h.tempC), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(4.dp))
@@ -168,7 +175,7 @@ fun TemperatureCurve(hours: List<ConsensusHour>, accent: Color, modifier: Modifi
 }
 
 @Composable
-fun DailySection(days: List<ConsensusDay>, phase: SunPhase, accent: Color) {
+fun DailySection(days: List<ConsensusDay>, accent: Color) {
     if (days.isEmpty()) return
     val locale = LocalConfiguration.current.locales[0]
     val globalMin = days.minOf { it.minC }
@@ -182,7 +189,7 @@ fun DailySection(days: List<ConsensusDay>, phase: SunPhase, accent: Color) {
                     if (i == 0) stringResource(R.string.today) else Format.weekday(d.date, locale),
                     style = MaterialTheme.typography.bodyMedium, color = Color.White, modifier = Modifier.width(52.dp),
                 )
-                Icon(d.condition.icon(SunPhase.DAY), null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(d.condition.icon(SunPhase.DAY), contentDescription = d.condition.label(), tint = Color.White, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(if (d.precipMm >= 0.5) Format.mm(d.precipMm) else "", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5), modifier = Modifier.width(48.dp))
                 Text(Format.temp(d.minC), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.width(36.dp))
@@ -213,7 +220,8 @@ private fun RangeBar(min: Double, max: Double, gMin: Double, gMax: Double, accen
 @Composable
 private fun AgreementDot(agreement: Float) {
     val color = when { agreement >= 0.75f -> Color(0xFF7CE0A5); agreement >= 0.45f -> Color(0xFFFFD166); else -> Color(0xFFFF8A80) }
-    Box(Modifier.padding(start = 8.dp).size(8.dp).clip(CircleShape).background(color))
+    val description = stringResource(R.string.agreement_desc, (agreement * 100).roundToInt())
+    Box(Modifier.padding(start = 8.dp).size(8.dp).clip(CircleShape).background(color).semantics { contentDescription = description })
 }
 
 @Composable

@@ -29,7 +29,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,6 +47,7 @@ import it.apexweather.domain.model.ConsensusHour
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.label
 import it.apexweather.ui.theme.fromArgb
+import java.time.Instant
 
 @Composable
 fun HomeScreen(onOpenBulletin: () -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
@@ -58,7 +58,7 @@ fun HomeScreen(onOpenBulletin: () -> Unit, viewModel: HomeViewModel = hiltViewMo
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () -> Unit) {
-    var selectedHour by remember { mutableIntStateOf(-1) }
+    var selectedHour by remember { mutableStateOf<Instant?>(null) }
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(state.isEmpty) { if (!state.isEmpty) appeared = true }
     val accent = Color.fromArgb(state.palette.accent)
@@ -78,7 +78,7 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
                 }
                 item {
                     AnimatedVisibility(appeared, enter = fadeIn(tween(600, 100)) + slideInVertically(tween(600, 100)) { it / 4 }) {
-                        DailySection(state.days, state.phase, accent)
+                        DailySection(state.days, accent)
                     }
                 }
                 state.bulletin?.let { b ->
@@ -93,9 +93,9 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
         }
     }
 
-    val hour = state.upcomingHours.getOrNull(selectedHour)
+    val hour = selectedHour?.let { t -> state.upcomingHours.firstOrNull { it.time == t } }
     if (hour != null) {
-        ModalBottomSheet(onDismissRequest = { selectedHour = -1 }, containerColor = MaterialTheme.colorScheme.surface, modifier = Modifier.testTag("hour_detail_sheet")) {
+        ModalBottomSheet(onDismissRequest = { selectedHour = null }, containerColor = MaterialTheme.colorScheme.surface, modifier = Modifier.testTag("hour_detail_sheet")) {
             HourDetail(hour, state)
         }
     }

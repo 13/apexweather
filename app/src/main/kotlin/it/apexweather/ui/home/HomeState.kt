@@ -39,8 +39,15 @@ data class HomeUiState(
     val offline: Boolean = false,
     val settings: AppSettings = AppSettings(),
 ) {
-    /** Sun phase at an arbitrary instant, using today's sunrise/sunset (fallback 07–19 local). */
-    fun phaseAt(t: Instant): SunPhase = SunPhaseCalculator.phase(t, sunrise, sunset, DorfTirol.ZONE)
+    /**
+     * Sun phase at an arbitrary instant, using the sunrise/sunset of the local day [t] falls on,
+     * so hours beyond today still get a day/night icon of their own. Falls back to today's
+     * sunrise/sunset and finally to the calculator's 07–19 local rule.
+     */
+    fun phaseAt(t: Instant): SunPhase {
+        val day = days.firstOrNull { it.date == t.atZone(DorfTirol.ZONE).toLocalDate() }
+        return SunPhaseCalculator.phase(t, day?.sunrise ?: sunrise, day?.sunset ?: sunset, DorfTirol.ZONE)
+    }
 }
 
 object HomeStateBuilder {

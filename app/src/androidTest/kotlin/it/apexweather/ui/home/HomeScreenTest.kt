@@ -51,7 +51,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun offlineBannerAndEmptyState() {
+    fun offlineBannerShowsLastUpdateTime() {
         rule.setContent { ApexTheme { HomeContent(state.copy(offline = true, updatedAt = t0), onRefresh = {}, onOpenBulletin = {}) } }
         rule.onNodeWithTag("offline_banner").assertIsDisplayed()
     }
