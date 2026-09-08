@@ -24,7 +24,7 @@ class ParticleSystem(val kind: ParticleKind, density: Float, private val random:
             ParticleKind.CLOUDS -> (5 * density).toInt().coerceAtLeast(2)
             ParticleKind.RAIN -> (180 * density).toInt().coerceAtLeast(30)
             ParticleKind.SNOW -> (120 * density).toInt().coerceAtLeast(25)
-            ParticleKind.FOG -> 4
+            ParticleKind.FOG -> 4 // intentionally fixed; independent of density
             ParticleKind.LIGHTNING -> (160 * density).toInt().coerceAtLeast(40)
         }
         particles = List(count) { newParticle(kind, random, spawnAnywhere = true) }
