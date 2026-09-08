@@ -42,6 +42,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import it.apexweather.MainActivity
+import it.apexweather.R
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
 import it.apexweather.domain.ConsensusBlender
@@ -92,6 +93,7 @@ class ApexWidget : GlanceAppWidget() {
 private fun WidgetContent(state: WidgetState, background: Bitmap) {
     val size = LocalSize.current
     val white = ColorProvider(Color.White)
+    val isMedium = size.height >= ApexWidget.MEDIUM.height
     Box(GlanceModifier.fillMaxSize().cornerRadius(24.dp).clickable(actionStartActivity<MainActivity>())) {
         Image(ImageProvider(background), contentDescription = null, contentScale = ContentScale.FillBounds, modifier = GlanceModifier.fillMaxSize())
         Column(GlanceModifier.fillMaxSize().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -103,9 +105,15 @@ private fun WidgetContent(state: WidgetState, background: Bitmap) {
                 Column {
                     Text(DorfTirol.NAME, style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium))
                     Text(androidx.glance.LocalContext.current.getString(state.conditionRes), style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.8f)), fontSize = 12.sp))
+                    if (isMedium && state.updatedText.isNotEmpty()) {
+                        Text(
+                            androidx.glance.LocalContext.current.getString(R.string.updated_at, state.updatedText),
+                            style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.7f)), fontSize = 11.sp),
+                        )
+                    }
                 }
             }
-            if (size.height >= ApexWidget.MEDIUM.height && state.hours.isNotEmpty()) {
+            if (isMedium && state.hasData && state.hours.isNotEmpty()) {
                 Spacer(GlanceModifier.height(10.dp))
                 Row(GlanceModifier.fillMaxWidth()) {
                     state.hours.forEach { h ->

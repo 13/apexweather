@@ -45,16 +45,19 @@ fun Condition.labelRes(): Int = when (this) {
 }
 
 object WidgetStateBuilder {
-    fun build(home: HomeUiState, zone: ZoneId): WidgetState = WidgetState(
-        hasData = !home.isEmpty && home.heroTempC != null,
-        tempText = home.heroTempC?.let(Format::temp) ?: "–",
-        conditionRes = home.heroCondition.labelRes(),
-        iconRes = home.heroCondition.widgetIcon(home.phase),
-        hours = home.upcomingHours.drop(1).take(6).map { h ->
-            WidgetHour(Format.hour(h.time, zone), Format.temp(h.tempC), h.condition.widgetIcon(home.phaseAt(h.time)))
-        },
-        updatedText = home.updatedAt?.let { Format.time(it, zone) } ?: "",
-        topColor = home.palette.top,
-        bottomColor = home.palette.bottom,
-    )
+    fun build(home: HomeUiState, zone: ZoneId): WidgetState {
+        val hasData = !home.isEmpty && home.heroTempC != null
+        return WidgetState(
+            hasData = hasData,
+            tempText = home.heroTempC?.let(Format::temp) ?: "–",
+            conditionRes = if (hasData) home.heroCondition.labelRes() else R.string.empty_title,
+            iconRes = if (hasData) home.heroCondition.widgetIcon(home.phase) else R.drawable.ic_wx_cloud,
+            hours = if (hasData) home.upcomingHours.drop(1).take(6).map { h ->
+                WidgetHour(Format.hour(h.time, zone), Format.temp(h.tempC), h.condition.widgetIcon(home.phaseAt(h.time)))
+            } else emptyList(),
+            updatedText = home.updatedAt?.let { Format.time(it, zone) } ?: "",
+            topColor = home.palette.top,
+            bottomColor = home.palette.bottom,
+        )
+    }
 }
