@@ -10,7 +10,7 @@ enum class Source(val displayName: String, val regional: Boolean) {
     GEOSPHERE_AROME("GeoSphere AROME", true),
     ICON_CH1("MeteoSwiss ICON-CH1", true),
     ICON_CH2("MeteoSwiss ICON-CH2", true),
-    ICON_2I("ItaliaMeteo ICON-2I", true),
+    ICON_2I("ARPAE ICON-2I", true),
     ICON_D2("DWD ICON-D2", true),
     ECMWF("ECMWF IFS", false);
 

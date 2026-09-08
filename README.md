@@ -18,7 +18,7 @@ Room, so the app renders offline and says how old its data is.
 - [GeoSphere Austria](https://data.hub.geosphere.at/) — AROME nowcast/forecast, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 - [Open-Meteo](https://open-meteo.com/) (non-commercial use) for
   [MeteoSwiss](https://www.meteoswiss.admin.ch/) ICON-CH1 and ICON-CH2,
-  [ItaliaMeteo/ARPAE](https://www.italiameteo.org/) ICON-2I,
+  [ARPAE / ItaliaMeteo](https://www.italiameteo.org/) ICON-2I,
   [DWD](https://www.dwd.de/) ICON-D2 and [ECMWF](https://www.ecmwf.int/) IFS
 
 Weather icons and district maps in the bulletin are served by the Landeswetterdienst and shown with their
