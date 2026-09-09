@@ -20,8 +20,9 @@ val keystoreProps = Properties().apply {
     val f = rootProject.file("keystore/keystore.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
+// CI exports these even when the secret is unset, so an empty value means "absent".
 fun signingSecret(envName: String, propName: String): String? =
-    System.getenv(envName) ?: keystoreProps.getProperty(propName)
+    (System.getenv(envName) ?: keystoreProps.getProperty(propName))?.takeIf { it.isNotBlank() }
 
 val releaseStoreFile: String? = signingSecret("APEX_KEYSTORE_FILE", "storeFile")
 
