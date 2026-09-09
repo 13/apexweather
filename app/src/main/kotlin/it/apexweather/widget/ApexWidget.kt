@@ -47,6 +47,7 @@ import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.DorfTirol
+import it.apexweather.ui.common.Formats
 import it.apexweather.ui.home.HomeStateBuilder
 import kotlinx.coroutines.flow.first
 import java.time.Clock
@@ -70,7 +71,13 @@ class ApexWidget : GlanceAppWidget() {
         val settings = ep.settings().settings.first()
         val snapshot = ep.repository().snapshot(settings.bulletinLanguage(Locale.getDefault().toLanguageTag())).first()
         val home = HomeStateBuilder.build(snapshot, settings, ep.blender().blend(snapshot.forecasts), ep.clock().instant())
-        val state = WidgetStateBuilder.build(home, DorfTirol.ZONE)
+        // The widget renders outside the composition, so it resolves the reader's language and
+        // clock preference from its own context.
+        val formats = Formats(
+            context.resources.configuration.locales[0],
+            android.text.format.DateFormat.is24HourFormat(context),
+        )
+        val state = WidgetStateBuilder.build(home, DorfTirol.ZONE, formats)
         val background = gradientBitmap(state.topColor, state.bottomColor)
 
         provideContent { WidgetContent(state, background) }

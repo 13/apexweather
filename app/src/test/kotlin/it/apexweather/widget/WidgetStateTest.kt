@@ -11,20 +11,24 @@ import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.ui.common.Format
+import it.apexweather.ui.common.Formats
 import it.apexweather.ui.home.HomeStateBuilder
 import it.apexweather.ui.home.HomeUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class WidgetStateTest {
+    private val formats = Formats(Locale.GERMAN, use24Hour = true)
+
     @Test
     fun `builds temperature, six upcoming hours and icons`() {
         val f = mapOf(Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 24).map { point(it, 20.0 + it, condition = if (it < 3) Condition.RAIN else Condition.CLEAR) }))
         val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = f, lastSuccessfulRefresh = hour(0))
         val home = HomeStateBuilder.build(snapshot, AppSettings(), ConsensusBlender().blend(f), hour(0).plusSeconds(30))
-        val w = WidgetStateBuilder.build(home, DorfTirol.ZONE)
+        val w = WidgetStateBuilder.build(home, DorfTirol.ZONE, formats)
         assertTrue(w.hasData)
         assertEquals("20°", w.tempText)
         assertEquals(R.drawable.ic_wx_rain, w.iconRes)
@@ -32,12 +36,12 @@ class WidgetStateTest {
         assertEquals("03", w.hours[0].label) // hour(1) = 03:00 local
         assertEquals(R.drawable.ic_wx_moon, w.hours[2].iconRes) // hour(3) = 05:00 local, clear → night icon
         assertEquals(R.drawable.ic_wx_sun, w.hours[5].iconRes) // hour(6) = 08:00 local, clear → day icon
-        assertEquals(Format.time(hour(0), DorfTirol.ZONE), w.updatedText)
+        assertEquals(Format.time(hour(0), DorfTirol.ZONE, formats), w.updatedText)
     }
 
     @Test
     fun `empty home gives no-data widget`() {
-        val w = WidgetStateBuilder.build(HomeUiState(loading = false, isEmpty = true), DorfTirol.ZONE)
+        val w = WidgetStateBuilder.build(HomeUiState(loading = false, isEmpty = true), DorfTirol.ZONE, formats)
         assertFalse(w.hasData)
         assertEquals("–", w.tempText)
         assertEquals(R.string.empty_title, w.conditionRes)

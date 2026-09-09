@@ -4,9 +4,9 @@ import it.apexweather.R
 import it.apexweather.domain.SunPhase
 import it.apexweather.domain.model.Condition
 import it.apexweather.ui.common.Format
+import it.apexweather.ui.common.Formats
 import it.apexweather.ui.home.HomeUiState
 import java.time.ZoneId
-import java.util.Locale
 
 data class WidgetHour(val label: String, val tempText: String, val iconRes: Int)
 
@@ -46,17 +46,17 @@ fun Condition.labelRes(): Int = when (this) {
 }
 
 object WidgetStateBuilder {
-    fun build(home: HomeUiState, zone: ZoneId, locale: Locale = Locale.getDefault()): WidgetState {
+    fun build(home: HomeUiState, zone: ZoneId, formats: Formats): WidgetState {
         val hasData = !home.isEmpty && home.heroTempC != null
         return WidgetState(
             hasData = hasData,
-            tempText = home.heroTempC?.let(Format::temp) ?: "–",
+            tempText = home.heroTempC?.let { Format.temp(it, formats) } ?: "–",
             conditionRes = if (hasData) home.heroCondition.labelRes() else R.string.empty_title,
             iconRes = if (hasData) home.heroCondition.widgetIcon(home.phase) else R.drawable.ic_wx_cloud,
             hours = if (hasData) home.upcomingHours.drop(1).take(6).map { h ->
-                WidgetHour(Format.hour(h.time, zone), Format.temp(h.tempC), h.condition.widgetIcon(home.phaseAt(h.time)))
+                WidgetHour(Format.hour(h.time, zone, formats), Format.temp(h.tempC, formats), h.condition.widgetIcon(home.phaseAt(h.time)))
             } else emptyList(),
-            updatedText = home.updatedAt?.let { Format.timestamp(it, zone, home.now, locale) } ?: "",
+            updatedText = home.updatedAt?.let { Format.timestamp(it, zone, home.now, formats) } ?: "",
             topColor = home.palette.top,
             bottomColor = home.palette.bottom,
         )

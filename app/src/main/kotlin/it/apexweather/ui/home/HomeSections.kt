@@ -47,6 +47,7 @@ import it.apexweather.domain.model.Bulletin
 import it.apexweather.domain.model.ConsensusDay
 import it.apexweather.domain.model.ConsensusHour
 import it.apexweather.ui.common.Format
+import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.GlassCard
 import it.apexweather.ui.common.icon
 import it.apexweather.ui.common.label
@@ -58,10 +59,11 @@ import kotlin.math.roundToInt
 @Composable
 fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier) {
     val locale = LocalConfiguration.current.locales[0]
+    val formats = LocalFormats.current
     Column(modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.Start) {
         Text(DorfTirol.NAME, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
         Text(
-            text = state.heroTempC?.let(Format::temp) ?: "–",
+            text = state.heroTempC?.let { Format.temp(it, formats) } ?: "–",
             style = MaterialTheme.typography.displayLarge,
             color = Color.White,
             modifier = Modifier.testTag("hero_temp"),
@@ -72,16 +74,16 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            state.heroFeelsLikeC?.let { Text(stringResource(R.string.feels_like, Format.temp(it)), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f)) }
+            state.heroFeelsLikeC?.let { Text(stringResource(R.string.feels_like, Format.temp(it, formats)), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f)) }
             state.bandHalfWidth?.let { AgreementBadge(it, state.currentHour?.agreement ?: 0.5f) }
         }
         Spacer(Modifier.height(4.dp))
         val sourceCount = state.currentHour?.sourceCount ?: 0
-        val source = state.observation?.let { stringResource(R.string.now_from_station, it.stationName, Format.timestamp(it.time, DorfTirol.ZONE, state.now, locale)) }
+        val source = state.observation?.let { stringResource(R.string.now_from_station, it.stationName, Format.timestamp(it.time, DorfTirol.ZONE, state.now, formats)) }
             ?: pluralStringResource(R.plurals.now_from_consensus, sourceCount, sourceCount)
         Text(source, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.65f))
         state.updatedAt?.let {
-            Text(stringResource(R.string.updated_at, Format.timestamp(it, DorfTirol.ZONE, state.now, locale)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
+            Text(stringResource(R.string.updated_at, Format.timestamp(it, DorfTirol.ZONE, state.now, formats)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
         }
     }
 }
@@ -135,6 +137,7 @@ fun HourStrip(
 ) {
     if (hours.isEmpty()) return
     val scroll = rememberScrollState()
+    val formats = LocalFormats.current
     Column(modifier.horizontalScroll(scroll)) {
         TemperatureCurve(hours, accent, Modifier.width(HourColumnWidth * hours.size).height(90.dp))
         val openLabel = stringResource(R.string.open_hour_details)
@@ -143,8 +146,8 @@ fun HourStrip(
                 // clickable is what merges a column into one spoken node, so the inert strip has to
                 // say so itself — otherwise every hour is read as four unrelated fragments.
                 val spoken = stringResource(
-                    R.string.hour_column_desc, Format.hour(h.time, DorfTirol.ZONE),
-                    h.condition.label(), Format.temp(h.tempC), h.precipProb,
+                    R.string.hour_column_desc, Format.hour(h.time, DorfTirol.ZONE, formats),
+                    h.condition.label(), Format.temp(h.tempC, formats), h.precipProb,
                 )
                 val behaviour = if (onHourClick == null) Modifier.semantics(mergeDescendants = true) { contentDescription = spoken }
                 else Modifier.clickable(onClickLabel = openLabel) { onHourClick(h.time) }
@@ -154,13 +157,13 @@ fun HourStrip(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        if (i == 0 && labelFirstAsNow) stringResource(R.string.now) else Format.hour(h.time, DorfTirol.ZONE),
+                        if (i == 0 && labelFirstAsNow) stringResource(R.string.now) else Format.hour(h.time, DorfTirol.ZONE, formats),
                         style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.75f),
                     )
                     Spacer(Modifier.height(6.dp))
                     Icon(h.condition.icon(phaseAt(h.time)), contentDescription = h.condition.label(), tint = Color.White, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.height(6.dp))
-                    Text(Format.temp(h.tempC), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(Format.temp(h.tempC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
                     PrecipBar(h.precipMm, h.precipProb)
                 }
@@ -215,6 +218,7 @@ fun TemperatureCurve(hours: List<ConsensusHour>, accent: Color, modifier: Modifi
 fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate) -> Unit) {
     if (days.isEmpty()) return
     val locale = LocalConfiguration.current.locales[0]
+    val formats = LocalFormats.current
     val globalMin = days.minOf { it.minC }
     val globalMax = days.maxOf { it.maxC }
     GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("daily_list")) {
@@ -231,16 +235,16 @@ fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    if (i == 0) stringResource(R.string.today) else Format.weekday(d.date, locale),
+                    if (i == 0) stringResource(R.string.today) else Format.weekday(d.date, formats),
                     style = MaterialTheme.typography.bodyMedium, color = Color.White, modifier = Modifier.width(52.dp),
                 )
                 Icon(d.condition.icon(SunPhase.DAY), contentDescription = d.condition.label(), tint = Color.White, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(if (d.precipMm >= 0.5) Format.mm(d.precipMm) else "", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5), modifier = Modifier.width(48.dp))
-                Text(Format.temp(d.minC), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.width(36.dp))
+                Text(if (d.precipMm >= 0.5) Format.mm(d.precipMm, formats) else "", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5), modifier = Modifier.width(48.dp))
+                Text(Format.temp(d.minC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.width(36.dp))
                 RangeBar(d.minC, d.maxC, globalMin, globalMax, accent, Modifier.weight(1f).height(6.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(Format.temp(d.maxC), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(36.dp))
+                Text(Format.temp(d.maxC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(36.dp))
                 AgreementDot(d.agreement)
             }
         }

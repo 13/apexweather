@@ -19,6 +19,7 @@ import it.apexweather.R
 import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.model.Source
 import it.apexweather.ui.common.Format
+import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.SourceColors
 import java.time.Instant
 import kotlin.math.ceil
@@ -40,7 +41,7 @@ fun MultiLineChart(
     variableName: String = "",
     modifier: Modifier = Modifier,
 ) {
-    val locale = LocalConfiguration.current.locales[0]
+    val formats = LocalFormats.current
     val labelPaint = remember {
         android.graphics.Paint().apply { color = android.graphics.Color.argb(160, 255, 255, 255); textSize = 28f; isAntiAlias = true }
     }
@@ -75,7 +76,7 @@ fun MultiLineChart(
         var t = from
         while (!t.isAfter(from.plusSeconds(hours * 3600))) {
             val z = t.atZone(DorfTirol.ZONE)
-            val label = if (z.hour == 0) Format.weekday(z.toLocalDate(), locale) else "${z.hour}h"
+            val label = if (z.hour == 0) Format.weekday(z.toLocalDate(), formats) else "${z.hour}h"
             drawContext.canvas.nativeCanvas.drawText(label, x(t) - 12f, size.height - 8f, labelPaint)
             drawLine(Color.White.copy(alpha = 0.06f), Offset(x(t), top), Offset(x(t), bottom), strokeWidth = 1f)
             t = t.plusSeconds(12 * 3600)
