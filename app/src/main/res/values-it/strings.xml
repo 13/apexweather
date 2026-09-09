@@ -89,4 +89,27 @@
         <item quantity="many">%1$d gradi dal consenso</item>
         <item quantity="other">%1$d gradi dal consenso</item>
     </plurals>
+
+    <!-- In-app update, all of it driven by the button in the settings sheet. -->
+    <string name="update_check">Cerca aggiornamenti</string>
+    <string name="update_checking">Ricerca …</string>
+    <string name="update_up_to_date">La versione %1$s è la più recente</string>
+    <string name="update_available">Versione %1$s disponibile · %2$s</string>
+    <string name="update_download">Scarica</string>
+    <string name="update_downloading">Scaricamento %1$s …</string>
+    <string name="update_ready">Versione %1$s pronta</string>
+    <string name="update_ready_unverified">Versione %1$s pronta · pubblicata senza checksum</string>
+    <string name="update_install">Installa</string>
+    <string name="update_installing">Android chiederà la conferma</string>
+    <string name="update_needs_permission">Android deve consentire ad Apex Weather di installare app</string>
+    <string name="update_grant_permission">Consenti</string>
+    <string name="update_open_release">Apri la pagina del rilascio</string>
+    <string name="update_failed_network">GitHub non raggiungibile</string>
+    <string name="update_failed_no_apk">Questo rilascio non contiene un APK</string>
+    <string name="update_failed_version">Numero di versione non leggibile</string>
+    <string name="update_failed_digest">Il file scaricato non corrisponde al checksum</string>
+    <string name="update_failed_storage">Impossibile salvare il file</string>
+    <string name="update_install_failed">Installazione non riuscita: %1$s</string>
+    <string name="update_install_failed_unknown">Installazione non riuscita</string>
+    <string name="update_retry">Riprova</string>
 </resources>

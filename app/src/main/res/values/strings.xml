@@ -88,4 +88,27 @@
     <!-- The place itself and the preview's sample reading: the same in every language. -->
     <string name="location_name" translatable="false">Dorf Tirol</string>
     <string name="widget_preview_temp" translatable="false">18°</string>
+
+    <!-- In-app update, all of it driven by the button in the settings sheet. -->
+    <string name="update_check">Nach Update suchen</string>
+    <string name="update_checking">Suche …</string>
+    <string name="update_up_to_date">Version %1$s ist die neueste</string>
+    <string name="update_available">Version %1$s verfügbar · %2$s</string>
+    <string name="update_download">Herunterladen</string>
+    <string name="update_downloading">Lädt %1$s …</string>
+    <string name="update_ready">Version %1$s bereit</string>
+    <string name="update_ready_unverified">Version %1$s bereit · ohne Prüfsumme veröffentlicht</string>
+    <string name="update_install">Installieren</string>
+    <string name="update_installing">Android fragt gleich nach der Bestätigung</string>
+    <string name="update_needs_permission">Android muss Apex Weather erlauben, Apps zu installieren</string>
+    <string name="update_grant_permission">Erlauben</string>
+    <string name="update_open_release">Release-Seite öffnen</string>
+    <string name="update_failed_network">GitHub nicht erreichbar</string>
+    <string name="update_failed_no_apk">Dieses Release enthält kein APK</string>
+    <string name="update_failed_version">Versionsnummer nicht lesbar</string>
+    <string name="update_failed_digest">Die geladene Datei stimmt nicht mit der Prüfsumme überein</string>
+    <string name="update_failed_storage">Die Datei konnte nicht gespeichert werden</string>
+    <string name="update_install_failed">Installation fehlgeschlagen: %1$s</string>
+    <string name="update_install_failed_unknown">Installation fehlgeschlagen</string>
+    <string name="update_retry">Erneut versuchen</string>
 </resources>

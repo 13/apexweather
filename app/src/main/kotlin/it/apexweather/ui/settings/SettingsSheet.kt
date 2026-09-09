@@ -40,6 +40,12 @@ fun SettingsSheet(
     onAnimations: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onDismiss: () -> Unit,
+    /**
+     * The in-app update row, passed in as a slot so this file imports nothing from the update
+     * package. That keeps the feature removable in one piece, which matters because the permission
+     * it needs is restricted on the Play Store.
+     */
+    updateSection: @Composable () -> Unit = {},
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -75,6 +81,8 @@ fun SettingsSheet(
             }
 
             Button(onClick = { onRefresh(); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.refresh_now)) }
+
+            updateSection()
 
             Spacer(Modifier.height(4.dp))
             Text(stringResource(R.string.about, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyMedium)

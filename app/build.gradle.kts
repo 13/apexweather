@@ -10,8 +10,10 @@ plugins {
 }
 
 // The release workflow stamps the git tag in with -PapexVersionName / -PapexVersionCode.
-val apexVersionName: String = providers.gradleProperty("apexVersionName").getOrElse("0.1.0")
-val apexVersionCode: Int = providers.gradleProperty("apexVersionCode").map(String::toInt).getOrElse(1)
+// Kept level with the newest published release, so a local build does not claim to be older than
+// what is on GitHub and the updater does not offer a version the developer already has.
+val apexVersionName: String = providers.gradleProperty("apexVersionName").getOrElse("0.2.0")
+val apexVersionCode: Int = providers.gradleProperty("apexVersionCode").map(String::toInt).getOrElse(200)
 
 // A real signing key, when one exists: environment variables on CI, or an
 // untracked keystore/keystore.properties locally. Without either, both build
@@ -54,6 +56,9 @@ android {
         versionName = apexVersionName
         testInstrumentationRunner = "it.apexweather.HiltTestRunner"
 
+        // Where the in-app updater looks for releases. Here rather than in Kotlin so the repo is
+        // named once, beside the version it is compared against.
+        buildConfigField("String", "UPDATE_REPO", "\"13/apexweather\"")
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
         buildConfigField("String", "GIT_DATE", "\"$gitDate\"")
     }

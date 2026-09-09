@@ -85,4 +85,27 @@
         <item quantity="one">%1$d degree from the consensus</item>
         <item quantity="other">%1$d degrees from the consensus</item>
     </plurals>
+
+    <!-- In-app update, all of it driven by the button in the settings sheet. -->
+    <string name="update_check">Check for updates</string>
+    <string name="update_checking">Checking …</string>
+    <string name="update_up_to_date">Version %1$s is the newest</string>
+    <string name="update_available">Version %1$s available · %2$s</string>
+    <string name="update_download">Download</string>
+    <string name="update_downloading">Downloading %1$s …</string>
+    <string name="update_ready">Version %1$s ready</string>
+    <string name="update_ready_unverified">Version %1$s ready · published without a checksum</string>
+    <string name="update_install">Install</string>
+    <string name="update_installing">Android will ask you to confirm</string>
+    <string name="update_needs_permission">Android has to let Apex Weather install apps</string>
+    <string name="update_grant_permission">Allow</string>
+    <string name="update_open_release">Open the release page</string>
+    <string name="update_failed_network">Could not reach GitHub</string>
+    <string name="update_failed_no_apk">This release carries no APK</string>
+    <string name="update_failed_version">Could not read the version number</string>
+    <string name="update_failed_digest">The downloaded file does not match its checksum</string>
+    <string name="update_failed_storage">The file could not be saved</string>
+    <string name="update_install_failed">Install failed: %1$s</string>
+    <string name="update_install_failed_unknown">Install failed</string>
+    <string name="update_retry">Try again</string>
 </resources>

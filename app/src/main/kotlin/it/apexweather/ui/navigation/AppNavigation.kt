@@ -43,6 +43,7 @@ import it.apexweather.ui.compare.CompareScreen
 import it.apexweather.ui.home.HomeScreen
 import it.apexweather.ui.home.HomeViewModel
 import it.apexweather.ui.settings.SettingsSheet
+import it.apexweather.update.UpdateSection
 import it.apexweather.ui.settings.SettingsViewModel
 import it.apexweather.ui.sky.SkyBackground
 import it.apexweather.ui.sky.SkyViewModel
@@ -113,6 +114,7 @@ fun ApexApp() {
             onAnimations = settingsVm::setAnimations,
             onRefresh = homeVm::refresh,
             onDismiss = { settingsOpen = false },
+            updateSection = { UpdateSection() },
         )
     }
 }
