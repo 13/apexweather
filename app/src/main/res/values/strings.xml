@@ -67,4 +67,6 @@
     <string name="compare_cell_desc">%1$s, %2$s: %3$s bis %4$s, %5$s, %6$d Grad vom Konsens entfernt</string>
     <string name="compare_cell_missing">%1$s: keine Vorhersage für %2$s</string>
     <string name="compare_chart_desc">%1$s der nächsten %2$d Stunden, %3$s bis %4$s, %5$d Modelle plus Konsens</string>
+    <string name="about_build">Version %1$s (%2$d) · %3$s</string>
+    <string name="about_commit">Commit %1$s · %2$s</string>
 </resources>

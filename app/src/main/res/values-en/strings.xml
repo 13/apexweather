@@ -67,4 +67,6 @@
     <string name="compare_cell_desc">%1$s, %2$s: %3$s to %4$s, %5$s, %6$d degrees from the consensus</string>
     <string name="compare_cell_missing">%1$s: no forecast for %2$s</string>
     <string name="compare_chart_desc">%1$s over the next %2$d hours, %3$s to %4$s, %5$d models plus the consensus</string>
+    <string name="about_build">Version %1$s (%2$d) · %3$s</string>
+    <string name="about_commit">Commit %1$s · %2$s</string>
 </resources>

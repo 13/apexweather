@@ -1,6 +1,7 @@
 package it.apexweather.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -77,6 +78,19 @@ fun SettingsSheet(
 
             Spacer(Modifier.height(4.dp))
             Text(stringResource(R.string.about, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyMedium)
+            // Selectable so the exact build can be copied into a bug report.
+            SelectionContainer {
+                Column(Modifier.testTag("about_build")) {
+                    Text(
+                        stringResource(R.string.about_build, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE, BuildConfig.BUILD_TYPE),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                    Text(
+                        stringResource(R.string.about_commit, BuildConfig.GIT_HASH, BuildConfig.GIT_DATE),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
             Text(stringResource(R.string.attribution), style = MaterialTheme.typography.labelSmall)
         }
     }

@@ -26,6 +26,17 @@ fun signingSecret(envName: String, propName: String): String? =
 
 val releaseStoreFile: String? = signingSecret("APEX_KEYSTORE_FILE", "storeFile")
 
+// Which commit a build came from, for bug reports. Deliberately the commit's own hash and date
+// rather than the wall clock: a build timestamp would change on every single build and force
+// BuildConfig, and everything that reads it, to recompile each time.
+fun git(vararg args: String): String? = runCatching {
+    ProcessBuilder("git", *args).directory(rootDir).start()
+        .inputStream.bufferedReader().readText().trim()
+}.getOrNull()?.takeIf { it.isNotEmpty() }
+
+val gitHash: String = git("rev-parse", "--short", "HEAD") ?: "unknown"
+val gitDate: String = git("show", "-s", "--format=%cs", "HEAD") ?: "unknown"
+
 // Names the outputs ApexWeather-<variant>.apk instead of app-<variant>.apk.
 base {
     archivesName.set("ApexWeather")
@@ -42,6 +53,9 @@ android {
         versionCode = apexVersionCode
         versionName = apexVersionName
         testInstrumentationRunner = "it.apexweather.HiltTestRunner"
+
+        buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
+        buildConfigField("String", "GIT_DATE", "\"$gitDate\"")
     }
 
     signingConfigs {
