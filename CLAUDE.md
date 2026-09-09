@@ -32,9 +32,11 @@ Single module, package `it.apexweather`, fixed location Dorf Tirol (constants in
   emulator); run them locally against the phone.
 - `.github/workflows/release.yml` runs on a `v*` tag and publishes `ApexWeather-<version>.apk` to a GitHub
   release. `base { archivesName = "ApexWeather" }` in `app/build.gradle.kts` is what puts the app name in
-  the file; `-PapexVersionName` / `-PapexVersionCode` stamp the tag into the build. Signing is optional and
-  driven by `APEX_KEYSTORE_*` env vars (repository secrets on CI, `keystore/keystore.properties` locally);
-  without them the release APK is unsigned and the asset gets an `-unsigned` suffix.
+  the file; `-PapexVersionName` / `-PapexVersionCode` stamp the tag into the build.
+- Both build types sign with `tools/debug.keystore` (standard Android debug credentials, committed on
+  purpose, copied from Apex Maps) so a debug build updates a sideloaded release build in place. A real key
+  overrides it through the `APEX_KEYSTORE_*` env vars or `keystore/keystore.properties`. Do not ship the
+  debug-signed APK to a store.
 - The launcher icon is the Apex Maps A-sharp glyph at the same scale and translate as that app's icon, so
   the two sit at identical optical size; only the palette differs. Source copy: `assets/apexmaps-A-sharp-source.svg`.
 

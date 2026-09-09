@@ -13,8 +13,9 @@ plugins {
 val apexVersionName: String = providers.gradleProperty("apexVersionName").getOrElse("0.1.0")
 val apexVersionCode: Int = providers.gradleProperty("apexVersionCode").map(String::toInt).getOrElse(1)
 
-// Signing material comes from the environment on CI, or from an untracked
-// keystore/keystore.properties locally. Without either, the release build is unsigned.
+// A real signing key, when one exists: environment variables on CI, or an
+// untracked keystore/keystore.properties locally. Without either, both build
+// types fall back to the repo keystore below.
 val keystoreProps = Properties().apply {
     val f = rootProject.file("keystore/keystore.properties")
     if (f.exists()) f.inputStream().use { load(it) }
@@ -43,12 +44,27 @@ android {
     }
 
     signingConfigs {
+        // Repo-local keystore holding the standard Android debug credentials, so it
+        // is not a secret. Copied from Apex Maps, which signs this way on purpose:
+        // every machine and both build types sign identically, so a debug build
+        // updates a sideloaded release build in place instead of failing on a
+        // signature mismatch. It is not a distribution key — anyone can produce an
+        // APK with this signature, so Play Store builds need a real one.
+        getByName("debug") {
+            storeFile = rootProject.file("tools/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            // v1 (JAR) signing only matters below Android 7; minSdk is 31.
+            enableV1Signing = false
+        }
         if (releaseStoreFile != null) {
             create("release") {
                 storeFile = file(releaseStoreFile)
                 storePassword = signingSecret("APEX_KEYSTORE_PASSWORD", "storePassword")
                 keyAlias = signingSecret("APEX_KEY_ALIAS", "keyAlias")
                 keyPassword = signingSecret("APEX_KEY_PASSWORD", "keyPassword")
+                enableV1Signing = false
             }
         }
     }
@@ -57,7 +73,7 @@ android {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.findByName("release")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {

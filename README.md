@@ -50,10 +50,16 @@ Pushing a `v*` tag builds the release APK and publishes it as `ApexWeather-<vers
 git tag v1.0.0 && git push origin v1.0.0
 ```
 
-The workflow signs the APK when the repository has the `APEX_KEYSTORE_BASE64`, `APEX_KEYSTORE_PASSWORD`,
-`APEX_KEY_ALIAS` and `APEX_KEY_PASSWORD` secrets, and otherwise publishes it with an `-unsigned` suffix.
 The version in the tag becomes the `versionName`, and `versionCode` is derived from it (1.2.3 → 10203).
 Locally the same override works with `-PapexVersionName=1.0.0 -PapexVersionCode=10000`.
+
+Both build types are signed with `tools/debug.keystore`, the standard Android debug credentials, copied
+from Apex Maps which signs the same way: every machine signs identically, so a debug build updates a
+sideloaded release build in place instead of failing on a signature mismatch. That keystore is not a
+distribution key — anyone can produce an APK with the same signature, so a Play Store build needs a real
+one. Supply it through `APEX_KEYSTORE_FILE`, `APEX_KEYSTORE_PASSWORD`, `APEX_KEY_ALIAS` and
+`APEX_KEY_PASSWORD` (repository secrets `APEX_KEYSTORE_BASE64` and the passwords on CI, or an untracked
+`keystore/keystore.properties` locally) and the release build picks it up instead.
 
 ## Logo
 
