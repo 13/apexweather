@@ -47,9 +47,12 @@ import it.apexweather.domain.SunPhase
 import it.apexweather.domain.model.Bulletin
 import it.apexweather.domain.model.ConsensusDay
 import it.apexweather.domain.model.ConsensusHour
+import it.apexweather.domain.model.StationObservation
+import it.apexweather.domain.model.Warning
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.GlassCard
+import it.apexweather.ui.common.color
 import it.apexweather.ui.common.iconRes
 import it.apexweather.ui.common.label
 import it.apexweather.ui.theme.fromArgb
@@ -76,12 +79,18 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             state.heroFeelsLikeC?.let { Text(stringResource(R.string.feels_like, Format.temp(it, formats)), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f)) }
-            state.bandHalfWidth?.let { AgreementBadge(it, state.currentHour?.agreement ?: 0.5f) }
+            state.bandHalfWidth?.let { AgreementBadge(it, state.currentHour?.agreement ?: 0.5f, sourceCount = state.currentHour?.sourceCount ?: 0) }
         }
         Spacer(Modifier.height(4.dp))
         val sourceCount = state.currentHour?.sourceCount ?: 0
-        val source = state.observation?.let { stringResource(R.string.now_from_station, it.stationName, Format.timestamp(it.time, DorfTirol.ZONE, state.now, formats)) }
-            ?: pluralStringResource(R.plurals.now_from_consensus, sourceCount, sourceCount)
+        // A moved reading has to say it was moved, and by how much: it is still a measurement, but
+        // not one taken where the reader is standing.
+        val source = state.observation?.let { obs ->
+            val at = Format.timestamp(obs.time, DorfTirol.ZONE, state.now, formats)
+            state.heroAdjustmentC
+                ?.let { stringResource(R.string.now_from_station_adjusted, obs.stationName, at, Format.tempDelta(it, formats)) }
+                ?: stringResource(R.string.now_from_station, obs.stationName, at)
+        } ?: pluralStringResource(R.plurals.now_from_consensus, sourceCount, sourceCount)
         Text(source, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.65f))
         state.updatedAt?.let {
             Text(stringResource(R.string.updated_at, Format.timestamp(it, DorfTirol.ZONE, state.now, formats)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
@@ -94,17 +103,24 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier) {
  * a day has no single band to quote, so it passes [showSpread] false and shows the dot alone.
  */
 @Composable
-fun AgreementBadge(halfWidth: Double, agreement: Float, showSpread: Boolean = true, tag: String = "agreement_badge") {
-    val color = agreementColor(agreement)
-    val description = stringResource(R.string.agreement_desc, (agreement * 100).roundToInt())
+fun AgreementBadge(halfWidth: Double, agreement: Float, sourceCount: Int = 0, showSpread: Boolean = true, tag: String = "agreement_badge") {
+    // One model has nothing to agree with. Saying "50 %" there would invent a comparison that never
+    // happened, which is exactly what the later days of the week are: ECMWF on its own.
+    val single = sourceCount == 1
+    val color = if (single) SingleModelColor else agreementColor(agreement)
+    val description = if (single) stringResource(R.string.agreement_single)
+    else stringResource(R.string.agreement_desc, (agreement * 100).roundToInt())
     Row(
         Modifier.clip(CircleShape).background(color.copy(alpha = 0.18f)).padding(horizontal = 10.dp, vertical = 3.dp)
             .semantics { contentDescription = description }.testTag(tag),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(Modifier.size(7.dp).clip(CircleShape).background(color))
-        if (showSpread) Text("±${halfWidth.roundToInt()}°", style = MaterialTheme.typography.labelSmall, color = Color.White)
-        else Text(stringResource(R.string.agreement_short, (agreement * 100).roundToInt()), style = MaterialTheme.typography.labelSmall, color = Color.White)
+        when {
+            single -> Text(stringResource(R.string.agreement_single), style = MaterialTheme.typography.labelSmall, color = Color.White)
+            showSpread -> Text("±${halfWidth.roundToInt()}°", style = MaterialTheme.typography.labelSmall, color = Color.White)
+            else -> Text(stringResource(R.string.agreement_short, (agreement * 100).roundToInt()), style = MaterialTheme.typography.labelSmall, color = Color.White)
+        }
     }
 }
 
@@ -223,7 +239,7 @@ fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate
     val globalMin = days.minOf { it.minC }
     val globalMax = days.maxOf { it.maxC }
     GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("daily_list")) {
-        Text(stringResource(R.string.section_daily), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+        Text(stringResource(R.string.section_daily_long), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
         Spacer(Modifier.height(8.dp))
         val openLabel = stringResource(R.string.open_day_details)
         days.forEachIndexed { i, d ->
@@ -246,8 +262,17 @@ fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate
                 RangeBar(d.minC, d.maxC, globalMin, globalMax, accent, Modifier.weight(1f).height(6.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(Format.temp(d.maxC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(36.dp))
-                AgreementDot(d.agreement)
+                AgreementDot(d.agreement, d.sourceCount)
             }
+        }
+        // Only worth saying once, and only when the list actually reaches that far.
+        if (days.any { it.sourceCount == 1 }) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(R.string.daily_tail_note),
+                style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.55f),
+                modifier = Modifier.testTag("daily_tail_note"),
+            )
         }
     }
 }
@@ -274,10 +299,15 @@ internal fun agreementColor(agreement: Float): Color = when {
     else -> Color(0xFFFF8A80)
 }
 
+/** Neutral grey: not agreement, not disagreement, simply nothing to compare. */
+private val SingleModelColor = Color(0xFF9AA6B8)
+
 @Composable
-private fun AgreementDot(agreement: Float) {
-    val color = agreementColor(agreement)
-    val description = stringResource(R.string.agreement_desc, (agreement * 100).roundToInt())
+private fun AgreementDot(agreement: Float, sourceCount: Int) {
+    val single = sourceCount == 1
+    val color = if (single) SingleModelColor else agreementColor(agreement)
+    val description = if (single) stringResource(R.string.agreement_single)
+    else stringResource(R.string.agreement_desc, (agreement * 100).roundToInt())
     Box(Modifier.padding(start = 8.dp).size(8.dp).clip(CircleShape).background(color).semantics { contentDescription = description })
 }
 

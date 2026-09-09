@@ -7,6 +7,7 @@ import it.apexweather.domain.SunPhase
 import it.apexweather.domain.SunPhaseCalculator
 import it.apexweather.domain.DailyAggregator
 import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.StationDownscale
 import it.apexweather.domain.model.Bulletin
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.ConsensusDay
@@ -15,6 +16,7 @@ import it.apexweather.domain.model.ConsensusHour
 import it.apexweather.domain.model.DailyPoint
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.StationObservation
+import it.apexweather.domain.model.Warning
 import it.apexweather.domain.model.WeatherSnapshot
 import java.time.Duration
 import java.time.Instant
@@ -35,7 +37,21 @@ data class HomeUiState(
     val heroCondition: Condition = Condition.PARTLY_CLOUDY,
     val bandHalfWidth: Double? = null,
     val currentHour: ConsensusHour? = null,
+    /** The station reading, but only while it is fresh enough to stand in for the hero temperature. */
     val observation: StationObservation? = null,
+    /**
+     * The same reading with no age gate, for the card that shows what the station actually measured.
+     * The card carries the timestamp, so an older reading is honest rather than hidden.
+     */
+    val station: StationObservation? = null,
+    /** Civil-protection warnings in force for the province, worst first. */
+    val warnings: List<Warning> = emptyList(),
+    /**
+     * How much the station's reading had to be moved to stand for the village, in degrees. Null when
+     * the hero is not a station reading, or when there was nothing to correct it with — the wording
+     * beside the temperature depends on it, because a moved reading has to say so.
+     */
+    val heroAdjustmentC: Double? = null,
     val upcomingHours: List<ConsensusHour> = emptyList(),
     val days: List<ConsensusDay> = emptyList(),
     /** Every consensus hour of the week, grouped by local day, so a day sheet can show its hours. */
@@ -70,6 +86,12 @@ data class HomeUiState(
 object HomeStateBuilder {
     private val OBSERVATION_MAX_AGE: Duration = Duration.ofMinutes(90)
 
+    /**
+     * Two weeks, matching what Open-Meteo is asked for. Only ECMWF reaches beyond about day five, so
+     * the later days carry a source count of one and the list says so rather than implying a consensus.
+     */
+    const val MAX_DAYS = 14
+
     fun build(snapshot: WeatherSnapshot, settings: AppSettings, consensus: ConsensusForecast, now: Instant): HomeUiState {
         val thisHour = now.truncatedTo(ChronoUnit.HOURS)
         val upcoming = consensus.hourly.filter { !it.time.isBefore(thisHour) }.take(48)
@@ -77,6 +99,11 @@ object HomeStateBuilder {
         val today = consensus.daily.firstOrNull { it.date == now.atZone(DorfTirol.ZONE).toLocalDate() }
         val phase = SunPhaseCalculator.phase(now, today?.sunrise, today?.sunset, DorfTirol.ZONE)
         val obs = snapshot.observation?.takeIf { Duration.between(it.time, now) <= OBSERVATION_MAX_AGE && it.tempC != null }
+        // The station stands 270 m below the village, so its thermometer is only worth quoting once
+        // it has been carried up; where it cannot be, the consensus is already at the right height
+        // and is the better number. The raw reading is the last resort, never the first choice.
+        val adjustment = obs?.let { StationDownscale.offsetAt(it.time, snapshot.stationReference, consensus, now) }
+        val heroFromStation = obs?.tempC?.let { t -> adjustment?.let { t + it } }
         val heroCondition = current?.condition ?: Condition.PARTLY_CLOUDY
         val isEmpty = current == null && obs == null && snapshot.bulletin == null
         return HomeUiState(
@@ -87,14 +114,17 @@ object HomeStateBuilder {
             sunrise = today?.sunrise,
             sunset = today?.sunset,
             palette = SkyPaletteSelector.select(heroCondition, phase, current?.precipMm ?: 0.0),
-            heroTempC = obs?.tempC ?: current?.tempC,
+            heroTempC = heroFromStation ?: current?.tempC ?: obs?.tempC,
+            heroAdjustmentC = adjustment?.takeIf { heroFromStation != null },
             heroFeelsLikeC = current?.feelsLikeC,
             heroCondition = heroCondition,
             bandHalfWidth = current?.let { (it.tempMaxC - it.tempMinC) / 2.0 },
             currentHour = current,
-            observation = obs,
+            observation = obs?.takeIf { heroFromStation != null },
+            station = snapshot.observation,
+            warnings = snapshot.warnings,
             upcomingHours = upcoming,
-            days = consensus.daily.filter { !it.date.isBefore(now.atZone(DorfTirol.ZONE).toLocalDate()) }.take(7),
+            days = consensus.daily.filter { !it.date.isBefore(now.atZone(DorfTirol.ZONE).toLocalDate()) }.take(MAX_DAYS),
             hoursByDate = consensus.hourly.groupBy { it.time.atZone(DorfTirol.ZONE).toLocalDate() },
             sourceDays = DailyAggregator.perSource(snapshot.forecasts, DorfTirol.ZONE),
             bulletin = snapshot.bulletin,

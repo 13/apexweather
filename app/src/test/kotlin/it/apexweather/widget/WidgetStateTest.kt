@@ -80,4 +80,32 @@ class WidgetStateTest {
         assertTrue(w.isStale)
         assertEquals("", w.updatedText)
     }
+
+    /**
+     * The widget has two lines and a warning outranks both, so the state has to carry the worst one
+     * as resource ids — the widget renders outside a composition and cannot resolve strings itself.
+     */
+    @Test
+    fun `the worst warning in force reaches the widget`() {
+        fun warning(id: String, level: it.apexweather.domain.model.WarningLevel) = it.apexweather.domain.model.Warning(
+            identifier = id, type = it.apexweather.domain.model.WarningType.THUNDERSTORM, level = level,
+            areaDesc = "Trentino Alto Adige", onset = hour(0), expires = hour(6), headline = "Warning",
+        )
+        // The repository hands them over worst first; the widget takes the head of that list.
+        val home = HomeUiState(
+            loading = false, isEmpty = false, heroTempC = 18.0,
+            warnings = listOf(warning("a", it.apexweather.domain.model.WarningLevel.RED), warning("b", it.apexweather.domain.model.WarningLevel.YELLOW)),
+        )
+        val w = WidgetStateBuilder.build(home, DorfTirol.ZONE, formats)
+        assertEquals(R.string.warn_thunderstorm, w.warningTypeRes)
+        assertEquals(R.string.warn_level_red, w.warningLevelRes)
+        assertEquals(0xFFFF5A4EL, w.warningColor)
+    }
+
+    @Test
+    fun `with nothing in force the widget is told nothing`() {
+        val w = WidgetStateBuilder.build(HomeUiState(loading = false, isEmpty = false, heroTempC = 18.0), DorfTirol.ZONE, formats)
+        assertEquals(null, w.warningTypeRes)
+        assertEquals(null, w.warningLevelRes)
+    }
 }

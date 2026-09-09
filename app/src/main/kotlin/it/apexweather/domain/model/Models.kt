@@ -48,6 +48,9 @@ data class HourlyPoint(
     val windDirDeg: Int? = null,
     val cloudPct: Int? = null,
     val humidityPct: Int? = null,
+    /** Height of the 0 °C isotherm in metres above sea level. Null where the model does not publish it;
+     * ECMWF IFS via Open-Meteo is one such model. */
+    val freezingLevelM: Double? = null,
     val condition: Condition,
 )
 
@@ -103,6 +106,34 @@ data class Bulletin(
     val days: List<BulletinDay>,
 )
 
+/** Awareness level of a warning, in the order MeteoAlarm paints them. */
+enum class WarningLevel { YELLOW, ORANGE, RED }
+
+/** What the warning is about. [OTHER] keeps a warning whose wording we do not recognise visible. */
+enum class WarningType { WIND, RAIN, THUNDERSTORM, SNOW_ICE, FOG, HIGH_TEMPERATURE, LOW_TEMPERATURE, COASTAL_EVENT, FOREST_FIRE, AVALANCHE, RAIN_FLOOD, FLOOD, OTHER }
+
+/**
+ * One civil-protection warning for the province, as published through MeteoAlarm.
+ *
+ * The feed is regional: the smallest area Italy publishes is "Trentino Alto Adige", so a warning
+ * here covers far more ground than Dorf Tirol. It is shown as what it is — a provincial warning —
+ * and never presented as a forecast for the village.
+ */
+@Serializable
+data class Warning(
+    val identifier: String,
+    val type: WarningType,
+    val level: WarningLevel,
+    val areaDesc: String,
+    @Serializable(with = InstantSerializer::class) val onset: Instant,
+    @Serializable(with = InstantSerializer::class) val expires: Instant,
+    /** The feed's own English wording, kept for the detail sheet; the card uses our own translations. */
+    val headline: String,
+) {
+    fun isActiveAt(now: Instant): Boolean = !now.isAfter(expires)
+    fun hasStartedAt(now: Instant): Boolean = !now.isBefore(onset)
+}
+
 @Serializable
 data class StationObservation(
     val stationName: String,
@@ -126,15 +157,34 @@ data class WeatherSnapshot(
     val forecasts: Map<Source, SourceForecast>,
     val bulletin: Bulletin?,
     val observation: StationObservation?,
+    val warnings: List<Warning>,
+    /** The models' temperature at the weather station, for carrying its reading up to the village. */
+    val stationReference: it.apexweather.data.remote.StationReference?,
     val status: Map<Source, SourceStatus>,
     val bulletinStatus: SourceStatus?,
     val observationStatus: SourceStatus?,
+    val warningStatus: SourceStatus?,
     val lastSuccessfulRefresh: Instant?,
     val lastRefreshFailed: Boolean,
 ) {
     val isEmpty: Boolean get() = forecasts.isEmpty() && bulletin == null && observation == null
+
+    /**
+     * The forecasts worth blending: the ones whose run is current.
+     *
+     * A model run that has gone stale is still cached, because showing something old beats showing
+     * nothing — but mixing a twenty-hour-old ICON-D2 into the median with five current runs drags
+     * the consensus toward yesterday's weather while looking exactly as confident as before. So a
+     * stale run is kept for the per-source lists, where its age is visible beside it, and left out
+     * of the number the app leads with.
+     *
+     * When every run is stale there is nothing to prefer, so all of them are used and the screen's
+     * own staleness banner is what tells the reader.
+     */
+    val forecastsForBlend: Map<Source, SourceForecast>
+        get() = forecasts.filterKeys { status[it] is SourceStatus.Ok }.takeIf { it.isNotEmpty() } ?: forecasts
     companion object {
-        val EMPTY = WeatherSnapshot(emptyMap(), null, null, emptyMap(), null, null, null, false)
+        val EMPTY = WeatherSnapshot(emptyMap(), null, null, emptyList(), null, emptyMap(), null, null, null, null, false)
     }
 }
 
@@ -148,7 +198,10 @@ data class ConsensusHour(
     val precipProb: Int,
     /** Null when not one contributing model publishes wind. */
     val windKmh: Double?,
+    /** Highest gust any contributing model publishes, not the median; see ConsensusBlender. */
     val gustKmh: Double?,
+    /** Median 0 °C isotherm across the models that publish one, in metres. */
+    val freezingLevelM: Double?,
     val condition: Condition,
     val agreement: Float,
     val sourceCount: Int,
@@ -162,6 +215,10 @@ data class ConsensusDay(
     val precipMm: Double,
     val condition: Condition,
     val agreement: Float,
+    /** Most models that agreed on any hour of this day. One means nothing was compared. */
+    val sourceCount: Int,
+    /** Lowest 0 °C isotherm of the day in metres — the snow line at its lowest. Null where no model says. */
+    val freezingLevelMinM: Double?,
     val sunrise: Instant?,
     val sunset: Instant?,
 )

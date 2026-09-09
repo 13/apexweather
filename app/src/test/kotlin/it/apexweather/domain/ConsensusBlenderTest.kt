@@ -157,6 +157,78 @@ class ConsensusBlenderTest {
         assertEquals(44.0, d0.precipMm, 1e-9) // 22 local hours on 2026-09-08 × median 2.0
     }
 
+    /**
+     * The median everywhere else, the maximum here, and deliberately so: a gust nobody was warned
+     * about is worse than one that did not arrive. Pinned because it reads like an oversight.
+     */
+    @Test
+    fun `the gust is the worst any model expects, not the middle one`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, gust = 30.0))),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(point(0, 10.0, gust = 35.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0, gust = 95.0))),
+        )
+        assertEquals(95.0, blender.blend(f).hourly.single().gustKmh!!, 0.0)
+    }
+
+    @Test
+    fun `the freezing level is the median of the models that publish one`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, freezing = 2000.0))),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(point(0, 10.0, freezing = 2400.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0, freezing = 3100.0))),
+        )
+        assertEquals(2400.0, blender.blend(f).hourly.single().freezingLevelM!!, 0.0)
+    }
+
+    /** ECMWF publishes none. A model that says nothing must not pull the snow line to sea level. */
+    @Test
+    fun `a model without a freezing level is left out of it rather than counted as zero`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, freezing = 2000.0))),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(point(0, 10.0, freezing = 2200.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0, freezing = null))),
+        )
+        assertEquals(2100.0, blender.blend(f).hourly.single().freezingLevelM!!, 0.0)
+    }
+
+    @Test
+    fun `no model publishing a freezing level leaves it absent`() {
+        val f = mapOf(Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))))
+        assertNull(blender.blend(f).hourly.single().freezingLevelM)
+    }
+
+    @Test
+    fun `the lowest hour of the day is what the day reports as its snow line`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 24).map { point(it, 10.0, freezing = 3000.0 - it * 50) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 24).map { point(it, 10.0, freezing = 3000.0 - it * 50) }),
+        )
+        val day = blender.blend(f).daily.first()
+        // 22 local hours of 2026-09-08 fall in the first day; the last of them is the lowest.
+        assertEquals(1950.0, day.freezingLevelMinM!!, 0.0)
+    }
+
+    /**
+     * Days past the reach of the regional models are ECMWF alone. The day has to carry that, because
+     * a badge reading "50 % agreement" over a single model invents a comparison that never happened.
+     */
+    @Test
+    fun `a day only one model reaches says so`() {
+        val f = mapOf(Source.ECMWF to forecast(Source.ECMWF, (0 until 24).map { point(it, 10.0) }))
+        assertEquals(1, blender.blend(f).daily.first().sourceCount)
+    }
+
+    @Test
+    fun `a day every model reaches counts them all`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 24).map { point(it, 10.0) }),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, (0 until 24).map { point(it, 11.0) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 24).map { point(it, 12.0) }),
+        )
+        assertEquals(3, blender.blend(f).daily.first().sourceCount)
+    }
+
     @Test
     fun `empty input yields empty consensus`() {
         val c = blender.blend(emptyMap())

@@ -4,6 +4,7 @@ import it.apexweather.data.WindUnit
 import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -37,6 +38,13 @@ object Format {
 
     fun tempDecimal(c: Double, f: Formats): String = "${f.oneDecimal(c)}°"
 
+    /**
+     * A difference rather than a value, so it always carries its sign. The minus comes from the
+     * locale's own number format; only the plus has to be added, because no locale writes one.
+     */
+    fun tempDelta(c: Double, f: Formats): String =
+        (if (c > 0) "+" else "") + f.oneDecimal(c) + "°"
+
     fun wind(kmh: Double, unit: WindUnit, f: Formats): String = when (unit) {
         WindUnit.KMH -> "${f.whole(unit.fromKmh(kmh).roundToInt())} km/h"
         WindUnit.MS -> "${f.oneDecimal(unit.fromKmh(kmh))} m/s"
@@ -53,9 +61,21 @@ object Format {
         else -> "${f.whole(mm.roundToInt())} mm"
     }
 
+    /**
+     * A height above sea level. Rounded to 50 m: the models do not agree to better than that, and a
+     * freezing level quoted to the metre would claim a precision nobody has.
+     */
+    fun metres(m: Double, f: Formats): String = f.whole((m / 50.0).roundToInt() * 50)
+
+    fun hPa(v: Double, f: Formats): String = f.whole(v.roundToInt())
+
     /** Just the hour, for the columns of the hourly strip. */
     fun hour(t: Instant, zone: ZoneId, f: Formats): String =
         DateTimeFormatter.ofPattern(if (f.use24Hour) "HH" else "h a", f.locale).format(t.atZone(zone))
+
+    /** A whole hour of the day on its own, for a setting that picks one. */
+    fun hourOfDay(hour: Int, f: Formats): String =
+        DateTimeFormatter.ofPattern(if (f.use24Hour) "HH:mm" else "h a", f.locale).format(LocalTime.of(hour.coerceIn(0, 23), 0))
 
     fun time(t: Instant, zone: ZoneId, f: Formats): String =
         DateTimeFormatter.ofPattern(if (f.use24Hour) "HH:mm" else "h:mm a", f.locale).format(t.atZone(zone))

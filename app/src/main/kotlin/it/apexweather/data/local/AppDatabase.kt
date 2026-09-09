@@ -39,6 +39,26 @@ data class ObservationEntity(
     val lastErrorAtMs: Long?,
 )
 
+/** The civil-protection warnings for the province, as one JSON list in a single row. */
+@Entity(tableName = "warnings")
+data class WarningsEntity(
+    @PrimaryKey val id: Int = 0,
+    val json: String?,
+    val fetchedAtMs: Long?,
+    val lastError: String?,
+    val lastErrorAtMs: Long?,
+)
+
+/** The models' temperature down at the weather station, used to carry its reading up to the village. */
+@Entity(tableName = "station_reference")
+data class StationReferenceEntity(
+    @PrimaryKey val id: Int = 0,
+    val json: String?,
+    val fetchedAtMs: Long?,
+    val lastError: String?,
+    val lastErrorAtMs: Long?,
+)
+
 @Entity(tableName = "refresh_meta")
 data class RefreshMetaEntity(
     @PrimaryKey val id: Int = 0,
@@ -61,13 +81,27 @@ interface WeatherDao {
     @Query("SELECT * FROM observation WHERE id = 0") suspend fun observationOnce(): ObservationEntity?
     @Upsert suspend fun upsertObservation(entity: ObservationEntity)
 
+    @Query("SELECT * FROM warnings WHERE id = 0") fun warnings(): Flow<WarningsEntity?>
+    @Query("SELECT * FROM warnings WHERE id = 0") suspend fun warningsOnce(): WarningsEntity?
+    @Upsert suspend fun upsertWarnings(entity: WarningsEntity)
+
+    @Query("SELECT * FROM station_reference WHERE id = 0") fun stationReference(): Flow<StationReferenceEntity?>
+    @Query("SELECT * FROM station_reference WHERE id = 0") suspend fun stationReferenceOnce(): StationReferenceEntity?
+    @Upsert suspend fun upsertStationReference(entity: StationReferenceEntity)
+
     @Query("SELECT * FROM refresh_meta WHERE id = 0") fun meta(): Flow<RefreshMetaEntity?>
     @Upsert suspend fun upsertMeta(entity: RefreshMetaEntity)
 }
 
 @Database(
-    entities = [SourceForecastEntity::class, BulletinEntity::class, ObservationEntity::class, RefreshMetaEntity::class],
-    version = 1,
+    entities = [
+        SourceForecastEntity::class, BulletinEntity::class, ObservationEntity::class,
+        WarningsEntity::class, StationReferenceEntity::class, RefreshMetaEntity::class,
+    ],
+    // 2: the warnings table. 3: the station reference. Every row here is a cache of something
+    // fetchable, so a schema change drops the database rather than migrating it; the next refresh
+    // fills it again.
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

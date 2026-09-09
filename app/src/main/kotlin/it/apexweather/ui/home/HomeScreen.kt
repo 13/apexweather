@@ -64,6 +64,7 @@ fun HomeScreen(onOpenBulletin: () -> Unit, viewModel: HomeViewModel = hiltViewMo
 fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () -> Unit) {
     var selectedHour by remember { mutableStateOf<Instant?>(null) }
     var selectedDay by remember { mutableStateOf<LocalDate?>(null) }
+    var warningsOpen by remember { mutableStateOf(false) }
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(state.isEmpty) { if (!state.isEmpty) appeared = true }
     val accent = Color.fromArgb(state.palette.accent)
@@ -75,6 +76,8 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
             state.isEmpty -> EmptyState(onRefresh, Modifier.fillMaxSize())
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (state.offline) item { OfflineBanner(state) }
+                // Above the hero: a warning that has to be scrolled to is a warning that was missed.
+                if (state.warnings.isNotEmpty()) item { WarningSection(state.warnings, state.now) { warningsOpen = true } }
                 item { HeroSection(state) }
                 item {
                     AnimatedVisibility(appeared, enter = fadeIn(tween(500)) + slideInVertically(tween(500)) { it / 4 }) {
@@ -83,6 +86,11 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
                 }
                 item {
                     AnimatedVisibility(appeared, enter = fadeIn(tween(600, 100)) + slideInVertically(tween(600, 100)) { it / 4 }) {
+                        StationSection(state.station, state.currentHour, state.settings.windUnit, state.now)
+                    }
+                }
+                item {
+                    AnimatedVisibility(appeared, enter = fadeIn(tween(600, 150)) + slideInVertically(tween(600, 150)) { it / 4 }) {
                         DailySection(state.days, accent) { selectedDay = it }
                     }
                 }
@@ -104,6 +112,13 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
     if (hour != null) {
         ModalBottomSheet(onDismissRequest = { selectedHour = null }, containerColor = MaterialTheme.colorScheme.surface, modifier = Modifier.testTag("hour_detail_sheet")) {
             HourDetail(hour, state)
+        }
+    }
+
+    // Warnings expire while the sheet is open; the last one going closes it rather than leaving an empty sheet.
+    if (warningsOpen && state.warnings.isNotEmpty()) {
+        ModalBottomSheet(onDismissRequest = { warningsOpen = false }, containerColor = MaterialTheme.colorScheme.surface, modifier = Modifier.testTag("warning_sheet")) {
+            WarningDetail(state.warnings, state.now)
         }
     }
 
@@ -156,6 +171,10 @@ private fun HourDetail(hour: ConsensusHour, state: HomeUiState) {
             stringResource(R.string.hour_summary, Format.temp(hour.tempC, formats), Format.temp(hour.tempMinC, formats), Format.temp(hour.tempMaxC, formats), Format.mm(hour.precipMm, formats), hour.precipProb, hour.windKmh?.let { Format.wind(it, state.settings.windUnit, formats) } ?: MISSING),
             style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f),
         )
+        hour.freezingLevelM?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(freezingLevelText(it, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f), modifier = Modifier.testTag("hour_freezing_level"))
+        }
         Spacer(Modifier.height(16.dp))
         Text(stringResource(R.string.per_source), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
         Spacer(Modifier.height(6.dp))

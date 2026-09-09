@@ -17,7 +17,6 @@
     <string name="now_from_station">Ora: stazione %1$s, %2$s</string>
     <string name="updated_at">Aggiornato %1$s</string>
     <string name="section_hourly">PROSSIME 48 ORE</string>
-    <string name="section_daily">7 GIORNI</string>
     <string name="section_bulletin">SERVIZIO METEO PROVINCIALE</string>
     <string name="now">Ora</string>
     <string name="today">Oggi</string>
@@ -117,4 +116,79 @@
     <string name="compare_day_today">Oggi</string>
     <string name="compare_day_tomorrow">Domani</string>
     <string name="compare_readout_hint">Tocca il grafico per i valori</string>
+
+    <!-- Allerte della protezione civile via MeteoAlarm: valgono per la regione, mai per il solo paese. -->
+    <string name="warn_wind">Vento</string>
+    <string name="warn_rain">Pioggia</string>
+    <string name="warn_thunderstorm">Temporali</string>
+    <string name="warn_snow_ice">Neve e ghiaccio</string>
+    <string name="warn_fog">Nebbia</string>
+    <string name="warn_high_temperature">Caldo</string>
+    <string name="warn_low_temperature">Freddo</string>
+    <string name="warn_coastal_event">Evento costiero</string>
+    <string name="warn_forest_fire">Incendi boschivi</string>
+    <string name="warn_avalanche">Valanghe</string>
+    <string name="warn_rain_flood">Pioggia e piene</string>
+    <string name="warn_flood">Piene</string>
+    <string name="warn_other">Maltempo</string>
+    <string name="warn_level_yellow">Giallo</string>
+    <string name="warn_level_orange">Arancione</string>
+    <string name="warn_level_red">Rosso</string>
+    <string name="warn_headline">%1$s: allerta %2$s</string>
+    <string name="warn_window">dalle %1$s alle %2$s</string>
+    <string name="warn_until">fino alle %1$s</string>
+    <string name="warn_area">%1$s · protezione civile via MeteoAlarm</string>
+    <plurals name="warn_more">
+        <item quantity="one">%1$d altra allerta</item>
+        <item quantity="many">%1$d altre allerte</item>
+        <item quantity="other">%1$d altre allerte</item>
+    </plurals>
+    <string name="warn_desc">%1$s, allerta %2$s, %3$s</string>
+    <string name="warnings_sheet_title">Allerte per %1$s</string>
+
+    <!-- Quello che la stazione ha davvero misurato, non quello che i modelli prevedono. -->
+    <string name="section_station">MISURATO · STAZIONE %1$s</string>
+    <string name="station_measured_at">Rilevato %1$s</string>
+    <string name="station_temp">Temperatura</string>
+    <string name="station_wind">Vento</string>
+    <string name="station_gust">Raffiche</string>
+    <string name="station_humidity">Umidità</string>
+    <string name="station_pressure">Pressione</string>
+    <string name="station_precip">Precipitazioni</string>
+    <string name="station_wind_with_dir">%1$s da %2$s</string>
+    <string name="unit_percent">%1$d %%</string>
+    <string name="unit_hpa">%1$s hPa</string>
+
+    <!-- Lo zero termico: a 600 m di quota decide se piove o nevica. -->
+    <string name="freezing_level">Zero termico %1$s</string>
+    <string name="freezing_level_low">Quota neve fino a %1$s</string>
+    <string name="unit_metres">%1$s m</string>
+
+    <!-- Giorni oltre la portata dei modelli regionali. -->
+    <string name="agreement_single">1 modello</string>
+    <string name="section_daily_long">14 GIORNI</string>
+    <string name="daily_tail_note">Dal sesto giorno calcola solo ECMWF: nessun consenso, una previsione sola.</string>
+
+    <!-- Notifiche. Tutte disattivate finché non vengono accese nelle impostazioni. -->
+    <string name="channel_summary_name">Riepilogo del mattino</string>
+    <string name="channel_summary_desc">Una volta al mattino, il tempo della giornata</string>
+    <string name="channel_rain_name">Sta per piovere</string>
+    <string name="channel_rain_desc">Quando nelle prossime ore iniziano le precipitazioni</string>
+    <string name="channel_warning_name">Allerte meteo</string>
+    <string name="channel_warning_desc">Allerte della protezione civile per la regione</string>
+    <string name="notif_summary_title">Oggi a Tirolo: %1$s</string>
+    <string name="notif_summary_text">%1$s / %2$s · %3$s</string>
+    <string name="notif_rain_title">%1$s dalle %2$s</string>
+    <string name="notif_rain_text">%1$d %% di probabilità · %2$s previsti</string>
+    <string name="notif_warning_text">%1$s · %2$s</string>
+    <string name="setting_notifications">NOTIFICHE</string>
+    <string name="setting_notif_summary">Riepilogo del mattino</string>
+    <string name="setting_notif_summary_time">Alle %1$s</string>
+    <string name="setting_notif_rain">Sta per piovere</string>
+    <string name="setting_notif_warning">Allerte meteo</string>
+    <string name="setting_notif_permission">Android deve permettere le notifiche ad Apex Weather</string>
+    <string name="setting_notif_grant">Consenti</string>
+
+    <!-- La stazione sta 270 m sotto il paese: il valore viene riportato in quota prima di mostrarlo. -->
+    <string name="now_from_station_adjusted">Ora: stazione %1$s, %2$s · riportato a Tirolo (%3$s)</string>
 </resources>

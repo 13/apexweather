@@ -1,7 +1,9 @@
 package it.apexweather.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +13,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -19,6 +23,9 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +37,8 @@ import it.apexweather.R
 import it.apexweather.data.AppSettings
 import it.apexweather.data.LanguageSetting
 import it.apexweather.data.WindUnit
+import it.apexweather.ui.common.Format
+import it.apexweather.ui.common.LocalFormats
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +50,16 @@ fun SettingsSheet(
     onRefresh: () -> Unit,
     onDismiss: () -> Unit,
     /**
+     * Notifications. Defaulted so a test, or any caller that does not care, can leave them out; the
+     * switches then still render and simply lead nowhere.
+     */
+    notificationsAllowed: Boolean = true,
+    onRequestNotifications: () -> Unit = {},
+    onNotifySummary: (Boolean) -> Unit = {},
+    onNotifySummaryHour: (Int) -> Unit = {},
+    onNotifyRain: (Boolean) -> Unit = {},
+    onNotifyWarnings: (Boolean) -> Unit = {},
+    /**
      * The in-app update row, passed in as a slot so this file imports nothing from the update
      * package. That keeps the feature removable in one piece, which matters because the permission
      * it needs is restricted on the Play Store.
@@ -49,12 +68,19 @@ fun SettingsSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        // The sheet is short: open it fully so the refresh button and the attribution are never under the navigation bar.
+        // Open fully: the sheet is long enough now that a half-height one would start folded.
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surface,
         modifier = Modifier.testTag("settings_sheet"),
     ) {
-        Column(Modifier.navigationBarsPadding().padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // The sheet is no longer short: language, wind, animations, three notification switches and
+        // their hour, the update row and the build lines run past a phone screen in landscape or at a
+        // large font scale, and ModalBottomSheet scrolls nothing by itself.
+        Column(
+            Modifier.verticalScroll(rememberScrollState())
+                .navigationBarsPadding().padding(horizontal = 24.dp).padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
             Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineMedium)
 
             Text(stringResource(R.string.setting_language), style = MaterialTheme.typography.labelSmall)
@@ -80,6 +106,16 @@ fun SettingsSheet(
                 Switch(checked = settings.animations, onCheckedChange = onAnimations)
             }
 
+            NotificationSettings(
+                settings = settings,
+                allowed = notificationsAllowed,
+                onRequestPermission = onRequestNotifications,
+                onSummary = onNotifySummary,
+                onSummaryHour = onNotifySummaryHour,
+                onRain = onNotifyRain,
+                onWarnings = onNotifyWarnings,
+            )
+
             Button(onClick = { onRefresh(); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.refresh_now)) }
 
             updateSection()
@@ -101,5 +137,73 @@ fun SettingsSheet(
             }
             Text(stringResource(R.string.attribution), style = MaterialTheme.typography.labelSmall)
         }
+    }
+}
+
+/**
+ * The three notification switches.
+ *
+ * Android's permission is asked for only once something has been switched on: a settings sheet that
+ * demands permission before the reader has expressed any interest is the pattern this avoids.
+ */
+@Composable
+private fun NotificationSettings(
+    settings: AppSettings,
+    allowed: Boolean,
+    onRequestPermission: () -> Unit,
+    onSummary: (Boolean) -> Unit,
+    onSummaryHour: (Int) -> Unit,
+    onRain: (Boolean) -> Unit,
+    onWarnings: (Boolean) -> Unit,
+) {
+    val formats = LocalFormats.current
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("notification_settings")) {
+        Text(stringResource(R.string.setting_notifications), style = MaterialTheme.typography.labelSmall)
+
+        SwitchRow(stringResource(R.string.setting_notif_summary), settings.notifySummary, "notify_summary", onSummary)
+        if (settings.notifySummary) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.setting_notif_summary_time, Format.hourOfDay(settings.notifySummaryHour, formats)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.testTag("notify_summary_hour"),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Wrapping rather than clamping: 0 is the hour before 23, and a reader stepping
+                    // down from midnight means late evening, not "stay at midnight".
+                    FilledTonalIconButton(onClick = { onSummaryHour((settings.notifySummaryHour + 23) % 24) }, modifier = Modifier.testTag("notify_hour_down")) {
+                        Icon(Icons.Filled.Remove, contentDescription = null)
+                    }
+                    FilledTonalIconButton(onClick = { onSummaryHour((settings.notifySummaryHour + 1) % 24) }, modifier = Modifier.testTag("notify_hour_up")) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                    }
+                }
+            }
+        }
+
+        SwitchRow(stringResource(R.string.setting_notif_rain), settings.notifyRain, "notify_rain", onRain)
+        SwitchRow(stringResource(R.string.setting_notif_warning), settings.notifyWarnings, "notify_warning", onWarnings)
+
+        // Only worth saying once something is switched on and Android is still in the way.
+        if (settings.anyNotification && !allowed) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.setting_notif_permission),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.weight(1f).testTag("notify_permission_hint"),
+                )
+                Button(onClick = onRequestPermission, modifier = Modifier.testTag("notify_grant")) {
+                    Text(stringResource(R.string.setting_notif_grant))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SwitchRow(label: String, checked: Boolean, tag: String, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Switch(checked = checked, onCheckedChange = onChange, modifier = Modifier.testTag(tag))
     }
 }

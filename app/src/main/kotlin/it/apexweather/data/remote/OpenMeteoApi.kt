@@ -1,5 +1,6 @@
 package it.apexweather.data.remote
 
+import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.DailyAggregator
 import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.WmoCodes
@@ -22,14 +23,42 @@ interface OpenMeteoApi {
         @Query("latitude") latitude: Double = DorfTirol.LAT,
         @Query("longitude") longitude: Double = DorfTirol.LON,
         @Query("timezone") timezone: String = DorfTirol.ZONE.id,
-        @Query("forecast_days") forecastDays: Int = 7,
+        @Query("forecast_days") forecastDays: Int = OpenMeteoMapper.FORECAST_DAYS,
         @Query("models") models: String = OpenMeteoMapper.MODELS.values.joinToString(","),
         @Query("hourly") hourly: String = OpenMeteoMapper.HOURLY_VARS,
         @Query("daily") daily: String = OpenMeteoMapper.DAILY_VARS,
     ): OpenMeteoResponse
 
+    /**
+     * The same models, at the weather station instead of the village.
+     *
+     * Only the temperature, and only a day either side of now: this exists to measure how much
+     * colder the village is than the station at a given hour, so that the station's live reading can
+     * be carried up the hill instead of being quoted 300 m too low. Yesterday is included because an
+     * observation may be up to ninety minutes old and can therefore belong to the previous day.
+     */
+    @GET("v1/forecast")
+    suspend fun stationForecast(
+        @Query("latitude") latitude: Double = DorfTirol.STATION_LAT,
+        @Query("longitude") longitude: Double = DorfTirol.STATION_LON,
+        @Query("elevation") elevation: Int = DorfTirol.STATION_ALTITUDE_M,
+        @Query("timezone") timezone: String = DorfTirol.ZONE.id,
+        @Query("past_days") pastDays: Int = 1,
+        @Query("forecast_days") forecastDays: Int = 1,
+        @Query("models") models: String = OpenMeteoMapper.MODELS.values.joinToString(","),
+        @Query("hourly") hourly: String = "temperature_2m",
+    ): OpenMeteoStationResponse
+
     companion object { const val BASE_URL = "https://api.open-meteo.com/" }
 }
+
+/** The station call asks for no daily block, so its response has none. */
+@Serializable
+data class OpenMeteoStationResponse(
+    @SerialName("utc_offset_seconds") val utcOffsetSeconds: Int = 0,
+    val elevation: Double = 0.0,
+    val hourly: JsonObject,
+)
 
 @Serializable
 data class OpenMeteoResponse(
@@ -46,8 +75,15 @@ object OpenMeteoMapper {
         Source.ICON_D2 to "icon_d2",
         Source.ECMWF to "ecmwf_ifs025",
     )
+    /**
+     * Two weeks, although only ECMWF reaches past day five. Every other model returns nulls for the
+     * hours it does not cover and the mapper drops those, so the extra days cost nothing but a longer
+     * array of nulls — 2.7 kB more over the wire once gzipped, measured against the seven-day call.
+     */
+    const val FORECAST_DAYS = 14
     const val HOURLY_VARS = "temperature_2m,apparent_temperature,precipitation,precipitation_probability," +
-        "weather_code,cloud_cover,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m"
+        "weather_code,cloud_cover,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m," +
+        "freezing_level_height"
     const val DAILY_VARS = "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,sunrise,sunset"
 
     fun map(resp: OpenMeteoResponse, fetchedAt: Instant): Map<Source, SourceForecast> {
@@ -68,6 +104,8 @@ object OpenMeteoMapper {
             val wind = h.doubles("wind_speed_10m_$key")
             val gust = h.doubles("wind_gusts_10m_$key")
             val dir = h.ints("wind_direction_10m_$key")
+            // ECMWF IFS publishes no freezing level through Open-Meteo; the column comes back all null.
+            val freezing = h.doubles("freezing_level_height_$key")
 
             val hourly = times.indices.mapNotNull { i ->
                 val t = temps.getOrNull(i) ?: return@mapNotNull null
@@ -82,6 +120,7 @@ object OpenMeteoMapper {
                     windDirDeg = dir.getOrNull(i),
                     cloudPct = cloud.getOrNull(i),
                     humidityPct = hum.getOrNull(i),
+                    freezingLevelM = freezing.getOrNull(i),
                     condition = WmoCodes.toCondition(code.getOrNull(i)),
                 )
             }
@@ -112,5 +151,36 @@ object OpenMeteoMapper {
             }
             source to SourceForecast(source, issuedAt = fetchedAt, fetchedAt = fetchedAt, hourly = hourly, daily = daily)
         }.toMap()
+    }
+}
+
+/**
+ * The models' temperature at the weather station, hour by hour.
+ *
+ * Only the median across the models is kept: this series is never shown, it exists solely as the
+ * "what would the models say down at the station" half of a difference, and a median is the same
+ * statistic the consensus at the village uses, so the two are comparable.
+ */
+@kotlinx.serialization.Serializable
+data class StationReference(
+    @kotlinx.serialization.Serializable(with = it.apexweather.domain.model.InstantSerializer::class)
+    val fetchedAt: Instant,
+    val elevationM: Double,
+    /** Epoch seconds → median model temperature, because a map key has to be a string in JSON anyway. */
+    val tempByEpochSecond: Map<Long, Double>,
+) {
+    fun tempAt(t: Instant): Double? = tempByEpochSecond[t.truncatedTo(java.time.temporal.ChronoUnit.HOURS).epochSecond]
+}
+
+object OpenMeteoStationMapper {
+    fun map(resp: OpenMeteoStationResponse, fetchedAt: Instant): StationReference {
+        val times = resp.hourly.strings("time").map { parseLocal(it!!, DorfTirol.ZONE) }
+        val series = OpenMeteoMapper.MODELS.values.map { key -> resp.hourly.doubles("temperature_2m_$key") }
+        val byHour = times.indices.mapNotNull { i ->
+            // A model that does not reach this hour contributes nothing rather than a zero.
+            val values = series.mapNotNull { it.getOrNull(i) }
+            if (values.isEmpty()) null else times[i].epochSecond to ConsensusBlender.median(values)
+        }.toMap()
+        return StationReference(fetchedAt = fetchedAt, elevationM = resp.elevation, tempByEpochSecond = byHour)
     }
 }
