@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What may leave the device, for cloud backup and for device-to-device transfer.
+
+  The cached forecast must not: restoring it onto a new phone would open the app showing whatever
+  the weather was when the backup was taken, with a lastSuccessfulRefresh that makes it look
+  current. The app refetches within seconds of first launch, so there is nothing to gain by
+  carrying it over. WorkManager keeps its own database of scheduled jobs, which is likewise
+  device state and is rebuilt on first launch.
+
+  Everything else is carried over, which in practice means the settings DataStore: language, wind
+  unit, animations and the compare selections are worth keeping.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="apexweather.db" />
+        <exclude domain="database" path="apexweather.db-wal" />
+        <exclude domain="database" path="apexweather.db-shm" />
+        <exclude domain="database" path="androidx.work.workdb" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="database" path="apexweather.db" />
+        <exclude domain="database" path="apexweather.db-wal" />
+        <exclude domain="database" path="apexweather.db-shm" />
+        <exclude domain="database" path="androidx.work.workdb" />
+    </device-transfer>
+</data-extraction-rules>
