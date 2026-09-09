@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Night sky, the same ground the app and its splash screen paint. -->
+    <color name="ic_launcher_background">#0B1020</color>
+</resources>

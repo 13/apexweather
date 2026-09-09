@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="512" height="512">
+  <!-- Apex Weather: the Apex Maps A-sharp glyph, recoloured as a sunlit peak
+       over its cool blue reflection, on night sky instead of warm paper. -->
+  <rect width="108" height="108" rx="24" fill="#0B1020"/>
+  <g transform="translate(27 27.81) scale(0.27)">
+    <path d="M10.02,176L100,151.9L189.98,176L100,100.5Z" fill="#9CC9FF"/>
+    <path d="M28.08,142.58L100,82.22L171.92,142.58L100,18Z" fill="#FFD166"/>
+  </g>
+</svg>

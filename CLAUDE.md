@@ -24,6 +24,20 @@ Single module, package `it.apexweather`, fixed location Dorf Tirol (constants in
 - ViewModels blend on `Dispatchers.Default` (`flowOn` before `stateIn`), so the consensus never runs on the main thread.
 - Background refresh: `work/RefreshWorker` (Hilt worker, hourly, network constraint) → repository → `ApexWidget().updateAll`.
 
+## CI and releases
+
+- `.github/workflows/ci.yml` runs unit tests and assembles debug + release on every push to `main` and
+  every PR. It deletes the `org.gradle.java.home` line from `gradle.properties` first, because that path
+  is this machine's JDK; the runner supplies its own JDK 21. Instrumented tests are not run on CI (no
+  emulator); run them locally against the phone.
+- `.github/workflows/release.yml` runs on a `v*` tag and publishes `ApexWeather-<version>.apk` to a GitHub
+  release. `base { archivesName = "ApexWeather" }` in `app/build.gradle.kts` is what puts the app name in
+  the file; `-PapexVersionName` / `-PapexVersionCode` stamp the tag into the build. Signing is optional and
+  driven by `APEX_KEYSTORE_*` env vars (repository secrets on CI, `keystore/keystore.properties` locally);
+  without them the release APK is unsigned and the asset gets an `-unsigned` suffix.
+- The launcher icon is the Apex Maps A-sharp glyph at the same scale and translate as that app's icon, so
+  the two sit at identical optical size; only the palette differs. Source copy: `assets/apexmaps-A-sharp-source.svg`.
+
 ## Conventions
 
 - Screens are split into `XScreen` (ViewModel wiring) and `XContent(state, callbacks)`; UI tests drive `XContent` with hand-built states.

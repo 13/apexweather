@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -6,6 +7,26 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+}
+
+// The release workflow stamps the git tag in with -PapexVersionName / -PapexVersionCode.
+val apexVersionName: String = providers.gradleProperty("apexVersionName").getOrElse("0.1.0")
+val apexVersionCode: Int = providers.gradleProperty("apexVersionCode").map(String::toInt).getOrElse(1)
+
+// Signing material comes from the environment on CI, or from an untracked
+// keystore/keystore.properties locally. Without either, the release build is unsigned.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore/keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun signingSecret(envName: String, propName: String): String? =
+    System.getenv(envName) ?: keystoreProps.getProperty(propName)
+
+val releaseStoreFile: String? = signingSecret("APEX_KEYSTORE_FILE", "storeFile")
+
+// Names the outputs ApexWeather-<variant>.apk instead of app-<variant>.apk.
+base {
+    archivesName.set("ApexWeather")
 }
 
 android {
@@ -16,15 +37,27 @@ android {
         applicationId = "it.apexweather"
         minSdk = 31
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = apexVersionCode
+        versionName = apexVersionName
         testInstrumentationRunner = "it.apexweather.HiltTestRunner"
+    }
+
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = signingSecret("APEX_KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = signingSecret("APEX_KEY_ALIAS", "keyAlias")
+                keyPassword = signingSecret("APEX_KEY_PASSWORD", "keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     compileOptions {

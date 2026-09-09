@@ -1,4 +1,8 @@
+<img src="assets/apexweather-logo.svg" alt="" width="88" align="right">
+
 # Apex Weather
+
+[![CI](https://github.com/13/apexweather/actions/workflows/ci.yml/badge.svg)](https://github.com/13/apexweather/actions/workflows/ci.yml)
 
 An Android weather app for one place: Dorf Tirol near Meran, South Tyrol. Instead of trusting a single
 forecast, it fetches seven models plus the provincial weather service and blends them into a consensus —
@@ -37,3 +41,22 @@ ANDROID_SERIAL=RZCXA1ZEXJE ./gradlew :app:connectedDebugAndroidTest   # device t
 
 The toolchain is pinned: JDK 21 via `org.gradle.java.home` in `gradle.properties`, the SDK via `sdk.dir` in
 `local.properties`. AGP 9 with built-in Kotlin, KSP only. See `CLAUDE.md` for the architecture notes.
+
+## Releases
+
+Pushing a `v*` tag builds the release APK and publishes it as `ApexWeather-<version>.apk`:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+The workflow signs the APK when the repository has the `APEX_KEYSTORE_BASE64`, `APEX_KEYSTORE_PASSWORD`,
+`APEX_KEY_ALIAS` and `APEX_KEY_PASSWORD` secrets, and otherwise publishes it with an `-unsigned` suffix.
+The version in the tag becomes the `versionName`, and `versionCode` is derived from it (1.2.3 → 10203).
+Locally the same override works with `-PapexVersionName=1.0.0 -PapexVersionCode=10000`.
+
+## Logo
+
+The mark is the [Apex Maps](https://github.com/13/apexmaps) A-sharp glyph at the same geometry and
+optical size, recoloured for weather: a sunlit peak over its cool blue reflection, on night sky
+instead of warm paper.

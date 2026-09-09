@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build, without the leading v (e.g. 1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish ApexWeather APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ github.event.inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          echo "name=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          # versionCode must increase monotonically: 1.2.3 -> 10203
+          echo "code=$(echo "$version" | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Use the runner's JDK
+        run: sed -i '/^org\.gradle\.java\.home=/d' gradle.properties
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode signing keystore
+        id: keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.APEX_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/apexweather.jks"
+            echo "path=$RUNNER_TEMP/apexweather.jks" >> "$GITHUB_OUTPUT"
+          else
+            echo "No APEX_KEYSTORE_BASE64 secret; the APK will be unsigned." >&2
+            echo "path=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --console=plain
+
+      - name: Build release APK
+        env:
+          APEX_KEYSTORE_FILE: ${{ steps.keystore.outputs.path }}
+          APEX_KEYSTORE_PASSWORD: ${{ secrets.APEX_KEYSTORE_PASSWORD }}
+          APEX_KEY_ALIAS: ${{ secrets.APEX_KEY_ALIAS }}
+          APEX_KEY_PASSWORD: ${{ secrets.APEX_KEY_PASSWORD }}
+        run: |
+          ./gradlew :app:assembleRelease --console=plain \
+            -PapexVersionName='${{ steps.version.outputs.name }}' \
+            -PapexVersionCode='${{ steps.version.outputs.code }}'
+
+      - name: Name the artifact after the app
+        id: artifact
+        run: |
+          version='${{ steps.version.outputs.name }}'
+          src=$(ls app/build/outputs/apk/release/ApexWeather-release*.apk | head -1)
+          case "$src" in
+            *unsigned*) out="ApexWeather-${version}-unsigned.apk" ;;
+            *)          out="ApexWeather-${version}.apk" ;;
+          esac
+          mkdir -p dist && cp "$src" "dist/$out"
+          echo "path=dist/$out" >> "$GITHUB_OUTPUT"
+          echo "name=$out" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag='${{ steps.version.outputs.tag }}'
+          apk='${{ steps.artifact.outputs.path }}'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$apk" --clobber
+          else
+            gh release create "$tag" "$apk" \
+              --title 'Apex Weather ${{ steps.version.outputs.name }}' \
+              --generate-notes
+          fi
+
+      - name: Upload the APK as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: ${{ steps.artifact.outputs.path }}
