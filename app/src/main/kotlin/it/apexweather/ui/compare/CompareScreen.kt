@@ -32,6 +32,9 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,17 +59,23 @@ import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.GlassCard
 import it.apexweather.ui.common.SourceColors
 import java.time.temporal.ChronoUnit
+import java.time.Instant
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
 fun CompareScreen(viewModel: CompareViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    CompareContent(state, viewModel::toggleSource, viewModel::setVariable)
+    CompareContent(state, viewModel::toggleSource, viewModel::setVariable, viewModel::setDay)
 }
 
 @Composable
-fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVariable: (CompareVariable) -> Unit) {
+fun CompareContent(
+    state: CompareUiState,
+    onToggleSource: (Source) -> Unit,
+    onVariable: (CompareVariable) -> Unit,
+    onDay: (DaySelection) -> Unit = {},
+) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val locale = LocalConfiguration.current.locales[0]
     val formats = LocalFormats.current
@@ -86,17 +95,31 @@ fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVa
             }
         }
         item {
+            DayChips(state, onDay)
+        }
+        item {
             GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                // Keyed so that changing the day, the variable or the sources drops a selection that
+                // no longer means what it did when it was made.
+                var selectedHour by remember(state.window.from, state.variable, state.selected) {
+                    mutableStateOf<Instant?>(null)
+                }
+                val unitLabel = when (state.variable) {
+                    CompareVariable.TEMPERATURE -> "°"
+                    CompareVariable.PRECIPITATION -> " mm"
+                    CompareVariable.WIND -> Format.windUnitLabel(state.settings.windUnit)
+                }
+                ChartReadout(state, selectedHour, unitLabel)
+                Spacer(Modifier.height(6.dp))
                 MultiLineChart(
                     series = state.series, consensus = state.consensusLine, band = state.band,
-                    from = state.now.truncatedTo(ChronoUnit.HOURS), hours = 72,
-                    unitLabel = when (state.variable) {
-                        CompareVariable.TEMPERATURE -> "°"
-                        CompareVariable.PRECIPITATION -> " mm"
-                        CompareVariable.WIND -> Format.windUnitLabel(state.settings.windUnit)
-                    },
+                    window = state.window,
+                    unitLabel = unitLabel,
                     nonNegative = state.variable != CompareVariable.TEMPERATURE,
                     variableName = variableLabel(state.variable),
+                    now = state.now,
+                    selectedHour = selectedHour,
+                    onSelectHour = { selectedHour = it },
                     modifier = Modifier.fillMaxWidth().height(240.dp),
                 )
                 Spacer(Modifier.height(10.dp))
@@ -163,6 +186,112 @@ fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVa
         }
     }
 }
+
+/**
+ * The day picker above the chart. One chip per day the consensus actually reaches, plus the
+ * three-day sweep the screen has always opened on. Filter chips rather than a segmented button:
+ * the source row below already speaks that vocabulary, and how many days exist depends on how far
+ * the models reach.
+ */
+@Composable
+private fun DayChips(state: CompareUiState, onDay: (DaySelection) -> Unit) {
+    val formats = LocalFormats.current
+    val today = state.now.atZone(DorfTirol.ZONE).toLocalDate()
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        DayChip(
+            label = stringResource(R.string.compare_range_3d),
+            selected = state.window.selection == DaySelection.Sweep,
+            tag = "day_sweep",
+            onClick = { onDay(DaySelection.Sweep) },
+        )
+        state.dayRows.forEach { row ->
+            val offset = ChronoUnit.DAYS.between(today, row.date).toInt()
+            if (offset < 0) return@forEach
+            DayChip(
+                label = when (offset) {
+                    0 -> stringResource(R.string.compare_day_today)
+                    1 -> stringResource(R.string.compare_day_tomorrow)
+                    else -> Format.weekday(row.date, formats)
+                },
+                selected = state.window.selection == DaySelection.Day(offset),
+                tag = "day_$offset",
+                onClick = { onDay(DaySelection.Day(offset)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DayChip(label: String, selected: Boolean, tag: String, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected, onClick = onClick,
+        label = { Text(label) },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = Color.White.copy(alpha = 0.22f),
+            labelColor = Color.White.copy(alpha = 0.75f),
+            selectedLabelColor = Color.White,
+        ),
+        modifier = Modifier.testTag(tag),
+    )
+}
+
+/**
+ * The values at one hour, per model.
+ *
+ * It sits above the chart rather than following the finger, which would put it under the finger,
+ * and it is always present so the layout never jumps and the affordance is visible before anyone
+ * touches anything. With nothing selected it reads the current hour, or the first hour of the
+ * chosen day when that day is not today.
+ */
+@Composable
+private fun ChartReadout(state: CompareUiState, selectedHour: Instant?, unitLabel: String) {
+    val formats = LocalFormats.current
+    val hour = selectedHour
+        ?: state.now.takeIf { !it.isBefore(state.window.from) && it.isBefore(state.window.from.plus(state.window.hours, ChronoUnit.HOURS)) }
+        ?: state.window.from
+    val consensusValue = state.consensusLine.firstOrNull { it.time == hour }?.value
+
+    Column(Modifier.fillMaxWidth().testTag("chart_readout")) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                Format.time(hour, DorfTirol.ZONE, formats),
+                style = MaterialTheme.typography.titleMedium, color = Color.White,
+                modifier = Modifier.testTag("readout_hour"),
+            )
+            Text(
+                consensusValue?.let { "${it.roundToInt()}$unitLabel" } ?: MISSING,
+                style = MaterialTheme.typography.titleMedium, color = SourceColors.consensus,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            state.selected.sortedBy { it.ordinal }.forEach { source ->
+                val value = state.series[source]?.firstOrNull { it.time == hour }?.value
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(SourceColors.of(source)))
+                    Text(
+                        "${source.displayName.substringAfter(' ').take(9)} ${value?.let { "${it.roundToInt()}$unitLabel" } ?: MISSING}",
+                        style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f),
+                    )
+                }
+            }
+        }
+        if (selectedHour == null) {
+            Spacer(Modifier.height(2.dp))
+            Text(stringResource(R.string.compare_readout_hint), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.45f))
+        }
+    }
+}
+
+/** Shown where a model publishes no value for the selected hour, so absence never reads as zero. */
+private const val MISSING = "\u2013"
 
 /**
  * One model's take on one day. How far it sits from the consensus is shown three ways, so it

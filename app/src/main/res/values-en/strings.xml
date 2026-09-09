@@ -108,4 +108,9 @@
     <string name="update_install_failed">Install failed: %1$s</string>
     <string name="update_install_failed_unknown">Install failed</string>
     <string name="update_retry">Try again</string>
+    <!-- The compare chart's day picker and the values under the reader's finger. -->
+    <string name="compare_range_3d">3 days</string>
+    <string name="compare_day_today">Today</string>
+    <string name="compare_day_tomorrow">Tomorrow</string>
+    <string name="compare_readout_hint">Touch the chart for values</string>
 </resources>

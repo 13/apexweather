@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.Lifecycle
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import it.apexweather.MainActivity
@@ -25,6 +26,27 @@ class NavigationTest {
 
     private fun settle() = rule.mainClock.advanceTimeBy(1_000)
 
+    /**
+     * The sky's frame loop means the clock is driven by hand, so waitForIdle would never return and
+     * advancing the test clock does not make the real cache read finish. Poll both.
+     */
+    private fun awaitTag(tag: String, timeoutMs: Long = 15_000) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            rule.mainClock.advanceTimeBy(200)
+            // Early on there is no composition to query at all, which throws rather than returning
+            // an empty list, and the previous test's activity can still be tearing down. Both are
+            // "not yet", not a failure, so require a resumed activity and a node in it.
+            val found = runCatching {
+                rule.activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+                    rule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+            }.getOrDefault(false)
+            if (found) return
+            Thread.sleep(100)
+        }
+        throw AssertionError("'$tag' never appeared")
+    }
+
     @Test
     fun bottomBarSwitchesScreensAndSettingsOpens() {
         settle()
@@ -35,7 +57,9 @@ class NavigationTest {
         val hasEmpty = rule.onAllNodesWithTag("bulletin_empty").fetchSemanticsNodes().isNotEmpty()
         assertTrue("bulletin tab rendered neither text nor empty state", hasText || hasEmpty)
         rule.onNodeWithTag("nav_home").performClick(); settle()
+        awaitTag("hero_temp")
         rule.onNodeWithTag("settings_button").performClick(); settle()
         rule.onNodeWithTag("settings_sheet").assertIsDisplayed()
     }
+
 }
