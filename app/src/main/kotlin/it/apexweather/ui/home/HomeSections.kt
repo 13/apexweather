@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,6 +51,7 @@ import it.apexweather.ui.common.icon
 import it.apexweather.ui.common.label
 import it.apexweather.ui.theme.fromArgb
 import java.time.Instant
+import java.time.LocalDate
 import kotlin.math.roundToInt
 
 @Composable
@@ -81,21 +83,22 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * How far the models spread, as a coloured pill. [halfWidth] is half the min/max band in degrees;
+ * a day has no single band to quote, so it passes [showSpread] false and shows the dot alone.
+ */
 @Composable
-fun AgreementBadge(halfWidth: Double, agreement: Float) {
-    val color = when {
-        agreement >= 0.75f -> Color(0xFF7CE0A5)
-        agreement >= 0.45f -> Color(0xFFFFD166)
-        else -> Color(0xFFFF8A80)
-    }
+fun AgreementBadge(halfWidth: Double, agreement: Float, showSpread: Boolean = true, tag: String = "agreement_badge") {
+    val color = agreementColor(agreement)
     val description = stringResource(R.string.agreement_desc, (agreement * 100).roundToInt())
     Row(
         Modifier.clip(CircleShape).background(color.copy(alpha = 0.18f)).padding(horizontal = 10.dp, vertical = 3.dp)
-            .semantics { contentDescription = description }.testTag("agreement_badge"),
+            .semantics { contentDescription = description }.testTag(tag),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(Modifier.size(7.dp).clip(CircleShape).background(color))
-        Text("±${halfWidth.roundToInt()}°", style = MaterialTheme.typography.labelSmall, color = Color.White)
+        if (showSpread) Text("±${halfWidth.roundToInt()}°", style = MaterialTheme.typography.labelSmall, color = Color.White)
+        else Text(stringResource(R.string.agreement_short, (agreement * 100).roundToInt()), style = MaterialTheme.typography.labelSmall, color = Color.White)
     }
 }
 
@@ -107,25 +110,50 @@ fun HourlySection(hours: List<ConsensusHour>, phaseAt: (Instant) -> SunPhase, ac
     GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text(stringResource(R.string.section_hourly), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
         Spacer(Modifier.height(8.dp))
-        val scroll = rememberScrollState()
-        Column(Modifier.horizontalScroll(scroll).testTag("hourly_strip")) {
-            TemperatureCurve(hours, accent, Modifier.width(HourColumnWidth * hours.size).height(90.dp))
-            val openLabel = stringResource(R.string.open_hour_details)
-            Row {
-                hours.forEachIndexed { i, h ->
-                    Column(
-                        Modifier.width(HourColumnWidth).clickable(onClickLabel = openLabel) { onHourClick(h.time) }
-                            .padding(vertical = 6.dp).testTag("hour_column_$i"),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(if (i == 0) stringResource(R.string.now) else Format.hour(h.time, DorfTirol.ZONE), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.75f))
-                        Spacer(Modifier.height(6.dp))
-                        Icon(h.condition.icon(phaseAt(h.time)), contentDescription = h.condition.label(), tint = Color.White, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.height(6.dp))
-                        Text(Format.temp(h.tempC), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(4.dp))
-                        PrecipBar(h.precipMm, h.precipProb)
-                    }
+        HourStrip(hours, phaseAt, accent, tagPrefix = "hour_column", onHourClick = onHourClick, modifier = Modifier.testTag("hourly_strip"))
+    }
+}
+
+/**
+ * The scrolling hour columns under their temperature curve, without a card around them, so both the
+ * home screen section and the day sheet can show the same strip. [tagPrefix] keeps the two uses'
+ * test tags apart. A null [onHourClick] leaves the columns inert — the day sheet does not open a
+ * second sheet on top of itself.
+ */
+@Composable
+fun HourStrip(
+    hours: List<ConsensusHour>,
+    phaseAt: (Instant) -> SunPhase,
+    accent: Color,
+    tagPrefix: String,
+    onHourClick: ((Instant) -> Unit)? = null,
+    labelFirstAsNow: Boolean = true,
+    modifier: Modifier = Modifier,
+) {
+    if (hours.isEmpty()) return
+    val scroll = rememberScrollState()
+    Column(modifier.horizontalScroll(scroll)) {
+        TemperatureCurve(hours, accent, Modifier.width(HourColumnWidth * hours.size).height(90.dp))
+        val openLabel = stringResource(R.string.open_hour_details)
+        Row {
+            hours.forEachIndexed { i, h ->
+                val clickable = if (onHourClick == null) Modifier
+                else Modifier.clickable(onClickLabel = openLabel) { onHourClick(h.time) }
+                Column(
+                    Modifier.width(HourColumnWidth).then(clickable)
+                        .padding(vertical = 6.dp).testTag("${tagPrefix}_$i"),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        if (i == 0 && labelFirstAsNow) stringResource(R.string.now) else Format.hour(h.time, DorfTirol.ZONE),
+                        style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.75f),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Icon(h.condition.icon(phaseAt(h.time)), contentDescription = h.condition.label(), tint = Color.White, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.height(6.dp))
+                    Text(Format.temp(h.tempC), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(4.dp))
+                    PrecipBar(h.precipMm, h.precipProb)
                 }
             }
         }
@@ -175,7 +203,7 @@ fun TemperatureCurve(hours: List<ConsensusHour>, accent: Color, modifier: Modifi
 }
 
 @Composable
-fun DailySection(days: List<ConsensusDay>, accent: Color) {
+fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate) -> Unit) {
     if (days.isEmpty()) return
     val locale = LocalConfiguration.current.locales[0]
     val globalMin = days.minOf { it.minC }
@@ -183,8 +211,16 @@ fun DailySection(days: List<ConsensusDay>, accent: Color) {
     GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("daily_list")) {
         Text(stringResource(R.string.section_daily), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
         Spacer(Modifier.height(8.dp))
+        val openLabel = stringResource(R.string.open_day_details)
         days.forEachIndexed { i, d ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth()
+                    .clickable(onClickLabel = openLabel) { onDayClick(d.date) }
+                    .heightIn(min = 48.dp) // the row's own content is well under the minimum touch target
+                    .padding(vertical = 8.dp)
+                    .testTag("day_row_$i"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     if (i == 0) stringResource(R.string.today) else Format.weekday(d.date, locale),
                     style = MaterialTheme.typography.bodyMedium, color = Color.White, modifier = Modifier.width(52.dp),
@@ -217,9 +253,16 @@ private fun RangeBar(min: Double, max: Double, gMin: Double, gMax: Double, accen
     }
 }
 
+/** Green when the models agree, amber when they drift apart, red when they disagree outright. */
+internal fun agreementColor(agreement: Float): Color = when {
+    agreement >= 0.75f -> Color(0xFF7CE0A5)
+    agreement >= 0.45f -> Color(0xFFFFD166)
+    else -> Color(0xFFFF8A80)
+}
+
 @Composable
 private fun AgreementDot(agreement: Float) {
-    val color = when { agreement >= 0.75f -> Color(0xFF7CE0A5); agreement >= 0.45f -> Color(0xFFFFD166); else -> Color(0xFFFF8A80) }
+    val color = agreementColor(agreement)
     val description = stringResource(R.string.agreement_desc, (agreement * 100).roundToInt())
     Box(Modifier.padding(start = 8.dp).size(8.dp).clip(CircleShape).background(color).semantics { contentDescription = description })
 }

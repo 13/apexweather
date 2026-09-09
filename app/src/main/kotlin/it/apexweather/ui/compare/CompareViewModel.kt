@@ -75,9 +75,7 @@ object CompareStateBuilder {
         }
         val band = if (settings.compareVariable == CompareVariable.TEMPERATURE) window.map { BandPoint(it.time, it.tempMinC, it.tempMaxC) } else emptyList()
 
-        val perSourceDaily = snapshot.forecasts.mapValues { (_, fc) ->
-            (fc.daily.takeIf { it.isNotEmpty() } ?: DailyAggregator.aggregate(fc.hourly, DorfTirol.ZONE)).associateBy { it.date }
-        }
+        val perSourceDaily = DailyAggregator.perSource(snapshot.forecasts, DorfTirol.ZONE)
         val dayRows = consensus.daily.map { d ->
             DayRow(
                 date = d.date,

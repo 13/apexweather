@@ -5,16 +5,20 @@ import it.apexweather.domain.SkyPalette
 import it.apexweather.domain.SkyPaletteSelector
 import it.apexweather.domain.SunPhase
 import it.apexweather.domain.SunPhaseCalculator
+import it.apexweather.domain.DailyAggregator
 import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.model.Bulletin
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.ConsensusDay
 import it.apexweather.domain.model.ConsensusForecast
 import it.apexweather.domain.model.ConsensusHour
+import it.apexweather.domain.model.DailyPoint
+import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.StationObservation
 import it.apexweather.domain.model.WeatherSnapshot
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 data class HomeUiState(
@@ -34,6 +38,10 @@ data class HomeUiState(
     val observation: StationObservation? = null,
     val upcomingHours: List<ConsensusHour> = emptyList(),
     val days: List<ConsensusDay> = emptyList(),
+    /** Every consensus hour of the week, grouped by local day, so a day sheet can show its hours. */
+    val hoursByDate: Map<LocalDate, List<ConsensusHour>> = emptyMap(),
+    /** What each model on its own says about each day. */
+    val sourceDays: Map<Source, Map<LocalDate, DailyPoint>> = emptyMap(),
     val bulletin: Bulletin? = null,
     val updatedAt: Instant? = null,
     val offline: Boolean = false,
@@ -48,6 +56,15 @@ data class HomeUiState(
         val day = days.firstOrNull { it.date == t.atZone(DorfTirol.ZONE).toLocalDate() }
         return SunPhaseCalculator.phase(t, day?.sunrise ?: sunrise, day?.sunset ?: sunset, DorfTirol.ZONE)
     }
+
+    /**
+     * What each model says about [date]. Models whose forecast does not reach that far are absent
+     * rather than filled in, so a day late in the week honestly shows fewer of them.
+     */
+    fun sourcesForDay(date: LocalDate): Map<Source, DailyPoint> =
+        sourceDays.mapNotNull { (source, byDate) -> byDate[date]?.let { source to it } }
+            .sortedBy { it.first.ordinal }
+            .toMap()
 }
 
 object HomeStateBuilder {
@@ -78,6 +95,8 @@ object HomeStateBuilder {
             observation = obs,
             upcomingHours = upcoming,
             days = consensus.daily.filter { !it.date.isBefore(now.atZone(DorfTirol.ZONE).toLocalDate()) }.take(7),
+            hoursByDate = consensus.hourly.groupBy { it.time.atZone(DorfTirol.ZONE).toLocalDate() },
+            sourceDays = DailyAggregator.perSource(snapshot.forecasts, DorfTirol.ZONE),
             bulletin = snapshot.bulletin,
             updatedAt = snapshot.lastSuccessfulRefresh,
             offline = snapshot.lastRefreshFailed,

@@ -32,5 +32,6 @@ object Format {
     fun hour(t: Instant, zone: ZoneId): String = DateTimeFormatter.ofPattern("HH").format(t.atZone(zone))
     fun time(t: Instant, zone: ZoneId): String = DateTimeFormatter.ofPattern("HH:mm").format(t.atZone(zone))
     fun weekday(d: LocalDate, locale: Locale): String = d.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
+    fun weekdayFull(d: LocalDate, locale: Locale): String = d.dayOfWeek.getDisplayName(TextStyle.FULL, locale)
     fun dayMonth(d: LocalDate, locale: Locale): String = DateTimeFormatter.ofPattern("d. MMM", locale).format(d)
 }

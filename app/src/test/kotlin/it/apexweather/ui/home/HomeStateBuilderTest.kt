@@ -83,6 +83,30 @@ class HomeStateBuilderTest {
         assertEquals(SunPhase.NIGHT, s.phaseAt(tomorrow.atTime(3, 0).atZone(ROME).toInstant()))
     }
 
+    /**
+     * The 48-hour strip is a window, not the whole forecast: a day late in the week still needs its
+     * hours for the day sheet, and each model still needs its own view of that day.
+     */
+    @Test
+    fun `a day beyond the 48 hour strip still has its hours and its per-source values`() {
+        val week = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 168).map { point(it, 10.0 + it % 10) }),
+            Source.ECMWF to forecast(Source.ECMWF, (0 until 168).map { point(it, 12.0 + it % 10) }),
+        )
+        val s = HomeStateBuilder.build(WeatherSnapshot.EMPTY.copy(forecasts = week), AppSettings(), blender.blend(week), now = hour(0))
+
+        val dayFive = hour(24 * 5).atZone(ROME).toLocalDate()
+        assertTrue(s.upcomingHours.none { it.time.atZone(ROME).toLocalDate() == dayFive })
+        assertTrue(s.hoursByDate.getValue(dayFive).isNotEmpty())
+        assertEquals(setOf(Source.ICON_CH1, Source.ECMWF), s.sourcesForDay(dayFive).keys)
+    }
+
+    @Test
+    fun `a day no model reaches has no per-source rows`() {
+        val s = HomeStateBuilder.build(snapshot, AppSettings(), consensus, now = hour(0))
+        assertTrue(s.sourcesForDay(hour(0).atZone(ROME).toLocalDate().plusDays(30)).isEmpty())
+    }
+
     @Test
     fun `empty snapshot gives empty state with default palette`() {
         val s = HomeStateBuilder.build(WeatherSnapshot.EMPTY, AppSettings(), consensus = ConsensusForecast.EMPTY, now = hour(0))

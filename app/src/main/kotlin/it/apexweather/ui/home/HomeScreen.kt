@@ -24,6 +24,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -49,6 +50,7 @@ import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.label
 import it.apexweather.ui.theme.fromArgb
 import java.time.Instant
+import java.time.LocalDate
 
 @Composable
 fun HomeScreen(onOpenBulletin: () -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
@@ -60,6 +62,7 @@ fun HomeScreen(onOpenBulletin: () -> Unit, viewModel: HomeViewModel = hiltViewMo
 @Composable
 fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () -> Unit) {
     var selectedHour by remember { mutableStateOf<Instant?>(null) }
+    var selectedDay by remember { mutableStateOf<LocalDate?>(null) }
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(state.isEmpty) { if (!state.isEmpty) appeared = true }
     val accent = Color.fromArgb(state.palette.accent)
@@ -79,7 +82,7 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
                 }
                 item {
                     AnimatedVisibility(appeared, enter = fadeIn(tween(600, 100)) + slideInVertically(tween(600, 100)) { it / 4 }) {
-                        DailySection(state.days, accent)
+                        DailySection(state.days, accent) { selectedDay = it }
                     }
                 }
                 state.bulletin?.let { b ->
@@ -94,10 +97,25 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
         }
     }
 
+    // Both selections are resolved against the current state on every recomposition, so an open
+    // sheet keeps up with the minute tick and closes itself once its hour or day rolls off the end.
     val hour = selectedHour?.let { t -> state.upcomingHours.firstOrNull { it.time == t } }
     if (hour != null) {
         ModalBottomSheet(onDismissRequest = { selectedHour = null }, containerColor = MaterialTheme.colorScheme.surface, modifier = Modifier.testTag("hour_detail_sheet")) {
             HourDetail(hour, state)
+        }
+    }
+
+    val day = selectedDay?.let { d -> state.days.firstOrNull { it.date == d } }
+    if (day != null) {
+        ModalBottomSheet(
+            onDismissRequest = { selectedDay = null },
+            // A day carries far more than an hour, so it opens at full height rather than half.
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.testTag("day_detail_sheet"),
+        ) {
+            DayDetail(day, state)
         }
     }
 }
