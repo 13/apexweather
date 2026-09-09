@@ -72,4 +72,25 @@ class FormatTest {
         assertNotEquals(Format.time(daysAgo, DorfTirol.ZONE, german), old)
         assertTrue("an older timestamp must name its day: $old", old.contains("6"))
     }
+
+    /**
+     * The models do not agree on the 0 °C isotherm to better than a few hundred metres, so quoting
+     * it to the metre would claim a precision nobody has.
+     */
+    @Test fun `a height is rounded to the nearest fifty metres`() {
+        assertEquals("2.150", Format.metres(2137.0, german))
+        assertEquals("2.150", Format.metres(2160.0, german))
+        assertEquals("0", Format.metres(12.0, german))
+    }
+
+    @Test fun `a height is grouped the way the reader's language groups numbers`() {
+        assertNotEquals(Format.metres(2150.0, german), Format.metres(2150.0, english))
+    }
+
+    @Test fun `an hour of the day follows the clock preference`() {
+        val twelveHour = Formats(java.util.Locale.ENGLISH, use24Hour = false)
+        assertEquals("07:00", Format.hourOfDay(7, german))
+        assertTrue(Format.hourOfDay(7, twelveHour).contains("7"))
+        assertNotEquals("07:00", Format.hourOfDay(7, twelveHour))
+    }
 }

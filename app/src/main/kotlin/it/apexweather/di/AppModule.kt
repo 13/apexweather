@@ -10,6 +10,7 @@ import it.apexweather.BuildConfig
 import it.apexweather.data.local.AppDatabase
 import it.apexweather.data.local.WeatherDao
 import it.apexweather.data.remote.GeoSphereApi
+import it.apexweather.data.remote.MeteoAlarmApi
 import it.apexweather.data.remote.OdhApi
 import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.SiagApi
@@ -39,6 +40,9 @@ object AppModule {
     fun okHttp(): OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
+        // A whole-call bound as well as the per-phase ones: a server that dribbles a byte every ten
+        // seconds satisfies the read timeout forever, and the refresh waits on it forever with it.
+        .callTimeout(45, TimeUnit.SECONDS)
         .addInterceptor { chain ->
             chain.proceed(chain.request().newBuilder().header("User-Agent", "ApexWeather/${BuildConfig.VERSION_NAME} (Android)").build())
         }
@@ -57,6 +61,9 @@ object AppModule {
     @Provides @Singleton fun geoSphere(c: OkHttpClient, j: Json): GeoSphereApi = retrofit(GeoSphereApi.BASE_URL, c, j).create(GeoSphereApi::class.java)
     @Provides @Singleton fun siag(c: OkHttpClient, j: Json): SiagApi = retrofit(SiagApi.BASE_URL, c, j).create(SiagApi::class.java)
     @Provides @Singleton fun odh(c: OkHttpClient, j: Json): OdhApi = retrofit(OdhApi.BASE_URL, c, j).create(OdhApi::class.java)
+    // Returns the Atom feed as a raw body: Retrofit hands ResponseBody back without a converter,
+    // and MeteoAlarmMapper does the XML parsing.
+    @Provides @Singleton fun meteoAlarm(c: OkHttpClient, j: Json): MeteoAlarmApi = retrofit(MeteoAlarmApi.BASE_URL, c, j).create(MeteoAlarmApi::class.java)
 
     @Provides @Singleton fun database(@ApplicationContext ctx: Context): AppDatabase = AppDatabase.build(ctx)
     @Provides fun dao(db: AppDatabase): WeatherDao = db.weatherDao()

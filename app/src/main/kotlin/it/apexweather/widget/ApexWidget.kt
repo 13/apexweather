@@ -72,7 +72,7 @@ class ApexWidget : GlanceAppWidget() {
         val ep = EntryPointAccessors.fromApplication(context, WidgetEntryPoint::class.java)
         val settings = ep.settings().settings.first()
         val snapshot = ep.repository().snapshot(settings.bulletinLanguage(Locale.getDefault().toLanguageTag())).first()
-        val home = HomeStateBuilder.build(snapshot, settings, ep.blender().blend(snapshot.forecasts), ep.clock().instant())
+        val home = HomeStateBuilder.build(snapshot, settings, ep.blender().blend(snapshot.forecastsForBlend), ep.clock().instant())
         // The widget renders outside the composition, so it resolves the reader's language and
         // clock preference from its own context.
         val formats = Formats(
@@ -119,7 +119,19 @@ private fun WidgetContent(state: WidgetState, background: Bitmap) {
                     // With no age to show, which is the case before the first refresh ever lands,
                     // the condition keeps the line rather than leaving it blank.
                     val showsAge = (isMedium || state.isStale) && state.updatedText.isNotEmpty()
-                    if (isMedium || !showsAge) {
+                    // A warning outranks both: on the small widget it takes the second line outright,
+                    // because "Gewitter: Orange" is what the reader needs from a glance and "Bedeckt"
+                    // is not. The colour is MeteoAlarm's, not the sky's.
+                    val warning = state.warningTypeRes?.let { type ->
+                        val ctx = androidx.glance.LocalContext.current
+                        state.warningLevelRes?.let { level ->
+                            ctx.getString(R.string.warn_headline, ctx.getString(type), ctx.getString(level))
+                        }
+                    }
+                    if (warning != null) {
+                        Text(warning, style = TextStyle(color = ColorProvider(Color(state.warningColor.toInt())), fontSize = 12.sp, fontWeight = FontWeight.Medium))
+                    }
+                    if (warning == null && (isMedium || !showsAge)) {
                         Text(androidx.glance.LocalContext.current.getString(state.conditionRes), style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.8f)), fontSize = 12.sp))
                     }
                     if (showsAge) {

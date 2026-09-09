@@ -10,6 +10,11 @@
       receiver below is all it would take.
     -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!--
+      Notifications are all off by default and each one is a switch in the settings sheet; this only
+      lets the app ask. Android takes the runtime decision from the reader on top of that.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".ApexApplication"

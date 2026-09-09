@@ -23,6 +23,11 @@ class OpenMeteoMapperTest {
     private val fetchedAt = Instant.parse("2026-09-08T12:00:00Z")
     private val result = OpenMeteoMapper.map(resp, fetchedAt)
 
+    private val fourteenDay = OpenMeteoMapper.map(
+        Fixtures.json.decodeFromString(OpenMeteoResponse.serializer(), Fixtures.read("openmeteo_14d.json")),
+        Instant.parse("2026-09-09T12:00:00Z"),
+    )
+
     @Test
     fun `maps all five models`() {
         assertEquals(setOf(Source.ICON_CH1, Source.ICON_CH2, Source.ICON_2I, Source.ICON_D2, Source.ECMWF), result.keys)
@@ -61,5 +66,76 @@ class OpenMeteoMapperTest {
     @Test
     fun `missing precipitation probability stays null (ICON-2I)`() {
         assertTrue(result.getValue(Source.ICON_2I).hourly.all { it.precipProb == null })
+    }
+
+    /**
+     * `openmeteo.json` was recorded before the app asked for the freezing level, so it has no such
+     * column at all — which makes it the case that matters most here. A response that predates a
+     * request change must map to a null, never to a zero-metre snow line at the bottom of the valley.
+     */
+    @Test
+    fun `a response without the freezing level column maps to null, not to zero`() {
+        assertTrue(result.getValue(Source.ICON_D2).hourly.all { it.freezingLevelM == null })
+    }
+
+    /**
+     * `openmeteo_14d.json` is the same upstream recorded on 2026-09-09 with the request the app
+     * makes today: fourteen days, and the freezing level asked for.
+     */
+    @Test
+    fun `the freezing level is read where the model publishes one`() {
+        val hourly = fourteenDay.getValue(Source.ICON_D2).hourly
+        val levels = hourly.mapNotNull { it.freezingLevelM }
+        assertTrue(levels.isNotEmpty())
+        // An Alpine 0 °C isotherm in September; a value outside this is a unit or parsing mistake.
+        assertTrue(levels.all { it in 0.0..6000.0 })
+    }
+
+    /** ECMWF IFS returns the column all null through Open-Meteo. Absence must not read as sea level. */
+    @Test
+    fun `ECMWF publishes no freezing level and says so`() {
+        assertTrue(fourteenDay.getValue(Source.ECMWF).hourly.all { it.freezingLevelM == null })
+    }
+
+    /** Only ECMWF reaches the far end; the regional models stop where their run stops. */
+    @Test
+    fun `two weeks are asked for and only ECMWF answers for all of them`() {
+        assertEquals(14, OpenMeteoMapper.FORECAST_DAYS)
+        val ecmwfDays = fourteenDay.getValue(Source.ECMWF).daily.size
+        val regionalDays = fourteenDay.getValue(Source.ICON_D2).daily.size
+        assertTrue("ECMWF reached only $ecmwfDays days", ecmwfDays >= 10)
+        assertTrue("a regional model claimed $regionalDays days", regionalDays < ecmwfDays)
+    }
+
+    /**
+     * The station call is a separate, deliberately tiny request: one variable, two days, at the
+     * station's own coordinates and altitude. It exists to say how much colder the village is than
+     * the station at a given hour, so the elevation coming back is the number that matters most.
+     */
+    @Test
+    fun `the station reference is read at the station's altitude`() {
+        val resp = Fixtures.json.decodeFromString(
+            OpenMeteoStationResponse.serializer(), Fixtures.read("openmeteo_station.json"),
+        )
+        val reference = OpenMeteoStationMapper.map(resp, Instant.parse("2026-09-09T12:00:00Z"))
+        assertEquals(330.0, reference.elevationM, 0.0)
+        assertTrue(reference.tempByEpochSecond.isNotEmpty())
+        // A September valley floor: outside this the units or the parse are wrong.
+        assertTrue(reference.tempByEpochSecond.values.all { it in -20.0..45.0 })
+    }
+
+    /** The village sits about 290 m above the station, and the models know it. */
+    @Test
+    fun `the models put the village colder than the station`() {
+        val reference = OpenMeteoStationMapper.map(
+            Fixtures.json.decodeFromString(OpenMeteoStationResponse.serializer(), Fixtures.read("openmeteo_station.json")),
+            Instant.parse("2026-09-09T12:00:00Z"),
+        )
+        val village = it.apexweather.domain.ConsensusBlender(DorfTirol.ZONE).blend(fourteenDay)
+        val shared = village.hourly.mapNotNull { hour -> reference.tempAt(hour.time)?.let { hour.tempC - it } }
+        assertTrue("no overlapping hours between the two calls", shared.isNotEmpty())
+        val median = shared.sorted()[shared.size / 2]
+        assertTrue("village-minus-station came out at $median °C", median < 0.0)
+        assertTrue("that is not a height difference: $median °C", median > -6.0)
     }
 }

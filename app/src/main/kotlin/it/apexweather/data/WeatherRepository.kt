@@ -5,12 +5,18 @@ import it.apexweather.data.local.BulletinEntity
 import it.apexweather.data.local.ObservationEntity
 import it.apexweather.data.local.RefreshMetaEntity
 import it.apexweather.data.local.SourceForecastEntity
+import it.apexweather.data.local.StationReferenceEntity
+import it.apexweather.data.local.WarningsEntity
 import it.apexweather.data.local.WeatherDao
 import it.apexweather.data.remote.GeoSphereApi
 import it.apexweather.data.remote.GeoSphereMapper
+import it.apexweather.data.remote.MeteoAlarmApi
+import it.apexweather.data.remote.MeteoAlarmMapper
 import it.apexweather.data.remote.OdhApi
+import it.apexweather.data.remote.StationReference
 import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.OpenMeteoMapper
+import it.apexweather.data.remote.OpenMeteoStationMapper
 import it.apexweather.data.remote.SiagApi
 import it.apexweather.data.remote.SiagMappers
 import it.apexweather.domain.model.Bulletin
@@ -18,17 +24,21 @@ import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceForecast
 import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.StationObservation
+import it.apexweather.domain.model.Warning
 import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.domain.DorfTirol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import java.io.IOException
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -48,11 +58,16 @@ class WeatherRepository @Inject constructor(
     private val geoSphere: GeoSphereApi,
     private val siag: SiagApi,
     private val odh: OdhApi,
+    private val meteoAlarm: MeteoAlarmApi,
     private val json: Json,
     private val clock: Clock,
 ) {
-    fun snapshot(language: String): Flow<WeatherSnapshot> =
-        combine(dao.forecasts(), dao.bulletin(language), dao.observation(), dao.meta()) { rows, bulletinRow, obsRow, meta ->
+    /** [combine] is typed only up to five flows, so the two single-row caches arrive as one. */
+    private data class Sidecars(val warnings: WarningsEntity?, val reference: StationReferenceEntity?)
+
+    fun snapshot(language: String): Flow<WeatherSnapshot> {
+        val sidecars = combine(dao.warnings(), dao.stationReference(), ::Sidecars)
+        return combine(dao.forecasts(), dao.bulletin(language), dao.observation(), sidecars, dao.meta()) { rows, bulletinRow, obsRow, (warningRow, referenceRow), meta ->
             val now = clock.instant()
             val forecasts = mutableMapOf<Source, SourceForecast>()
             val status = mutableMapOf<Source, SourceStatus>()
@@ -71,10 +86,16 @@ class WeatherRepository @Inject constructor(
             }
             val bulletin = bulletinRow?.json?.let { decode("bulletin", Bulletin.serializer(), it) }
             val observation = obsRow?.json?.let { decode("observation", StationObservation.serializer(), it) }
+            // A cached warning outlives the refresh that fetched it, so it is filtered here rather
+            // than at fetch time: one that expired since is gone from the app the minute it expires.
+            val warnings = warningRow?.json?.let { decode("warnings", WARNINGS, it) }
+            val reference = referenceRow?.json?.let { decode("station reference", StationReference.serializer(), it) }
             WeatherSnapshot(
                 forecasts = forecasts,
                 bulletin = bulletin,
                 observation = observation,
+                warnings = warnings.orEmpty().filter { it.isActiveAt(now) },
+                stationReference = reference,
                 status = status,
                 bulletinStatus = bulletinRow?.let {
                     statusOf(bulletin != null, bulletin?.issuedAt, it.fetchedAtMs, it.lastError, it.lastErrorAtMs, Duration.ofHours(24), now)
@@ -82,10 +103,15 @@ class WeatherRepository @Inject constructor(
                 observationStatus = obsRow?.let {
                     statusOf(observation != null, observation?.time, it.fetchedAtMs, it.lastError, it.lastErrorAtMs, Duration.ofMinutes(90), now)
                 },
+                // The feed carries no issue time of its own, so the fetch is the only timestamp there is.
+                warningStatus = warningRow?.let {
+                    statusOf(warnings != null, it.fetchedAtMs?.let(Instant::ofEpochMilli), it.fetchedAtMs, it.lastError, it.lastErrorAtMs, WARNINGS_STALE_AFTER, now)
+                },
                 lastSuccessfulRefresh = meta?.lastSuccessMs?.let(Instant::ofEpochMilli),
                 lastRefreshFailed = meta?.lastAttemptFailed ?: false,
             )
         }
+    }
 
     /** Cached JSON can outlive a model change; a row that no longer decodes is reported, never fatal. */
     private fun <T> decode(what: String, serializer: KSerializer<T>, text: String): T? =
@@ -111,18 +137,38 @@ class WeatherRepository @Inject constructor(
         val succeeded = Collections.synchronizedList(mutableListOf<String>())
         val failed = Collections.synchronizedMap(linkedMapOf<String, String>())
 
-        // Cancellation (WorkManager stopping the worker) must propagate: a cancelled refresh is not a failed one.
-        suspend fun <T> attempt(name: String, block: suspend () -> T): T? =
-            try {
-                val value = block()
-                succeeded += name
-                value
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                failed[name] = e.message ?: e.javaClass.simpleName
-                null
+        /**
+         * One attempt, then one retry if the network was the problem.
+         *
+         * These calls go out over a phone's connection, often the moment it wakes for the hourly
+         * worker and before the radio has settled, and a single dropped connection used to cost a
+         * whole source for an hour — the next refresh is not until then. A second try a few seconds
+         * later costs almost nothing and recovers exactly that case. Only IOException is retried: a
+         * malformed payload or a 404 will fail the same way twice.
+         *
+         * Cancellation (WorkManager stopping the worker) must propagate: a cancelled refresh is not
+         * a failed one, and must not be retried either.
+         */
+        suspend fun <T> attempt(name: String, block: suspend () -> T): T? {
+            var attemptsLeft = 1 + NETWORK_RETRIES
+            while (true) {
+                attemptsLeft--
+                try {
+                    val value = block()
+                    succeeded += name
+                    return value
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    if (attemptsLeft > 0 && e is IOException) {
+                        delay(RETRY_DELAY_MS)
+                        continue
+                    }
+                    failed[name] = e.message ?: e.javaClass.simpleName
+                    return null
+                }
             }
+        }
 
         // Persistence is fallible too (Room, serialisation). One source failing to store must not abort the
         // others via await(), and must not skip the meta row, so nothing escapes an async body but cancellation.
@@ -177,7 +223,27 @@ class WeatherRepository @Inject constructor(
                     )
                 }
             }
-            om.await(); gs.await(); km.await(); bl.await(); ob.await()
+            val sr = async {
+                isolate("OPEN_METEO_STATION") {
+                    val ref = attempt("OPEN_METEO_STATION") { OpenMeteoStationMapper.map(openMeteo.stationForecast(), now) }
+                    val prev = dao.stationReferenceOnce()
+                    dao.upsertStationReference(
+                        if (ref != null) StationReferenceEntity(0, json.encodeToString(StationReference.serializer(), ref), now.toEpochMilli(), null, null)
+                        else StationReferenceEntity(0, prev?.json, prev?.fetchedAtMs, failed["OPEN_METEO_STATION"], now.toEpochMilli())
+                    )
+                }
+            }
+            val wa = async {
+                isolate("METEOALARM") {
+                    val w = attempt("METEOALARM") { MeteoAlarmMapper.map(meteoAlarm.italy().string(), now) }
+                    val prev = dao.warningsOnce()
+                    dao.upsertWarnings(
+                        if (w != null) WarningsEntity(0, json.encodeToString(WARNINGS, w), now.toEpochMilli(), null, null)
+                        else WarningsEntity(0, prev?.json, prev?.fetchedAtMs, failed["METEOALARM"], now.toEpochMilli())
+                    )
+                }
+            }
+            om.await(); gs.await(); km.await(); bl.await(); ob.await(); wa.await(); sr.await()
         }
 
         val result = RefreshResult(succeeded.toList(), LinkedHashMap(failed))
@@ -215,6 +281,15 @@ class WeatherRepository @Inject constructor(
     }
 
     companion object {
+        /** One retry, not three: the worker runs again in an hour and nothing here is urgent. */
+        private const val NETWORK_RETRIES = 1
+        private const val RETRY_DELAY_MS = 3_000L
+
+        private val WARNINGS: KSerializer<List<Warning>> = ListSerializer(Warning.serializer())
+
+        /** MeteoAlarm publishes a few times a day; six hours without one means we are behind. */
+        private val WARNINGS_STALE_AFTER: Duration = Duration.ofHours(6)
+
         fun statusOf(
             hasData: Boolean, issuedAt: Instant?, fetchedAtMs: Long?,
             lastError: String?, lastErrorAtMs: Long?, staleAfter: Duration, now: Instant,

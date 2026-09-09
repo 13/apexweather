@@ -41,15 +41,22 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             hourly.map { h ->
                 HourlyPoint(
                     time = h.time, tempC = h.tempC, precipMm = h.precipMm, precipProb = h.precipProb,
-                    windKmh = h.windKmh, gustKmh = h.gustKmh, condition = h.condition,
+                    windKmh = h.windKmh, gustKmh = h.gustKmh, freezingLevelM = h.freezingLevelM,
+                    condition = h.condition,
                 )
             },
             zone, sunTimes,
         ).map { d ->
-            val agreements = hourly.filter { it.time.atZone(zone).toLocalDate() == d.date }.map { it.agreement }
+            val hoursOfDay = hourly.filter { it.time.atZone(zone).toLocalDate() == d.date }
+            val agreements = hoursOfDay.map { it.agreement }
             ConsensusDay(
                 date = d.date, minC = d.minC, maxC = d.maxC, precipMm = d.precipMm,
-                condition = d.condition, agreement = agreements.average().toFloat(),
+                condition = d.condition,
+                // Days are built from these hours, so the list is never empty; guarded anyway because
+                // an empty average is NaN and NaN would reach the screen as a blank badge.
+                agreement = if (agreements.isEmpty()) 0.5f else agreements.average().toFloat(),
+                sourceCount = hoursOfDay.maxOfOrNull { it.sourceCount } ?: 0,
+                freezingLevelMinM = hoursOfDay.mapNotNull { it.freezingLevelM }.minOrNull(),
                 sunrise = d.sunrise, sunset = d.sunset,
             )
         }
@@ -71,6 +78,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         val feels = values.mapNotNull { it.feelsLikeC }
         val gusts = values.mapNotNull { it.gustKmh }
         val winds = values.mapNotNull { it.windKmh }
+        val freezing = values.mapNotNull { it.freezingLevelM }
 
         return ConsensusHour(
             time = time,
@@ -81,7 +89,12 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             precipMm = median(values.map { it.precipMm }),
             precipProb = precipProb,
             windKmh = winds.takeIf { it.isNotEmpty() }?.let(::median),
+            // Deliberately the maximum rather than the median every other quantity uses: a gust is a
+            // peak, and one nobody was warned about is worse than one that did not arrive. Precipitation
+            // probability is a maximum for the same reason. Both are decisions about what "consensus"
+            // means here, not oversights; change them only on purpose.
             gustKmh = gusts.maxOrNull(),
+            freezingLevelM = freezing.takeIf { it.isNotEmpty() }?.let(::median),
             condition = voteCondition(values.map { it.condition }),
             agreement = agreement,
             sourceCount = values.size,

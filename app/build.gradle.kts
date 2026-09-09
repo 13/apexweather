@@ -7,6 +7,8 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.roborazzi)
+    alias(libs.plugins.baselineprofile)
 }
 
 // The release workflow stamps the git tag in with -PapexVersionName / -PapexVersionCode.
@@ -125,10 +127,19 @@ android {
         compose = true
         buildConfig = true
     }
+    sourceSets {
+        // The instrumented tests read the same recorded fixtures as the JVM tests. One of them,
+        // MeteoAlarmMapper, can only be trusted once it has run on a device: Android's XML parser
+        // rejects a configuration the JVM's accepts, and that difference reached a phone once.
+        getByName("androidTest") { resources.srcDir("src/test/resources") }
+    }
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
+            // Roborazzi needs real pixels out of Robolectric; the default legacy mode draws nothing,
+            // and a golden image of an empty canvas would pass forever.
+            all { it.systemProperty("robolectric.graphicsMode", "NATIVE") }
         }
     }
     packaging {
@@ -177,8 +188,12 @@ dependencies {
     implementation(libs.retrofit.serialization)
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
+    // Installs the recorded baseline profile on first run; without it the profile in the APK is inert.
+    implementation(libs.profileinstaller)
     implementation(libs.coil.compose)
     implementation(libs.coil.okhttp)
+
+    baselineProfile(project(":baselineprofile"))
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
@@ -189,10 +204,18 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.work.testing)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.compose.ui.test.manifest)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    // GrantPermissionRule, for the notification tests: POST_NOTIFICATIONS is a runtime permission.
+    androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.hilt.android.testing)
     kspAndroidTest(libs.hilt.compiler)

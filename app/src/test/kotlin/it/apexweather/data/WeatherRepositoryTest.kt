@@ -54,12 +54,13 @@ class WeatherRepositoryTest {
     private val geoSphere = FakeGeoSphere()
     private val siag = FakeSiag()
     private val odh = FakeOdh()
+    private val meteoAlarm = FakeMeteoAlarm()
     private val clock = MutableClock(Instant.parse("2026-09-08T14:00:00Z"))
     private lateinit var repo: WeatherRepository
 
     @Before fun setUp() {
         db = AppDatabase.inMemory(ApplicationProvider.getApplicationContext())
-        repo = WeatherRepository(db.weatherDao(), openMeteo, geoSphere, siag, odh, Fixtures.json, clock)
+        repo = WeatherRepository(db.weatherDao(), openMeteo, geoSphere, siag, odh, meteoAlarm, Fixtures.json, clock)
     }
 
     @After fun tearDown() = db.close()
@@ -103,7 +104,7 @@ class WeatherRepositoryTest {
     fun `all sources failing marks the refresh failed but keeps data`() = runTest {
         repo.refresh("de")
         val firstRefresh = clock.now
-        openMeteo.fail = true; geoSphere.fail = true; siag.fail = true; odh.fail = true
+        openMeteo.fail = true; geoSphere.fail = true; siag.fail = true; odh.fail = true; meteoAlarm.fail = true
         clock.now = clock.now.plus(Duration.ofMinutes(30))
         val result = repo.refresh("de")
         assertTrue(result.succeeded.isEmpty())
@@ -120,7 +121,7 @@ class WeatherRepositoryTest {
     fun `a store failure is isolated and the refresh still records its meta`() = runTest {
         val failing = WeatherRepository(
             FailingStoreDao(db.weatherDao(), Source.GEOSPHERE_AROME.name),
-            openMeteo, geoSphere, siag, odh, Fixtures.json, clock,
+            openMeteo, geoSphere, siag, odh, meteoAlarm, Fixtures.json, clock,
         )
         val result = failing.refresh("de")
         assertEquals("store: disk full", result.failed["GEOSPHERE_AROME"])
@@ -168,5 +169,28 @@ class WeatherRepositoryTest {
         val s = repo.snapshot("de").first()
         assertTrue(s.status.getValue(Source.ICON_D2) is SourceStatus.Stale)
         assertTrue(s.status.getValue(Source.ECMWF) is SourceStatus.Ok) // 12 h threshold
+    }
+
+    /**
+     * The hourly worker often wakes the radio and calls straight away, and a connection dropped
+     * there used to cost a whole source until the next run an hour later. One retry recovers it.
+     */
+    @Test
+    fun `a dropped connection is retried once and the source still lands`() = runTest {
+        openMeteo.failuresBeforeSuccess = 1
+        val result = repo.refresh("de")
+        assertEquals(2, openMeteo.forecastCalls)
+        assertTrue("OPEN_METEO" in result.succeeded)
+        assertEquals(null, result.failed["OPEN_METEO"])
+        assertTrue(repo.snapshot("de").first().forecasts.containsKey(Source.ICON_D2))
+    }
+
+    /** A second failure is the source's answer, not the network's; it is not retried forever. */
+    @Test
+    fun `a source that keeps failing is given up on after one retry`() = runTest {
+        openMeteo.failuresBeforeSuccess = 5
+        val result = repo.refresh("de")
+        assertEquals(2, openMeteo.forecastCalls)
+        assertEquals("connection reset", result.failed["OPEN_METEO"])
     }
 }

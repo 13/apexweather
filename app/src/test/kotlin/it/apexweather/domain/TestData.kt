@@ -19,10 +19,11 @@ fun point(
     prob: Int? = null,
     wind: Double? = 5.0,
     gust: Double? = null,
+    freezing: Double? = null,
     condition: Condition = Condition.CLEAR,
 ) = HourlyPoint(
     time = hour(i), tempC = temp, precipMm = precip, precipProb = prob,
-    windKmh = wind, gustKmh = gust, condition = condition,
+    windKmh = wind, gustKmh = gust, freezingLevelM = freezing, condition = condition,
 )
 
 fun forecast(source: Source, hourly: List<HourlyPoint>) = SourceForecast(

@@ -4,13 +4,18 @@ import it.apexweather.Fixtures
 import it.apexweather.data.remote.GeoSphereApi
 import it.apexweather.data.remote.GeoSphereResponse
 import it.apexweather.data.remote.KmosResponse
+import it.apexweather.data.remote.MeteoAlarmApi
 import it.apexweather.data.remote.OdhApi
 import it.apexweather.data.remote.OdhDistrictResponse
 import it.apexweather.data.remote.OdhWeatherResponse
 import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.OpenMeteoResponse
+import it.apexweather.data.remote.OpenMeteoStationResponse
 import it.apexweather.data.remote.SiagApi
 import it.apexweather.data.remote.SiagStationsResponse
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.IOException
 import java.time.Clock
 import java.time.Instant
@@ -19,13 +24,29 @@ import java.time.ZoneOffset
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * The four upstreams, answered from the recorded fixtures. Shared by the repository tests and by
+ * The five upstreams, answered from the recorded fixtures. Shared by the repository tests and by
  * anything else that needs a repository backed by real payloads rather than hand-written ones.
  */
 internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
+    /** How many times the forecast call was made, so a retry can be told from a single attempt. */
+    var forecastCalls: Int = 0
+
+    /** Fails this many times and then succeeds, for testing the retry. */
+    var failuresBeforeSuccess: Int = 0
+
     open override suspend fun forecast(latitude: Double, longitude: Double, timezone: String, forecastDays: Int, models: String, hourly: String, daily: String): OpenMeteoResponse {
+        forecastCalls++
+        if (failuresBeforeSuccess >= forecastCalls) throw IOException("connection reset")
         if (fail) throw IOException("open-meteo down")
         return Fixtures.json.decodeFromString(OpenMeteoResponse.serializer(), Fixtures.read("openmeteo.json"))
+    }
+
+    override suspend fun stationForecast(
+        latitude: Double, longitude: Double, elevation: Int, timezone: String,
+        pastDays: Int, forecastDays: Int, models: String, hourly: String,
+    ): OpenMeteoStationResponse {
+        if (fail) throw IOException("open-meteo down")
+        return Fixtures.json.decodeFromString(OpenMeteoStationResponse.serializer(), Fixtures.read("openmeteo_station.json"))
     }
 }
 
@@ -56,6 +77,13 @@ internal class FakeOdh(var fail: Boolean = false) : OdhApi {
     override suspend fun district(id: Int, language: String): OdhDistrictResponse {
         if (fail) throw IOException("odh down")
         return Fixtures.json.decodeFromString(OdhDistrictResponse.serializer(), Fixtures.read("odh_district2_de.json"))
+    }
+}
+
+internal class FakeMeteoAlarm(var fail: Boolean = false) : MeteoAlarmApi {
+    override suspend fun italy(): ResponseBody {
+        if (fail) throw IOException("meteoalarm down")
+        return Fixtures.read("meteoalarm_italy.xml").toResponseBody("application/atom+xml".toMediaType())
     }
 }
 

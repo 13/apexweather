@@ -42,13 +42,60 @@ class HomeStateBuilderTest {
         assertFalse(s.isEmpty)
     }
 
+    private fun observation(temp: Double) = StationObservation(
+        "Meran", hour(3), tempC = temp, humidityPct = 40, windKmh = 5.0, windDir = "W",
+        gustKmh = null, precipMm = 0.0, pressureHpa = 1010.0,
+    )
+
+    /** The models' view from down at the station, warmer than the village by [warmerBy]. */
+    private fun reference(warmerBy: Double, fetchedAt: java.time.Instant = hour(3)) =
+        it.apexweather.data.remote.StationReference(
+            fetchedAt = fetchedAt,
+            elevationM = 330.0,
+            tempByEpochSecond = consensus.hourly.associate { it.time.epochSecond to it.tempC + warmerBy },
+        )
+
+    /**
+     * The station sits 270 m below the village, so its reading is quoted only after the models'
+     * own difference between the two points has been applied to it.
+     */
     @Test
-    fun `fresh observation overrides hero temperature but not condition`() {
-        val obs = StationObservation("Meran", hour(3), tempC = 25.5, humidityPct = 40, windKmh = 5.0, windDir = "W", gustKmh = null, precipMm = 0.0, pressureHpa = 1010.0)
-        val s = HomeStateBuilder.build(snapshot.copy(observation = obs), AppSettings(), consensus, now = hour(3).plusSeconds(600))
-        assertEquals(25.5, s.heroTempC!!, 0.0)
+    fun `a fresh observation is carried up to the village before it becomes the hero`() {
+        val s = HomeStateBuilder.build(
+            snapshot.copy(observation = observation(25.5), stationReference = reference(warmerBy = 2.0)),
+            AppSettings(), consensus, now = hour(3).plusSeconds(600),
+        )
+        assertEquals(23.5, s.heroTempC!!, 1e-9)
+        assertEquals(-2.0, s.heroAdjustmentC!!, 1e-9)
         assertEquals(Condition.RAIN, s.heroCondition)
         assertTrue(s.observation != null)
+    }
+
+    /**
+     * With nothing to carry it up with, the raw station reading is 270 m too low to stand for the
+     * village, while the consensus is already at the village's height. The forecast wins.
+     */
+    @Test
+    fun `without a reference the consensus is preferred to an uncorrected station reading`() {
+        val s = HomeStateBuilder.build(
+            snapshot.copy(observation = observation(25.5)),
+            AppSettings(), consensus, now = hour(3).plusSeconds(600),
+        )
+        assertEquals(consensus.hourly[3].tempC, s.heroTempC!!, 0.0)
+        assertNull(s.heroAdjustmentC)
+        // The card still shows what was measured; only the hero declines to quote it.
+        assertNull(s.observation)
+        assertTrue(s.station != null)
+    }
+
+    /** A reference from days ago describes air that has since moved on. */
+    @Test
+    fun `a stale reference is not used to correct anything`() {
+        val s = HomeStateBuilder.build(
+            snapshot.copy(observation = observation(25.5), stationReference = reference(2.0, fetchedAt = hour(3).minusSeconds(48 * 3600))),
+            AppSettings(), consensus, now = hour(3).plusSeconds(600),
+        )
+        assertNull(s.heroAdjustmentC)
     }
 
     @Test
@@ -112,5 +159,40 @@ class HomeStateBuilderTest {
         val s = HomeStateBuilder.build(WeatherSnapshot.EMPTY, AppSettings(), consensus = ConsensusForecast.EMPTY, now = hour(0))
         assertTrue(s.isEmpty)
         assertNull(s.heroTempC)
+    }
+
+    /**
+     * The hero drops a station reading older than ninety minutes, because it stands in for the
+     * forecast there. The card shows the same reading with its timestamp instead, so an older
+     * measurement stays readable rather than disappearing without a word.
+     */
+    @Test
+    fun `the station card keeps a reading the hero has already let go`() {
+        val old = it.apexweather.domain.model.StationObservation(
+            stationName = "Meran", time = hour(0), tempC = 18.0, humidityPct = 60, windKmh = 5.0,
+            windDir = "NO", gustKmh = 12.0, precipMm = 0.0, pressureHpa = 1013.0,
+        )
+        val s = HomeStateBuilder.build(
+            snapshot.copy(observation = old), AppSettings(), consensus,
+            now = hour(0).plusSeconds(4 * 3600),
+        )
+        assertNull("the hero must not quote a four-hour-old reading", s.observation)
+        assertEquals(old, s.station)
+    }
+
+    @Test
+    fun `warnings travel from the snapshot to the screen untouched`() {
+        val w = it.apexweather.domain.model.Warning(
+            identifier = "x", type = it.apexweather.domain.model.WarningType.RAIN,
+            level = it.apexweather.domain.model.WarningLevel.ORANGE, areaDesc = "Trentino Alto Adige",
+            onset = hour(0), expires = hour(6), headline = "Orange Rain Warning",
+        )
+        val s = HomeStateBuilder.build(snapshot.copy(warnings = listOf(w)), AppSettings(), consensus, now = hour(0))
+        assertEquals(listOf(w), s.warnings)
+    }
+
+    @Test
+    fun `the day list runs two weeks rather than one`() {
+        assertEquals(14, HomeStateBuilder.MAX_DAYS)
     }
 }

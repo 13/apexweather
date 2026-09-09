@@ -17,7 +17,6 @@
     <string name="now_from_station">Now: station %1$s, %2$s</string>
     <string name="updated_at">Updated %1$s</string>
     <string name="section_hourly">NEXT 48 HOURS</string>
-    <string name="section_daily">7 DAYS</string>
     <string name="section_bulletin">SOUTH TYROL WEATHER SERVICE</string>
     <string name="now">Now</string>
     <string name="today">Today</string>
@@ -113,4 +112,78 @@
     <string name="compare_day_today">Today</string>
     <string name="compare_day_tomorrow">Tomorrow</string>
     <string name="compare_readout_hint">Touch the chart for values</string>
+
+    <!-- Civil-protection warnings from MeteoAlarm. Issued for the whole region, never for the village. -->
+    <string name="warn_wind">Wind</string>
+    <string name="warn_rain">Rain</string>
+    <string name="warn_thunderstorm">Thunderstorms</string>
+    <string name="warn_snow_ice">Snow and ice</string>
+    <string name="warn_fog">Fog</string>
+    <string name="warn_high_temperature">Heat</string>
+    <string name="warn_low_temperature">Cold</string>
+    <string name="warn_coastal_event">Coastal event</string>
+    <string name="warn_forest_fire">Forest fire</string>
+    <string name="warn_avalanche">Avalanches</string>
+    <string name="warn_rain_flood">Rain and flooding</string>
+    <string name="warn_flood">Flooding</string>
+    <string name="warn_other">Severe weather</string>
+    <string name="warn_level_yellow">Yellow</string>
+    <string name="warn_level_orange">Orange</string>
+    <string name="warn_level_red">Red</string>
+    <string name="warn_headline">%1$s: %2$s warning</string>
+    <string name="warn_window">%1$s to %2$s</string>
+    <string name="warn_until">until %1$s</string>
+    <string name="warn_area">%1$s · civil protection via MeteoAlarm</string>
+    <plurals name="warn_more">
+        <item quantity="one">%1$d more warning</item>
+        <item quantity="other">%1$d more warnings</item>
+    </plurals>
+    <string name="warn_desc">%1$s, %2$s warning, %3$s</string>
+    <string name="warnings_sheet_title">Warnings for %1$s</string>
+
+    <!-- What the station actually measured, as opposed to what the models predict. -->
+    <string name="section_station">MEASURED · %1$s STATION</string>
+    <string name="station_measured_at">Reading from %1$s</string>
+    <string name="station_temp">Temperature</string>
+    <string name="station_wind">Wind</string>
+    <string name="station_gust">Gusts</string>
+    <string name="station_humidity">Humidity</string>
+    <string name="station_pressure">Pressure</string>
+    <string name="station_precip">Precipitation</string>
+    <string name="station_wind_with_dir">%1$s from %2$s</string>
+    <string name="unit_percent">%1$d %%</string>
+    <string name="unit_hpa">%1$s hPa</string>
+
+    <!-- The 0 °C isotherm: in a valley at 600 m it decides between rain and snow. -->
+    <string name="freezing_level">Freezing level %1$s</string>
+    <string name="freezing_level_low">Snow line down to %1$s</string>
+    <string name="unit_metres">%1$s m</string>
+
+    <!-- Days beyond the reach of the regional models. -->
+    <string name="agreement_single">1 model</string>
+    <string name="section_daily_long">14 DAYS</string>
+    <string name="daily_tail_note">From day six only ECMWF still reaches: no consensus, a single forecast.</string>
+
+    <!-- Notifications. Every one of them is off until switched on in the settings. -->
+    <string name="channel_summary_name">Morning summary</string>
+    <string name="channel_summary_desc">The day\'s weather, once each morning</string>
+    <string name="channel_rain_name">Rain starting</string>
+    <string name="channel_rain_desc">When precipitation begins in the next few hours</string>
+    <string name="channel_warning_name">Severe weather</string>
+    <string name="channel_warning_desc">Civil-protection warnings for the region</string>
+    <string name="notif_summary_title">Today in Dorf Tirol: %1$s</string>
+    <string name="notif_summary_text">%1$s to %2$s · %3$s</string>
+    <string name="notif_rain_title">%1$s from %2$s</string>
+    <string name="notif_rain_text">%1$d %% chance · %2$s expected</string>
+    <string name="notif_warning_text">%1$s · %2$s</string>
+    <string name="setting_notifications">NOTIFICATIONS</string>
+    <string name="setting_notif_summary">Morning summary</string>
+    <string name="setting_notif_summary_time">At %1$s</string>
+    <string name="setting_notif_rain">Rain starting</string>
+    <string name="setting_notif_warning">Severe weather</string>
+    <string name="setting_notif_permission">Android has to allow Apex Weather to post notifications</string>
+    <string name="setting_notif_grant">Allow</string>
+
+    <!-- The station stands 270 m below the village, so its reading is carried up before it is quoted. -->
+    <string name="now_from_station_adjusted">Now: %1$s station, %2$s · adjusted to Dorf Tirol (%3$s)</string>
 </resources>

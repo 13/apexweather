@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon: the same A-sharp glyph as the launcher, but scaled to fill a 24dp canvas
+     instead of sitting inside the launcher's safe zone. Android draws it as a white silhouette,
+     so it carries no colour of its own. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+
+    <group android:scaleX="0.111" android:scaleY="0.111"
+        android:translateX="0.89" android:translateY="1.25">
+        <path android:fillColor="#FFFFFFFF"
+            android:pathData="M10.02,176L100,151.9L189.98,176L100,100.5Z" />
+        <path android:fillColor="#FFFFFFFF"
+            android:pathData="M28.08,142.58L100,82.22L171.92,142.58L100,18Z" />
+    </group>
+</vector>

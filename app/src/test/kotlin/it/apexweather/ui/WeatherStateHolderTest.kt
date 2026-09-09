@@ -3,6 +3,7 @@ package it.apexweather.ui
 import androidx.test.core.app.ApplicationProvider
 import it.apexweather.Fixtures
 import it.apexweather.data.FakeGeoSphere
+import it.apexweather.data.FakeMeteoAlarm
 import it.apexweather.data.FakeOdh
 import it.apexweather.data.FakeOpenMeteo
 import it.apexweather.data.FakeSiag
@@ -53,7 +54,7 @@ class WeatherStateHolderTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         db = AppDatabase.inMemory(context)
         repository = WeatherRepository(
-            db.weatherDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(),
+            db.weatherDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(), FakeMeteoAlarm(),
             Fixtures.json, MutableClock(Instant.parse("2026-09-08T14:00:00Z")),
         )
         scope = CoroutineScope(UnconfinedTestDispatcher())

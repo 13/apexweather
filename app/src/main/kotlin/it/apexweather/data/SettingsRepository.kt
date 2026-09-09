@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -36,7 +37,18 @@ data class AppSettings(
     val animations: Boolean = true,
     val compareSources: Set<Source> = Source.entries.toSet(),
     val compareVariable: CompareVariable = CompareVariable.TEMPERATURE,
+    /**
+     * Notifications, every one of them off until asked for. Android's own permission is a second
+     * gate on top of these: a switch on here with the permission refused posts nothing.
+     */
+    val notifySummary: Boolean = false,
+    /** Local hour the morning summary is posted at, on the first refresh at or after it. */
+    val notifySummaryHour: Int = 7,
+    val notifyRain: Boolean = false,
+    val notifyWarnings: Boolean = false,
 ) {
+    val anyNotification: Boolean get() = notifySummary || notifyRain || notifyWarnings
+
     /** Language used for the SIAG bulletin: explicit setting, else system language, else German. */
     fun bulletinLanguage(systemTag: String): String {
         language.tag?.let { return it }
@@ -55,6 +67,10 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val animations = booleanPreferencesKey("animations")
         val compareSources = stringSetPreferencesKey("compare_sources")
         val compareVariable = stringPreferencesKey("compare_variable")
+        val notifySummary = booleanPreferencesKey("notify_summary")
+        val notifySummaryHour = intPreferencesKey("notify_summary_hour")
+        val notifyRain = booleanPreferencesKey("notify_rain")
+        val notifyWarnings = booleanPreferencesKey("notify_warnings")
     }
 
     val settings: Flow<AppSettings> = context.settingsStore.data.catch { e ->
@@ -68,6 +84,12 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
                 ?: Source.entries.toSet(),
             compareVariable = p[Keys.compareVariable]?.let { runCatching { CompareVariable.valueOf(it) }.getOrNull() }
                 ?: CompareVariable.TEMPERATURE,
+            notifySummary = p[Keys.notifySummary] ?: false,
+            // Anything outside a day is a corrupt preference, not a choice; fall back rather than
+            // schedule a summary for hour 47.
+            notifySummaryHour = p[Keys.notifySummaryHour]?.takeIf { it in 0..23 } ?: 7,
+            notifyRain = p[Keys.notifyRain] ?: false,
+            notifyWarnings = p[Keys.notifyWarnings] ?: false,
         )
     }
 
@@ -76,6 +98,10 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     suspend fun setAnimations(v: Boolean) = context.settingsStore.edit { it[Keys.animations] = v }
     suspend fun setCompareSources(v: Set<Source>) = context.settingsStore.edit { it[Keys.compareSources] = v.map { s -> s.name }.toSet() }
     suspend fun setCompareVariable(v: CompareVariable) = context.settingsStore.edit { it[Keys.compareVariable] = v.name }
+    suspend fun setNotifySummary(v: Boolean) = context.settingsStore.edit { it[Keys.notifySummary] = v }
+    suspend fun setNotifySummaryHour(v: Int) = context.settingsStore.edit { it[Keys.notifySummaryHour] = v.coerceIn(0, 23) }
+    suspend fun setNotifyRain(v: Boolean) = context.settingsStore.edit { it[Keys.notifyRain] = v }
+    suspend fun setNotifyWarnings(v: Boolean) = context.settingsStore.edit { it[Keys.notifyWarnings] = v }
 
     suspend fun toggleCompareSource(source: Source) = context.settingsStore.edit { prefs ->
         val current = prefs[Keys.compareSources]?.mapNotNull { runCatching { Source.valueOf(it) }.getOrNull() }?.toSet()

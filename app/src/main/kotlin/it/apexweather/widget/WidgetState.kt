@@ -4,6 +4,7 @@ import it.apexweather.R
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.Formats
 import it.apexweather.ui.common.iconRes
+import it.apexweather.ui.common.argb
 import it.apexweather.ui.common.labelRes
 import it.apexweather.ui.home.HomeUiState
 import java.time.Duration
@@ -22,6 +23,10 @@ data class WidgetState(
     val isStale: Boolean,
     val topColor: Long,
     val bottomColor: Long,
+    /** The worst warning in force, or null. Resource ids rather than text: the widget resolves them. */
+    val warningTypeRes: Int? = null,
+    val warningLevelRes: Int? = null,
+    val warningColor: Long = 0xFFFFFFFFL,
 )
 
 object WidgetStateBuilder {
@@ -42,6 +47,10 @@ object WidgetStateBuilder {
             isStale = home.updatedAt == null || Duration.between(home.updatedAt, home.now) > STALE_AFTER,
             topColor = home.palette.top,
             bottomColor = home.palette.bottom,
+            // Worst first out of the repository, so the first one is the one the widget has room for.
+            warningTypeRes = home.warnings.firstOrNull()?.type?.labelRes(),
+            warningLevelRes = home.warnings.firstOrNull()?.level?.labelRes(),
+            warningColor = home.warnings.firstOrNull()?.level?.argb ?: 0xFFFFFFFFL,
         )
     }
 }

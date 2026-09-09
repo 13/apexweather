@@ -1,5 +1,9 @@
 package it.apexweather.ui.navigation
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +22,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,9 +30,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -121,6 +129,20 @@ fun ApexApp() {
     }
 
     if (settingsOpen) {
+        // Asked for straight from the sheet, and re-read afterwards: Android answers the request in
+        // its own dialog, and on a refusal the hint has to come back rather than the sheet claiming
+        // the switch took effect. Re-read on every open, too — the reader may have changed it in
+        // Android's settings since.
+        val context = LocalContext.current
+        var notificationsAllowed by remember { mutableStateOf(true) }
+        fun readPermission() {
+            val granted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            notificationsAllowed = granted && NotificationManagerCompat.from(context).areNotificationsEnabled()
+        }
+        val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { readPermission() }
+        LaunchedEffect(Unit) { readPermission() }
+
         SettingsSheet(
             settings = settings,
             onLanguage = { l ->
@@ -131,6 +153,18 @@ fun ApexApp() {
             onAnimations = settingsVm::setAnimations,
             onRefresh = homeVm::refresh,
             onDismiss = { settingsOpen = false },
+            notificationsAllowed = notificationsAllowed,
+            onRequestNotifications = {
+                // Below API 33 there is no permission to ask for; the switch that is off lives in
+                // Android's own notification settings, and the hint never appears there anyway.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            },
+            onNotifySummary = settingsVm::setNotifySummary,
+            onNotifySummaryHour = settingsVm::setNotifySummaryHour,
+            onNotifyRain = settingsVm::setNotifyRain,
+            onNotifyWarnings = settingsVm::setNotifyWarnings,
             updateSection = { UpdateSection() },
         )
     }

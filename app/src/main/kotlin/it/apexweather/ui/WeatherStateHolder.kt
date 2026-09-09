@@ -76,7 +76,9 @@ class WeatherStateHolder @Inject constructor(
      * flipping the animations switch would have re-run it.
      */
     private val blended = snapshots
-        .map { it to blender.blend(it.forecasts) }
+        // forecastsForBlend, not forecasts: a model run that has gone stale stays visible per source
+        // with its age beside it, but is kept out of the number the app leads with.
+        .map { it to blender.blend(it.forecastsForBlend) }
         .flowOn(Dispatchers.Default)
 
     val weather: StateFlow<WeatherState> =
