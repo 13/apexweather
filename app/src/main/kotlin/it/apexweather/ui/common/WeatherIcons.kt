@@ -1,34 +1,37 @@
 package it.apexweather.ui.common
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AcUnit
-import androidx.compose.material.icons.rounded.Bolt
-import androidx.compose.material.icons.rounded.Cloud
-import androidx.compose.material.icons.rounded.Dehaze
-import androidx.compose.material.icons.rounded.Grain
-import androidx.compose.material.icons.rounded.NightsStay
-import androidx.compose.material.icons.rounded.Opacity
-import androidx.compose.material.icons.rounded.Umbrella
-import androidx.compose.material.icons.rounded.WbCloudy
-import androidx.compose.material.icons.rounded.WbSunny
+import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import it.apexweather.R
 import it.apexweather.domain.SunPhase
 import it.apexweather.domain.model.Condition
 
-fun Condition.icon(phase: SunPhase = SunPhase.DAY): ImageVector = when (this) {
-    Condition.CLEAR -> if (phase == SunPhase.NIGHT) Icons.Rounded.NightsStay else Icons.Rounded.WbSunny
-    Condition.MOSTLY_CLEAR -> if (phase == SunPhase.NIGHT) Icons.Rounded.NightsStay else Icons.Rounded.WbSunny
-    Condition.PARTLY_CLOUDY -> Icons.Rounded.WbCloudy
-    Condition.CLOUDY -> Icons.Rounded.Cloud
-    Condition.FOG -> Icons.Rounded.Dehaze
-    Condition.DRIZZLE -> Icons.Rounded.Grain
-    Condition.RAIN -> Icons.Rounded.Opacity
-    Condition.HEAVY_RAIN -> Icons.Rounded.Umbrella
-    Condition.SLEET, Condition.SNOW, Condition.HEAVY_SNOW -> Icons.Rounded.AcUnit
-    Condition.THUNDERSTORM -> Icons.Rounded.Bolt
+/**
+ * The one icon table, used by the app and by the widget alike.
+ *
+ * Every condition gets its own drawing rather than a stock glyph that happens to be nearby: rain
+ * falls in three weights, snow in two, and clear, mostly clear and partly cloudy differ by how
+ * much cloud there is instead of all reading as the same cloud. The widget used to keep a second
+ * copy of this table with nothing asserting the two agreed.
+ */
+@DrawableRes
+fun Condition.iconRes(phase: SunPhase = SunPhase.DAY): Int {
+    val night = phase == SunPhase.NIGHT
+    return when (this) {
+        Condition.CLEAR -> if (night) R.drawable.ic_wx_moon else R.drawable.ic_wx_sun
+        Condition.MOSTLY_CLEAR -> if (night) R.drawable.ic_wx_moon_cloud else R.drawable.ic_wx_sun_cloud
+        Condition.PARTLY_CLOUDY -> if (night) R.drawable.ic_wx_cloud_moon else R.drawable.ic_wx_cloud_sun
+        Condition.CLOUDY -> R.drawable.ic_wx_cloud
+        Condition.FOG -> R.drawable.ic_wx_fog
+        Condition.DRIZZLE -> R.drawable.ic_wx_drizzle
+        Condition.RAIN -> R.drawable.ic_wx_rain
+        Condition.HEAVY_RAIN -> R.drawable.ic_wx_heavy_rain
+        Condition.SLEET -> R.drawable.ic_wx_sleet
+        Condition.SNOW -> R.drawable.ic_wx_snow
+        Condition.HEAVY_SNOW -> R.drawable.ic_wx_heavy_snow
+        Condition.THUNDERSTORM -> R.drawable.ic_wx_storm
+    }
 }
 
 @Composable
@@ -48,3 +51,19 @@ fun Condition.label(): String = stringResource(
         Condition.THUNDERSTORM -> R.string.cond_thunderstorm
     }
 )
+
+/** Label for a condition outside a composition, such as in the widget. */
+fun Condition.labelRes(): Int = when (this) {
+    Condition.CLEAR -> R.string.cond_clear
+    Condition.MOSTLY_CLEAR -> R.string.cond_mostly_clear
+    Condition.PARTLY_CLOUDY -> R.string.cond_partly_cloudy
+    Condition.CLOUDY -> R.string.cond_cloudy
+    Condition.FOG -> R.string.cond_fog
+    Condition.DRIZZLE -> R.string.cond_drizzle
+    Condition.RAIN -> R.string.cond_rain
+    Condition.HEAVY_RAIN -> R.string.cond_heavy_rain
+    Condition.SLEET -> R.string.cond_sleet
+    Condition.SNOW -> R.string.cond_snow
+    Condition.HEAVY_SNOW -> R.string.cond_heavy_snow
+    Condition.THUNDERSTORM -> R.string.cond_thunderstorm
+}

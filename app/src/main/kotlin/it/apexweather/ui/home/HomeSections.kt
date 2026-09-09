@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -49,7 +50,7 @@ import it.apexweather.domain.model.ConsensusHour
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.GlassCard
-import it.apexweather.ui.common.icon
+import it.apexweather.ui.common.iconRes
 import it.apexweather.ui.common.label
 import it.apexweather.ui.theme.fromArgb
 import java.time.Instant
@@ -69,7 +70,7 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier) {
             modifier = Modifier.testTag("hero_temp"),
         )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(state.heroCondition.icon(state.phase), contentDescription = null, tint = Color.fromArgb(state.palette.accent), modifier = Modifier.size(22.dp))
+            Icon(painterResource(state.heroCondition.iconRes(state.phase)), contentDescription = null, tint = Color.fromArgb(state.palette.accent), modifier = Modifier.size(22.dp))
             Text(state.heroCondition.label(), style = MaterialTheme.typography.headlineMedium, color = Color.White)
         }
         Spacer(Modifier.height(6.dp))
@@ -161,7 +162,7 @@ fun HourStrip(
                         style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.75f),
                     )
                     Spacer(Modifier.height(6.dp))
-                    Icon(h.condition.icon(phaseAt(h.time)), contentDescription = h.condition.label(), tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(painterResource(h.condition.iconRes(phaseAt(h.time))), contentDescription = h.condition.label(), tint = Color.White, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.height(6.dp))
                     Text(Format.temp(h.tempC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
@@ -238,7 +239,7 @@ fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate
                     if (i == 0) stringResource(R.string.today) else Format.weekday(d.date, formats),
                     style = MaterialTheme.typography.bodyMedium, color = Color.White, modifier = Modifier.width(52.dp),
                 )
-                Icon(d.condition.icon(SunPhase.DAY), contentDescription = d.condition.label(), tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(painterResource(d.condition.iconRes(SunPhase.DAY)), contentDescription = d.condition.label(), tint = Color.White, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(if (d.precipMm >= 0.5) Format.mm(d.precipMm, formats) else "", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5), modifier = Modifier.width(48.dp))
                 Text(Format.temp(d.minC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.width(36.dp))

@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -31,7 +32,7 @@ import it.apexweather.domain.SunPhase
 import it.apexweather.domain.model.ConsensusDay
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
-import it.apexweather.ui.common.icon
+import it.apexweather.ui.common.iconRes
 import it.apexweather.ui.common.label
 import it.apexweather.ui.theme.fromArgb
 
@@ -61,7 +62,7 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState) {
         Spacer(Modifier.height(8.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon(day.condition.icon(SunPhase.DAY), contentDescription = null, tint = accent, modifier = Modifier.size(26.dp))
+            Icon(painterResource(day.condition.iconRes(SunPhase.DAY)), contentDescription = null, tint = accent, modifier = Modifier.size(26.dp))
             Text(day.condition.label(), style = MaterialTheme.typography.titleMedium, color = Color.White)
         }
         Spacer(Modifier.height(10.dp))
