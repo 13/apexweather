@@ -131,9 +131,9 @@ fun HourStrip(
     phaseAt: (Instant) -> SunPhase,
     accent: Color,
     tagPrefix: String,
+    modifier: Modifier = Modifier,
     onHourClick: ((Instant) -> Unit)? = null,
     labelFirstAsNow: Boolean = true,
-    modifier: Modifier = Modifier,
 ) {
     if (hours.isEmpty()) return
     val scroll = rememberScrollState()

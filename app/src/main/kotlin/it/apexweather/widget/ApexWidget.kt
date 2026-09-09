@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Shader
+import androidx.core.graphics.createBitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -85,7 +86,7 @@ class ApexWidget : GlanceAppWidget() {
     }
 
     private fun gradientBitmap(top: Long, bottom: Long): Bitmap {
-        val bmp = Bitmap.createBitmap(64, 128, Bitmap.Config.ARGB_8888)
+        val bmp = createBitmap(64, 128)
         val paint = Paint().apply { shader = LinearGradient(0f, 0f, 0f, 128f, top.toInt(), bottom.toInt(), Shader.TileMode.CLAMP) }
         Canvas(bmp).drawRect(0f, 0f, 64f, 128f, paint)
         return bmp

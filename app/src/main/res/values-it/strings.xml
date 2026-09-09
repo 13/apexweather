@@ -65,21 +65,28 @@
     <string name="agreement_short">Accordo %1$d %%</string>
     <string name="compare_cell_desc">%1$s, %2$s: da %3$s a %4$s, %5$s, %6$s</string>
     <string name="compare_cell_missing">%1$s: nessuna previsione per %2$s</string>
-    <string name="compare_chart_desc">%1$s nelle prossime %2$d ore, da %3$s a %4$s, %5$s</string>
+    <plurals name="compare_chart_desc">
+        <item quantity="one">%1$s nella prossima %2$d ora, da %3$s a %4$s, %5$s</item>
+        <item quantity="many">%1$s nelle prossime %2$d ore, da %3$s a %4$s, %5$s</item>
+        <item quantity="other">%1$s nelle prossime %2$d ore, da %3$s a %4$s, %5$s</item>
+    </plurals>
     <string name="about_build">Versione %1$s (%2$d) · %3$s</string>
     <string name="about_commit">Commit %1$s · %2$s</string>
     <string name="day_source_desc">%1$s: da %2$s a %3$s, %4$s</string>
     <string name="hour_column_desc">Ore %1$s: %2$s, %3$s, %4$d %% di probabilità di precipitazioni</string>
     <plurals name="now_from_consensus">
         <item quantity="one">Consenso di %1$d modello</item>
+        <item quantity="many">Consenso di %1$d modelli</item>
         <item quantity="other">Consenso di %1$d modelli</item>
     </plurals>
     <plurals name="compare_chart_desc_models">
         <item quantity="one">%1$d modello più il consenso</item>
+        <item quantity="many">%1$d modelli più il consenso</item>
         <item quantity="other">%1$d modelli più il consenso</item>
     </plurals>
     <plurals name="compare_cell_degrees">
         <item quantity="one">%1$d grado dal consenso</item>
+        <item quantity="many">%1$d gradi dal consenso</item>
         <item quantity="other">%1$d gradi dal consenso</item>
     </plurals>
 </resources>

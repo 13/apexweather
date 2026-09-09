@@ -84,6 +84,27 @@ android {
         }
     }
 
+    lint {
+        // CI runs this, so a warning has to be worth failing a build over.
+        warningsAsErrors = true
+        abortOnError = true
+        sarifReport = true
+        disable += setOf(
+            // Dependency and toolchain upgrades are a decision to take deliberately, on a day set
+            // aside for it. A new release upstream is not a defect in this code.
+            "GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion",
+            // targetSdk trails compileSdk on purpose; see the comment on targetSdk above.
+            "OldTargetApi",
+            // Lint calls mipmap-anydpi-v26 unnecessary at minSdk 31, but dropping the qualifier
+            // makes aapt2 fail with "resource mipmap/ic_launcher not found". Tried, reverted.
+            "ObsoleteSdkInt",
+            // Resource shrinking is left off: Glance selects its generated layouts at runtime, and
+            // nothing here verifies a shrunk widget on a device. Revisit with a placed widget to
+            // test against.
+            "NotShrinkingResources",
+        )
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true

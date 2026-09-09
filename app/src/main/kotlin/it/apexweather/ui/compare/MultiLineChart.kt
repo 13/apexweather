@@ -12,7 +12,6 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import it.apexweather.R
@@ -35,11 +34,11 @@ fun MultiLineChart(
     from: Instant,
     hours: Long,
     unitLabel: String,
+    modifier: Modifier = Modifier,
     /** True for variables that cannot go below zero (precipitation, wind): keeps the axis from showing negatives. */
     nonNegative: Boolean = false,
     /** Names the plotted variable for the spoken summary; the chart itself is only lines. */
     variableName: String = "",
-    modifier: Modifier = Modifier,
 ) {
     val formats = LocalFormats.current
     val labelPaint = remember {
@@ -49,8 +48,8 @@ fun MultiLineChart(
     // what is plotted, over how long, across what range, and how many models are in it.
     val values = series.values.flatten().map { it.value } + consensus.map { it.value }
     val models = pluralStringResource(R.plurals.compare_chart_desc_models, series.size, series.size)
-    val summary = if (values.isEmpty()) variableName else stringResource(
-        R.string.compare_chart_desc, variableName, hours,
+    val summary = if (values.isEmpty()) variableName else pluralStringResource(
+        R.plurals.compare_chart_desc, hours.toInt(), variableName, hours,
         "${values.min().roundToInt()}$unitLabel", "${values.max().roundToInt()}$unitLabel", models,
     )
     Canvas(modifier.testTag("compare_chart").semantics { contentDescription = summary }) {

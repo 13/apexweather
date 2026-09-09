@@ -65,7 +65,10 @@
     <string name="agreement_short">Agreement %1$d %%</string>
     <string name="compare_cell_desc">%1$s, %2$s: %3$s to %4$s, %5$s, %6$s</string>
     <string name="compare_cell_missing">%1$s: no forecast for %2$s</string>
-    <string name="compare_chart_desc">%1$s over the next %2$d hours, %3$s to %4$s, %5$s</string>
+    <plurals name="compare_chart_desc">
+        <item quantity="one">%1$s over the next %2$d hour, %3$s to %4$s, %5$s</item>
+        <item quantity="other">%1$s over the next %2$d hours, %3$s to %4$s, %5$s</item>
+    </plurals>
     <string name="about_build">Version %1$s (%2$d) · %3$s</string>
     <string name="about_commit">Commit %1$s · %2$s</string>
     <string name="day_source_desc">%1$s: %2$s to %3$s, %4$s</string>
