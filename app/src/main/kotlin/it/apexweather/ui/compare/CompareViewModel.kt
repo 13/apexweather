@@ -6,8 +6,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import it.apexweather.data.AppSettings
 import it.apexweather.data.CompareVariable
 import it.apexweather.data.SettingsRepository
-import it.apexweather.data.WeatherRepository
-import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.DailyAggregator
 import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.model.ConsensusForecast
@@ -15,20 +13,18 @@ import it.apexweather.domain.model.HourlyPoint
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.WeatherSnapshot
+import it.apexweather.ui.WeatherStateHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 import javax.inject.Inject
 
 data class SeriesPoint(val time: Instant, val value: Double)
@@ -94,16 +90,13 @@ object CompareStateBuilder {
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class CompareViewModel @Inject constructor(
-    private val repository: WeatherRepository,
+    holder: WeatherStateHolder,
     private val settingsRepository: SettingsRepository,
-    private val blender: ConsensusBlender,
-    private val clock: Clock,
 ) : ViewModel() {
-    val state: StateFlow<CompareUiState> = settingsRepository.settings.flatMapLatest { s ->
-        repository.snapshot(s.bulletinLanguage(Locale.getDefault().toLanguageTag())).map { snap ->
-            CompareStateBuilder.build(snap, s, blender.blend(snap.forecasts), clock.instant())
-        }
-    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CompareUiState())
+    val state: StateFlow<CompareUiState> = holder.weather
+        .map { CompareStateBuilder.build(it.snapshot, it.settings, it.consensus, it.now) }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CompareUiState())
 
     fun toggleSource(source: Source) = viewModelScope.launch { settingsRepository.toggleCompareSource(source) }
 

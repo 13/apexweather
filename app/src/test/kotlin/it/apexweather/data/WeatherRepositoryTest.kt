@@ -41,52 +41,12 @@ import kotlin.coroutines.cancellation.CancellationException
 @Config(sdk = [34])
 class WeatherRepositoryTest {
 
-    private class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
-        override suspend fun forecast(latitude: Double, longitude: Double, timezone: String, forecastDays: Int, models: String, hourly: String, daily: String): OpenMeteoResponse {
-            if (fail) throw IOException("open-meteo down")
-            return Fixtures.json.decodeFromString(OpenMeteoResponse.serializer(), Fixtures.read("openmeteo.json"))
-        }
-    }
-    private class FakeGeoSphere(var fail: Boolean = false, var cancel: Boolean = false) : GeoSphereApi {
-        override suspend fun forecast(latLon: String, parameters: String): GeoSphereResponse {
-            if (cancel) throw CancellationException("worker stopped")
-            if (fail) throw IOException("geosphere down")
-            return Fixtures.json.decodeFromString(GeoSphereResponse.serializer(), Fixtures.read("geosphere.json"))
-        }
-    }
-    private class FakeSiag(var fail: Boolean = false) : SiagApi {
-        override suspend fun municipality(istat: String): KmosResponse {
-            if (fail) throw IOException("siag down")
-            return Fixtures.json.decodeFromString(KmosResponse.serializer(), Fixtures.read("siag_kmos.json"))
-        }
-        override suspend fun stations(categoryId: Int, visibility: Int): SiagStationsResponse {
-            if (fail) throw IOException("siag down")
-            return Fixtures.json.decodeFromString(SiagStationsResponse.serializer(), Fixtures.read("siag_stations.json"))
-        }
-    }
-    private class FakeOdh(var fail: Boolean = false) : OdhApi {
-        override suspend fun weather(language: String): OdhWeatherResponse {
-            if (fail) throw IOException("odh down")
-            return Fixtures.json.decodeFromString(OdhWeatherResponse.serializer(), Fixtures.read("odh_weather_de.json"))
-        }
-        override suspend fun district(id: Int, language: String): OdhDistrictResponse {
-            if (fail) throw IOException("odh down")
-            return Fixtures.json.decodeFromString(OdhDistrictResponse.serializer(), Fixtures.read("odh_district2_de.json"))
-        }
-    }
-
     /** Stores everything except one source, which fails the way a full disk or a corrupt row would. */
     private class FailingStoreDao(private val delegate: WeatherDao, private val failFor: String) : WeatherDao by delegate {
         override suspend fun upsertForecast(entity: SourceForecastEntity) {
             if (entity.source == failFor) throw IOException("disk full")
             delegate.upsertForecast(entity)
         }
-    }
-
-    private class MutableClock(var now: Instant) : Clock() {
-        override fun getZone() = ZoneOffset.UTC
-        override fun withZone(zone: java.time.ZoneId) = this
-        override fun instant() = now
     }
 
     private lateinit var db: AppDatabase

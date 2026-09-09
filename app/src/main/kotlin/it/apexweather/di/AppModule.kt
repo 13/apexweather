@@ -15,6 +15,9 @@ import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.SiagApi
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.DorfTirol
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -58,5 +61,8 @@ object AppModule {
     @Provides @Singleton fun database(@ApplicationContext ctx: Context): AppDatabase = AppDatabase.build(ctx)
     @Provides fun dao(db: AppDatabase): WeatherDao = db.weatherDao()
     @Provides @Singleton fun clock(): Clock = Clock.systemUTC()
+
+    @Provides @Singleton @ApplicationScope
+    fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     @Provides @Singleton fun blender(): ConsensusBlender = ConsensusBlender(DorfTirol.ZONE)
 }
