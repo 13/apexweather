@@ -1,11 +1,15 @@
 package it.apexweather.ui.bulletin
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,8 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -65,23 +69,35 @@ fun BulletinContent(state: BulletinUiState) {
             }
         }
         if (b.days.isNotEmpty()) item {
-            Text(stringResource(R.string.bulletin_district), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.padding(horizontal = 24.dp))
-            Spacer(Modifier.height(8.dp))
-            LazyRow(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                itemsIndexed(b.days) { i, d ->
-                    GlassCard(Modifier.width(150.dp).testTag("bulletin_day_$i")) {
-                        Text(Format.weekday(d.date, locale) + " " + Format.dayMonth(d.date, locale), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
-                        Spacer(Modifier.height(6.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            d.iconUrl?.let { AsyncImage(model = it, contentDescription = d.description, modifier = Modifier.size(44.dp)) }
-                            Spacer(Modifier.width(8.dp))
-                            Column {
-                                Text(listOfNotNull(d.minC?.let(Format::temp), d.maxC?.let(Format::temp)).joinToString(" / "), style = MaterialTheme.typography.titleMedium, color = Color.White)
-                                if (d.rainToMm != null && d.rainToMm > 0) Text("${d.rainFromMm?.toInt() ?: 0}–${d.rainToMm.toInt()} mm", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5))
+            Column {
+                Text(stringResource(R.string.bulletin_district), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.padding(horizontal = 24.dp))
+                Spacer(Modifier.height(8.dp))
+                // A plain scrolling Row, not a LazyRow: there are only ever a handful of district
+                // days, and lazy items are measured independently, so IntrinsicSize.Max — which is
+                // what keeps every card as tall as the tallest — cannot see its siblings there.
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()).height(IntrinsicSize.Max).padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    b.days.forEachIndexed { i, d ->
+                        GlassCard(Modifier.width(150.dp).fillMaxHeight().testTag("bulletin_day_$i")) {
+                            Text(Format.weekday(d.date, locale) + " " + Format.dayMonth(d.date, locale), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                            Spacer(Modifier.height(6.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // The slot is always 44 dp, so a day without an icon keeps the
+                                // temperatures in the same column as its neighbours.
+                                Box(Modifier.size(44.dp)) {
+                                    d.iconUrl?.let { AsyncImage(model = it, contentDescription = d.description, modifier = Modifier.size(44.dp)) }
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(listOfNotNull(d.minC?.let(Format::temp), d.maxC?.let(Format::temp)).joinToString(" / "), style = MaterialTheme.typography.titleMedium, color = Color.White)
+                                    if (d.rainToMm != null && d.rainToMm > 0) Text("${d.rainFromMm?.toInt() ?: 0}–${d.rainToMm.toInt()} mm", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5))
+                                }
                             }
+                            Spacer(Modifier.height(6.dp))
+                            Text(d.description, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f), maxLines = 3)
                         }
-                        Spacer(Modifier.height(6.dp))
-                        Text(d.description, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f), maxLines = 3)
                     }
                 }
             }
