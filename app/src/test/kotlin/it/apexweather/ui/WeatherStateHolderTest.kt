@@ -6,7 +6,6 @@ import it.apexweather.data.FakeGeoSphere
 import it.apexweather.data.FakeOdh
 import it.apexweather.data.FakeOpenMeteo
 import it.apexweather.data.FakeSiag
-import it.apexweather.data.AppSettings
 import it.apexweather.data.MutableClock
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
@@ -46,6 +45,7 @@ class WeatherStateHolderTest {
     private lateinit var db: AppDatabase
     private lateinit var repository: WeatherRepository
     private lateinit var scope: CoroutineScope
+    private lateinit var settings: SettingsRepository
     private lateinit var holder: WeatherStateHolder
 
     @Before fun setUp() {
@@ -56,8 +56,9 @@ class WeatherStateHolderTest {
             Fixtures.json, MutableClock(Instant.parse("2026-09-08T14:00:00Z")),
         )
         scope = CoroutineScope(UnconfinedTestDispatcher())
+        settings = SettingsRepository(context)
         holder = WeatherStateHolder(
-            repository, SettingsRepository(context), ConsensusBlender(DorfTirol.ZONE),
+            repository, settings, ConsensusBlender(DorfTirol.ZONE),
             MutableClock(Instant.parse("2026-09-08T14:00:00Z")), scope,
         )
     }
@@ -67,23 +68,31 @@ class WeatherStateHolderTest {
         db.close()
     }
 
-    /** The bulletin is cached per language, so refresh the one the holder will actually ask for. */
-    private val language = AppSettings().bulletinLanguage(Locale.getDefault().toLanguageTag())
+    /**
+     * The bulletin is cached per language, so refresh the one the holder will actually ask for.
+     * Read it from the settings rather than assuming the defaults: the preferences file is shared
+     * across the JVM, so another test may have left a language behind.
+     */
+    private suspend fun language() =
+        settings.settings.first().bulletinLanguage(Locale.getDefault().toLanguageTag())
 
     @Test
     fun `the shared inputs carry the blended forecast every screen derives from`() = runTest {
-        repository.refresh(language)
+        repository.refresh(language())
 
-        val weather = holder.weather.first { it.consensus.hourly.isNotEmpty() }
+        // Forecasts, bulletin and observation are separate cache rows and land in separate
+        // emissions, so wait for the one that carries everything rather than the first that
+        // carries anything.
+        val weather = holder.weather.first { it.snapshot.forecasts.keys == Source.entries.toSet() && it.snapshot.bulletin != null }
+        assertTrue(weather.consensus.hourly.isNotEmpty())
         assertTrue(weather.consensus.daily.isNotEmpty())
         // Compare and the bulletin tab read these, instead of each re-reading and re-decoding the cache.
         assertNotNull(weather.snapshot.bulletin)
-        assertEquals(Source.entries.toSet(), weather.snapshot.forecasts.keys)
     }
 
     @Test
     fun `the home state is derived from those same inputs`() = runTest {
-        repository.refresh(language)
+        repository.refresh(language())
 
         val home = holder.home.first { it.days.isNotEmpty() }
         val weather = holder.weather.value

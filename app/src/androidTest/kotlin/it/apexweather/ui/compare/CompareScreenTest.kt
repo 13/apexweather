@@ -2,6 +2,8 @@ package it.apexweather.ui.compare
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import it.apexweather.data.AppSettings
@@ -13,7 +15,9 @@ import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceForecast
 import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.ui.theme.ApexTheme
+import androidx.compose.ui.semantics.SemanticsNode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
@@ -31,6 +35,27 @@ class CompareScreenTest {
         rule.onNodeWithTag("compare_chart").assertIsDisplayed()
         rule.onNodeWithTag("chip_ICON_D2").assertIsDisplayed()
     }
+
+    /**
+     * The chart is a bare canvas and the table shows deviation as a background tint, so both used
+     * to be silent to a screen reader and invisible without colour vision.
+     */
+    @Test
+    fun theChartAndTheDayCellsDescribeThemselves() {
+        rule.setContent { ApexTheme { CompareContent(state, {}, {}) } }
+        val chart = rule.onNodeWithTag("compare_chart").fetchSemanticsNode()
+        val chartDescription = chart.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
+        assertTrue("the chart says nothing", chartDescription.isNotEmpty())
+
+        // ICON_D2 runs 3 degrees above ICON_CH1, so its cells sit off the consensus and must say so.
+        val spoken = rule.onNodeWithTag("day_table").fetchSemanticsNode()
+            .let { collectDescriptions(it) }
+        assertTrue("no day cell described itself: $spoken", spoken.any { it.contains(Source.ICON_D2.displayName) })
+    }
+
+    private fun collectDescriptions(node: SemanticsNode): List<String> =
+        node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() +
+            node.children.flatMap { collectDescriptions(it) }
 
     @Test
     fun chipAndVariableCallbacksFire() {

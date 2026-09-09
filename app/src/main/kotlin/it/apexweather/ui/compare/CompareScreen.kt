@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,6 +39,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -51,6 +55,7 @@ import it.apexweather.ui.common.GlassCard
 import it.apexweather.ui.common.SourceColors
 import java.time.temporal.ChronoUnit
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun CompareScreen(viewModel: CompareViewModel = hiltViewModel()) {
@@ -88,6 +93,7 @@ fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVa
                         CompareVariable.WIND -> Format.windUnitLabel(state.settings.windUnit)
                     },
                     nonNegative = state.variable != CompareVariable.TEMPERATURE,
+                    variableName = variableLabel(state.variable),
                     modifier = Modifier.fillMaxWidth().height(240.dp),
                 )
                 Spacer(Modifier.height(10.dp))
@@ -121,13 +127,15 @@ fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVa
                         state.selected.sortedBy { it.ordinal }.forEach { s -> Text(s.displayName.substringAfter(' ').take(9), Modifier.width(84.dp), style = MaterialTheme.typography.labelSmall, color = SourceColors.of(s)) }
                     }
                     state.dayRows.forEach { row ->
-                        Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        // IntrinsicSize.Max so a missing source's one-line placeholder does not leave
+                        // its neighbours' tinted backgrounds standing taller than it.
+                        Row(Modifier.padding(vertical = 6.dp).height(IntrinsicSize.Max), verticalAlignment = Alignment.CenterVertically) {
                             Text(Format.weekday(row.date, locale), Modifier.width(52.dp), style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                            DayCellText(row.consensus, deviation = 0.0, bold = true)
+                            DayCellText(row.consensus, deviation = 0.0, bold = true, sourceName = stringResource(R.string.consensus), date = Format.weekday(row.date, locale))
                             state.selected.sortedBy { it.ordinal }.forEach { s ->
                                 val c = row.cells[s]
-                                if (c == null) Text("–", Modifier.width(84.dp), color = Color.White.copy(alpha = 0.4f))
-                                else DayCellText(c, deviation = abs(c.maxC - row.consensus.maxC), bold = false)
+                                if (c == null) MissingCell(s.displayName, Format.weekday(row.date, locale))
+                                else DayCellText(c, deviation = abs(c.maxC - row.consensus.maxC), bold = false, sourceName = s.displayName, date = Format.weekday(row.date, locale))
                             }
                         }
                     }
@@ -153,12 +161,41 @@ fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVa
     }
 }
 
+/**
+ * One model's take on one day. How far it sits from the consensus is shown three ways, so it
+ * survives without colour vision and without sight: the tint, a caret marker on the temperatures,
+ * and a spoken description.
+ */
 @Composable
-private fun DayCellText(c: DayCell, deviation: Double, bold: Boolean) {
-    val tint = when { deviation < 1.0 -> Color.Transparent; deviation < 3.0 -> Color(0x33FFD166); else -> Color(0x40FF8A80) }
-    Column(Modifier.width(84.dp).background(tint).padding(horizontal = 4.dp, vertical = 2.dp)) {
-        Text("${Format.temp(c.minC)} / ${Format.temp(c.maxC)}", style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
+private fun DayCellText(c: DayCell, deviation: Double, bold: Boolean, sourceName: String, date: String) {
+    val (tint, marker) = when {
+        deviation < 1.0 -> Color.Transparent to ""
+        deviation < 3.0 -> Color(0x33FFD166) to " ›"
+        else -> Color(0x40FF8A80) to " »"
+    }
+    val spoken = stringResource(
+        R.string.compare_cell_desc, sourceName, date,
+        Format.temp(c.minC), Format.temp(c.maxC), Format.mm(c.precipMm), deviation.roundToInt(),
+    )
+    Column(
+        Modifier.width(84.dp).fillMaxHeight().background(tint).padding(horizontal = 4.dp, vertical = 2.dp)
+            .semantics(mergeDescendants = true) { contentDescription = spoken },
+    ) {
+        Text("${Format.temp(c.minC)} / ${Format.temp(c.maxC)}$marker", style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
         Text(Format.mm(c.precipMm), style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5))
+    }
+}
+
+/** A model that does not reach this day. Same two-line shape as a filled cell, so the row stays even. */
+@Composable
+private fun MissingCell(sourceName: String, date: String) {
+    val spoken = stringResource(R.string.compare_cell_missing, sourceName, date)
+    Column(
+        Modifier.width(84.dp).fillMaxHeight().padding(horizontal = 4.dp, vertical = 2.dp)
+            .semantics(mergeDescendants = true) { contentDescription = spoken },
+    ) {
+        Text("–", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.4f))
+        Text("", style = MaterialTheme.typography.labelSmall)
     }
 }
 

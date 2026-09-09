@@ -64,4 +64,7 @@
     <string name="day_sun">Sunrise %1$s · Sunset %2$s</string>
     <string name="day_precip_total">Precipitation %1$s</string>
     <string name="agreement_short">Agreement %1$d %%</string>
+    <string name="compare_cell_desc">%1$s, %2$s: %3$s to %4$s, %5$s, %6$d degrees from the consensus</string>
+    <string name="compare_cell_missing">%1$s: no forecast for %2$s</string>
+    <string name="compare_chart_desc">%1$s over the next %2$d hours, %3$s to %4$s, %5$d models plus the consensus</string>
 </resources>

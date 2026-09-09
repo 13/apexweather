@@ -11,12 +11,17 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import it.apexweather.R
 import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.model.Source
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.SourceColors
 import java.time.Instant
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 import kotlin.math.floor
 
 /** Lines per source, thick white consensus line, optional shaded band. X axis = time over the 72 h window. */
@@ -30,13 +35,22 @@ fun MultiLineChart(
     unitLabel: String,
     /** True for variables that cannot go below zero (precipitation, wind): keeps the axis from showing negatives. */
     nonNegative: Boolean = false,
+    /** Names the plotted variable for the spoken summary; the chart itself is only lines. */
+    variableName: String = "",
     modifier: Modifier = Modifier,
 ) {
     val locale = LocalConfiguration.current.locales[0]
     val labelPaint = remember {
         android.graphics.Paint().apply { color = android.graphics.Color.argb(160, 255, 255, 255); textSize = 28f; isAntiAlias = true }
     }
-    Canvas(modifier.testTag("compare_chart")) {
+    // A canvas of lines says nothing to a screen reader, so the chart carries its own summary:
+    // what is plotted, over how long, across what range, and how many models are in it.
+    val values = series.values.flatten().map { it.value } + consensus.map { it.value }
+    val summary = if (values.isEmpty()) variableName else stringResource(
+        R.string.compare_chart_desc, variableName, hours,
+        "${values.min().roundToInt()}$unitLabel", "${values.max().roundToInt()}$unitLabel", series.size,
+    )
+    Canvas(modifier.testTag("compare_chart").semantics { contentDescription = summary }) {
         val all = series.values.flatten().map { it.value } + consensus.map { it.value } + band.flatMap { listOf(it.min, it.max) }
         if (all.isEmpty()) return@Canvas
         val lo = if (nonNegative) floor(all.min()).coerceAtLeast(0.0) else floor(all.min() - 1)
