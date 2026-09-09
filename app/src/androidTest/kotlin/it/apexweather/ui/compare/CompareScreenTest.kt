@@ -1,6 +1,8 @@
 package it.apexweather.ui.compare
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -29,11 +31,23 @@ class CompareScreenTest {
     private val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = mapOf(Source.ICON_CH1 to fc(Source.ICON_CH1, 0.0), Source.ICON_D2 to fc(Source.ICON_D2, 3.0)))
     private val state = CompareStateBuilder.build(snapshot, AppSettings(), ConsensusBlender().blend(snapshot.forecasts), t0)
 
+    /**
+     * The screen is a lazy list, so anything below the fold is not composed at all. Scroll to it
+     * first: on a short screen these assertions otherwise fail for want of a pixel, not a bug.
+     */
+    private fun scrollTo(tag: String) =
+        rule.onNodeWithTag("compare_list").performScrollToNode(hasTestTag(tag))
+
     @Test
     fun chartTableAndStatusRender() {
         rule.setContent { ApexTheme { CompareContent(state, {}, {}) } }
         rule.onNodeWithTag("compare_chart").assertIsDisplayed()
+        scrollTo("chip_ICON_D2")
         rule.onNodeWithTag("chip_ICON_D2").assertIsDisplayed()
+        scrollTo("day_table")
+        rule.onNodeWithTag("day_table").assertIsDisplayed()
+        scrollTo("status_list")
+        rule.onNodeWithTag("status_list").assertIsDisplayed()
     }
 
     /**
@@ -48,6 +62,7 @@ class CompareScreenTest {
         assertTrue("the chart says nothing", chartDescription.isNotEmpty())
 
         // ICON_D2 runs 3 degrees above ICON_CH1, so its cells sit off the consensus and must say so.
+        scrollTo("day_table")
         val spoken = rule.onNodeWithTag("day_table").fetchSemanticsNode()
             .let { collectDescriptions(it) }
         assertTrue("no day cell described itself: $spoken", spoken.any { it.contains(Source.ICON_D2.displayName) })
@@ -62,7 +77,9 @@ class CompareScreenTest {
         var toggled: Source? = null
         var variable: CompareVariable? = null
         rule.setContent { ApexTheme { CompareContent(state, { toggled = it }, { variable = it }) } }
+        scrollTo("chip_ICON_D2")
         rule.onNodeWithTag("chip_ICON_D2").performClick()
+        scrollTo("variable_WIND")
         rule.onNodeWithTag("variable_WIND").performClick()
         assertEquals(Source.ICON_D2, toggled)
         assertEquals(CompareVariable.WIND, variable)

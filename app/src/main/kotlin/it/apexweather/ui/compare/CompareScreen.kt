@@ -70,7 +70,7 @@ fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVa
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val locale = LocalConfiguration.current.locales[0]
     val formats = LocalFormats.current
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    LazyColumn(Modifier.fillMaxSize().testTag("compare_list"), contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Text(stringResource(R.string.compare_title), style = MaterialTheme.typography.headlineMedium, color = Color.White, modifier = Modifier.padding(horizontal = 24.dp))
         }
