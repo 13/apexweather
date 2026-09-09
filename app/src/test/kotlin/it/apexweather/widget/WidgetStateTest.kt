@@ -68,4 +68,16 @@ class WidgetStateTest {
         // Never refreshed at all is the oldest case there is, not the freshest.
         assertTrue(w.isStale)
     }
+
+    /**
+     * Before the first refresh there is no age to print. The small widget must fall back to the
+     * condition line rather than leaving it blank, which is what it did when the age unconditionally
+     * displaced it.
+     */
+    @Test
+    fun `with nothing cached there is no age to show`() {
+        val w = WidgetStateBuilder.build(HomeUiState(loading = false, isEmpty = true), DorfTirol.ZONE, formats)
+        assertTrue(w.isStale)
+        assertEquals("", w.updatedText)
+    }
 }

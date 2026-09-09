@@ -116,10 +116,13 @@ private fun WidgetContent(state: WidgetState, background: Bitmap) {
                     // The small widget has room for two lines. While the data is current those are
                     // the place and the sky; once it goes stale the age takes the second line,
                     // because a small widget showing an old reading with nothing to say so is a lie.
-                    if (isMedium || !state.isStale) {
+                    // With no age to show, which is the case before the first refresh ever lands,
+                    // the condition keeps the line rather than leaving it blank.
+                    val showsAge = (isMedium || state.isStale) && state.updatedText.isNotEmpty()
+                    if (isMedium || !showsAge) {
                         Text(androidx.glance.LocalContext.current.getString(state.conditionRes), style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.8f)), fontSize = 12.sp))
                     }
-                    if ((isMedium || state.isStale) && state.updatedText.isNotEmpty()) {
+                    if (showsAge) {
                         Text(
                             androidx.glance.LocalContext.current.getString(R.string.updated_at, state.updatedText),
                             style = TextStyle(color = ColorProvider(Color.White.copy(alpha = if (state.isStale) 0.95f else 0.7f)), fontSize = 11.sp),
