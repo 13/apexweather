@@ -7,3 +7,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "apexweather"
 include(":app")
+include(":baselineprofile")
