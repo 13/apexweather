@@ -20,6 +20,11 @@ Single module, package `it.apexweather`, fixed location Dorf Tirol (constants in
 - `data/remote/` has one file per upstream: Open-Meteo (5 models in one call, dynamic JSON keys read via `JsonObject`), GeoSphere AROME (condition derived from cloud/precip/CAPE, precipitation is a diff of the accumulated series), SIAG (KMOS municipality forecast, Open Data Hub bulletin, live station). Each mapper is tested against recorded fixtures in `app/src/test/resources/fixtures/` (recorded from the live services on 2026-09-08); re-record with the curl commands in `docs/superpowers/plans/2026-09-08-apexweather.md` Task 4 when an upstream changes.
 - `data/WeatherRepository` fetches all sources in a `supervisorScope`, writes each into Room independently, and keeps old JSON when a source fails (`SourceStatus.Failed` carries `lastIssuedAt`). UI always renders whatever is cached.
 - Staleness thresholds live on `Source.staleAfterHours`: regional models 6 h, SIAG KMOS 16 h (two runs a day), ECMWF 12 h; the bulletin goes stale after 24 h and a station observation after 90 min.
+- `ui/WeatherStateHolder` is the single app-scoped place that subscribes to the cache, runs the
+  minute tick and blends the models. Every ViewModel maps off it — Home stamps on its refreshing
+  flag, Sky takes the palette, Compare and the bulletin derive from the same inputs — so the seven
+  models are blended once per change rather than once per screen. The widget keeps its own one-shot
+  path, because it updates when no ViewModel is subscribed.
 - `ui/home/HomeStateBuilder` is the pure function that decides hero values (station observation wins if < 90 min old), palette, and the 48 h / 7 d windows; the widget (`widget/WidgetStateBuilder`) and `SkyViewModel` reuse it.
 - ViewModels blend on `Dispatchers.Default` (`flowOn` before `stateIn`), so the consensus never runs on the main thread.
 - Background refresh: `work/RefreshWorker` (Hilt worker, hourly, network constraint) → repository → `ApexWidget().updateAll`.
