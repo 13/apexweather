@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build and test
 
-- Build/install: `./gradlew :app:assembleDebug` then `adb -s RZCXA1ZEXJE install -r app/build/outputs/apk/debug/app-debug.apk`
+- Build/install: `./gradlew :app:assembleDebug` then `adb -s RZCXA1ZEXJE install -r app/build/outputs/apk/debug/ApexWeather-debug.apk`
 - JVM tests: `./gradlew :app:testDebugUnitTest` (single class: `--tests 'it.apexweather.domain.ConsensusBlenderTest'`)
 - Device tests: `ANDROID_SERIAL=RZCXA1ZEXJE ./gradlew :app:connectedDebugAndroidTest` (single class: `-Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.home.HomeScreenTest`). The serial is required: an emulator is usually attached as well.
 - Release build: `./gradlew :app:assembleRelease` (R8 on, unsigned APK; keep rules in `app/proguard-rules.pro`).
 - Toolchain is pinned in `gradle.properties` (`org.gradle.java.home` = JDK 21) and `local.properties` (`sdk.dir`); the shell's `ANDROID_HOME` points at an incomplete SDK, ignore it.
 - AGP 9 built-in Kotlin: never apply `org.jetbrains.kotlin.android` in `app/build.gradle.kts`; KSP only, no kapt.
+- Lint runs with `warningsAsErrors`: `./gradlew :app:lintDebug` has to be clean before a push. Three checks are switched off in `app/build.gradle.kts` with the reason beside each; add to that list only with a reason, and never rename `mipmap-anydpi-v26` (aapt2 then cannot find the launcher icon).
 - Any Compose test that renders `SkyBackground` (directly or through `MainActivity`) must set `rule.mainClock.autoAdvance = false` and advance the clock by hand — the sky's frame loop never lets the test rule go idle.
 
 ## Architecture
@@ -27,14 +28,22 @@ Single module, package `it.apexweather`, fixed location Dorf Tirol (constants in
   path, because it updates when no ViewModel is subscribed.
 - `ui/home/HomeStateBuilder` is the pure function that decides hero values (station observation wins if < 90 min old), palette, and the 48 h / 7 d windows; the widget (`widget/WidgetStateBuilder`) and `SkyViewModel` reuse it.
 - ViewModels blend on `Dispatchers.Default` (`flowOn` before `stateIn`), so the consensus never runs on the main thread.
-- Background refresh: `work/RefreshWorker` (Hilt worker, hourly, network constraint) → repository → `ApexWidget().updateAll`.
+- Background refresh: `work/RefreshWorker` (Hilt worker, hourly, network constraint) → repository → `ApexWidget().updateAll`. `RefreshScheduler.refreshNow` is the one-shot version, used by the settings sheet and the widget's refresh button.
+- `update/` is the in-app updater and is deliberately self-contained: it reads GitHub releases,
+  verifies the download against the asset's sha256 and hands the APK to `PackageInstaller`. Nothing
+  in the weather code imports it — the settings sheet takes it as a slot. Removing the feature means
+  deleting that package, the `REQUEST_INSTALL_PACKAGES` line and its receiver in the manifest, and
+  one call in `AppNavigation`. Keep it that way: the permission is restricted on the Play Store.
+  Compare version *names*, never version codes; the code is derived from the name in awk in
+  `release.yml` and must not be recomputed in Kotlin.
 
 ## CI and releases
 
 - `.github/workflows/ci.yml` runs unit tests and assembles debug + release on every push to `main` and
-  every PR. It deletes the `org.gradle.java.home` line from `gradle.properties` first, because that path
-  is this machine's JDK; the runner supplies its own JDK 21. Instrumented tests are not run on CI (no
-  emulator); run them locally against the phone.
+  every PR, and runs lint. It deletes the `org.gradle.java.home` line from `gradle.properties` first,
+  because that path is this machine's JDK; the runner supplies its own JDK 21. A second job runs the
+  instrumented tests on an API 31 emulator, kept separate so a slow emulator never delays the unit-test
+  feedback; running them locally against the phone is still the faster loop.
 - `.github/workflows/release.yml` runs on a `v*` tag and publishes `ApexWeather-<version>.apk` to a GitHub
   release. `base { archivesName = "ApexWeather" }` in `app/build.gradle.kts` is what puts the app name in
   the file; `-PapexVersionName` / `-PapexVersionCode` stamp the tag into the build.
@@ -51,3 +60,10 @@ Single module, package `it.apexweather`, fixed location Dorf Tirol (constants in
 - `hiltViewModel` comes from `androidx.hilt.lifecycle.viewmodel.compose` (the navigation-package variant is deprecated).
 - Strings live in `values` (German, default), `values-it`, `values-en`; add every new key to all three.
 - Source colours are in `ui/common/SourceColors.kt`; SIAG letter codes in `domain/SiagCodes.kt`.
+- Weather icons are hand-drawn vectors in `res/drawable/ic_wx_*.xml`, mapped once in
+  `ui/common/WeatherIcons.kt` and used by both the app and the widget. Every condition has its own
+  drawing and `WeatherIconsTest` asserts it; do not reintroduce a second table.
+- Numbers, dates and times go through `ui/common/Format.kt`, which takes an explicit `Formats`
+  (locale plus the 24-hour flag). Inside a composition take it from `LocalFormats.current`; outside
+  one, build it from a `Context`. Never format with `Locale.ROOT` or interpolate a number into a
+  string.
