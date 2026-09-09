@@ -57,6 +57,10 @@ Single module, package `it.apexweather`, fixed location Dorf Tirol (constants in
 ## Conventions
 
 - Screens are split into `XScreen` (ViewModel wiring) and `XContent(state, callbacks)`; UI tests drive `XContent` with hand-built states.
+- Everything that opens a bottom-bar destination goes through `NavHostController.openTopLevel` in
+  `ui/navigation/AppNavigation.kt`. The bulletin has two entrances, its tab and the teaser card on
+  home; when the card used a plain `navigate` the home tab could no longer bring itself back.
+  `TopLevelNavigationTest` drives the real routes with stub screens and guards this.
 - `hiltViewModel` comes from `androidx.hilt.lifecycle.viewmodel.compose` (the navigation-package variant is deprecated).
 - Strings live in `values` (German, default), `values-it`, `values-en`; add every new key to all three.
 - Source colours are in `ui/common/SourceColors.kt`; SIAG letter codes in `domain/SiagCodes.kt`.
