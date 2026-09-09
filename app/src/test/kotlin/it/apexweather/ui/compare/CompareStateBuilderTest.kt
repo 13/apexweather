@@ -4,6 +4,7 @@ import it.apexweather.data.AppSettings
 import it.apexweather.data.CompareVariable
 import it.apexweather.data.WindUnit
 import it.apexweather.domain.ConsensusBlender
+import it.apexweather.domain.ROME
 import it.apexweather.domain.forecast
 import it.apexweather.domain.hour
 import it.apexweather.domain.point
@@ -14,6 +15,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
 
 class CompareStateBuilderTest {
     private val forecasts = mapOf(
@@ -66,5 +68,60 @@ class CompareStateBuilderTest {
         assertTrue(row0.cells.containsKey(Source.ICON_D2))
         assertEquals(14.0, row0.cells.getValue(Source.ICON_D2).maxC, 0.0)
         assertEquals(3, s.statuses.size)
+    }
+
+    /** A day is the local calendar day, so two days are comparable and the axis does not creep. */
+    @Test
+    fun `a chosen day runs local midnight to local midnight`() {
+        val midMorning = Instant.parse("2026-09-09T07:40:00Z") // 09:40 in Europe/Rome
+        val today = CompareStateBuilder.window(DaySelection.Day(0), midMorning, ROME)
+        assertEquals(Instant.parse("2026-09-08T22:00:00Z"), today.from) // 09-09 00:00 local
+        assertEquals(24L, today.hours)
+
+        val tomorrow = CompareStateBuilder.window(DaySelection.Day(1), midMorning, ROME)
+        assertEquals(Instant.parse("2026-09-09T22:00:00Z"), tomorrow.from)
+    }
+
+    /**
+     * Europe/Rome puts the clocks back on 25 October 2026, making a 25-hour day, and forward on
+     * 29 March, making a 23-hour one. A hardcoded 24 would push an hour of data off the axis twice
+     * a year.
+     */
+    @Test
+    fun `the length of a day comes from the zone, not from a constant`() {
+        val beforeAutumn = Instant.parse("2026-10-24T12:00:00Z")
+        assertEquals(25L, CompareStateBuilder.window(DaySelection.Day(1), beforeAutumn, ROME).hours)
+
+        val beforeSpring = Instant.parse("2026-03-28T12:00:00Z")
+        assertEquals(23L, CompareStateBuilder.window(DaySelection.Day(1), beforeSpring, ROME).hours)
+    }
+
+    @Test
+    fun `the sweep starts at the current hour and runs three days`() {
+        val w = CompareStateBuilder.window(DaySelection.Sweep, Instant.parse("2026-09-09T07:40:00Z"), ROME)
+        assertEquals(Instant.parse("2026-09-09T07:00:00Z"), w.from)
+        assertEquals(72L, w.hours)
+    }
+
+    /** The chart is handed the window the builder filtered with, not a second copy of it. */
+    @Test
+    fun `the series stays inside the window the state carries`() {
+        val s = CompareStateBuilder.build(snapshot, AppSettings(), consensus, hour(0), DaySelection.Day(0))
+        val until = s.window.from.plusSeconds(s.window.hours * 3600)
+        s.series.values.flatten().forEach {
+            assertTrue("$it is outside ${s.window}", !it.time.isBefore(s.window.from) && it.time.isBefore(until))
+        }
+        assertEquals(DaySelection.Day(0), s.window.selection)
+    }
+
+    /**
+     * The state used to carry the untruncated instant, so it differed every minute and the
+     * distinctUntilChanged guarding the whole compare rebuild never fired.
+     */
+    @Test
+    fun `two states built in the same hour are equal`() {
+        val a = CompareStateBuilder.build(snapshot, AppSettings(), consensus, hour(2))
+        val b = CompareStateBuilder.build(snapshot, AppSettings(), consensus, hour(2).plusSeconds(90))
+        assertEquals(a, b)
     }
 }

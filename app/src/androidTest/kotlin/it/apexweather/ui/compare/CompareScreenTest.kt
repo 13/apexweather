@@ -8,6 +8,9 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import org.junit.Assert.assertNotEquals
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.geometry.Offset
 import it.apexweather.data.AppSettings
 import it.apexweather.data.CompareVariable
 import it.apexweather.domain.ConsensusBlender
@@ -84,4 +87,51 @@ class CompareScreenTest {
         assertEquals(Source.ICON_D2, toggled)
         assertEquals(CompareVariable.WIND, variable)
     }
+
+    /** The chips exist for the days the consensus reaches, plus the sweep the screen opens on. */
+    @Test
+    fun theDayChipsCoverTheDaysThatExist() {
+        var chosen: DaySelection? = null
+        rule.setContent { ApexTheme { CompareContent(state, {}, {}, { chosen = it }) } }
+        rule.onNodeWithTag("day_sweep").assertIsDisplayed()
+        rule.onNodeWithTag("day_0").assertIsDisplayed().performClick()
+        assertEquals(DaySelection.Day(0), chosen)
+        rule.onNodeWithTag("day_1").performClick()
+        assertEquals(DaySelection.Day(1), chosen)
+    }
+
+    /**
+     * Touching the chart used to do nothing. The values are shown outside the canvas, so this
+     * asserts what a reader can actually read rather than what was drawn.
+     */
+    @Test
+    fun touchingTheChartMovesTheReadoutToThatHour() {
+        rule.setContent { ApexTheme { CompareContent(state, {}, {}, {}) } }
+        val before = readoutHour()
+
+        val chart = rule.onNodeWithTag("compare_chart")
+        val size = chart.fetchSemanticsNode().size
+        chart.performTouchInput { down(Offset(size.width * 0.85f, size.height / 2f)); up() }
+        rule.waitForIdle()
+
+        assertNotEquals("the readout did not follow the touch", before, readoutHour())
+    }
+
+    /** Releasing must leave the values on screen; they are useless if they vanish with the finger. */
+    @Test
+    fun theReadoutSurvivesLiftingTheFinger() {
+        rule.setContent { ApexTheme { CompareContent(state, {}, {}, {}) } }
+        val chart = rule.onNodeWithTag("compare_chart")
+        val size = chart.fetchSemanticsNode().size
+        chart.performTouchInput { down(Offset(size.width * 0.7f, size.height / 2f)); up() }
+        rule.waitForIdle()
+        val afterLift = readoutHour()
+        rule.waitForIdle()
+        assertEquals(afterLift, readoutHour())
+    }
+
+    private fun readoutHour(): String =
+        rule.onNodeWithTag("readout_hour").fetchSemanticsNode()
+            .config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString { it.text }
+
 }
