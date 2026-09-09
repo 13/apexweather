@@ -45,7 +45,9 @@ class SettingsSheetTest {
     @Test
     fun theBuildLineNamesTheVersionAndTheCommitItCameFrom() {
         show()
-        rule.onNodeWithTag("about_build").assertIsDisplayed()
+        // The sheet has grown past a small screen and scrolls now; the build line is the last thing
+        // on it, so it has to be scrolled to. Reproduced at 720x1280.
+        rule.onNodeWithTag("about_build").performScrollTo().assertIsDisplayed()
         val line = textUnder(rule.onNodeWithTag("about_build").fetchSemanticsNode())
 
         listOf(

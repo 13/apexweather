@@ -25,6 +25,9 @@ import java.time.Instant
 class HomeScreenTest {
     @get:Rule val rule = createComposeRule()
 
+    /** Assertions about wording go through the resources: CI runs an en-US emulator, not a German phone. */
+    private val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+
     private val t0: Instant = Instant.parse("2026-09-08T10:00:00Z")
     private fun fc(source: Source, offset: Double) = SourceForecast(
         source, t0, t0,
@@ -106,7 +109,8 @@ class HomeScreenTest {
         // The card merges its children into one node, so the count is reached unmerged — and is
         // part of what the card says out loud, which is the only way a screen reader learns of it.
         rule.onNodeWithTag("warning_more", useUnmergedTree = true).assertIsDisplayed()
-        rule.onNodeWithTag("warning_card").assertContentDescriptionContains("2 weitere Warnungen", substring = true)
+        val more = context.resources.getQuantityString(it.apexweather.R.plurals.warn_more, 2, 2)
+        rule.onNodeWithTag("warning_card").assertContentDescriptionContains(more, substring = true)
         rule.onNodeWithTag("warning_card").performClick()
         rule.onNodeWithTag("warning_sheet").assertIsDisplayed()
         // The sheet opens half height; the last warning is below the fold until it is scrolled to.

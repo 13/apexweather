@@ -2,8 +2,10 @@ package it.apexweather.notify
 
 import android.Manifest
 import android.app.NotificationManager
+import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
+import it.apexweather.R
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.Warning
 import it.apexweather.domain.model.WarningLevel
@@ -15,6 +17,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.RuleChain
+import org.junit.rules.TestRule
 import java.time.Instant
 import java.time.LocalDate
 import java.util.Locale
@@ -29,7 +33,18 @@ import java.util.Locale
  */
 class WeatherNotifierDeviceTest {
 
-    @get:Rule val permission: GrantPermissionRule = GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+    /**
+     * POST_NOTIFICATIONS is a runtime permission only from API 33. Below that — and minSdk here is
+     * 31, which is what CI's emulator runs — the platform does not know the name, granting it throws,
+     * and notifications are enabled by default anyway. So the rule is only chained in where it means
+     * something.
+     */
+    @get:Rule val permission: TestRule =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            RuleChain.emptyRuleChain()
+        }
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val manager = context.getSystemService(NotificationManager::class.java)
@@ -76,6 +91,7 @@ class WeatherNotifierDeviceTest {
         awaitCount(1)
         val shown = manager.activeNotifications.single()
         assertEquals(WeatherNotifier.CHANNEL_SUMMARY, shown.notification.channelId)
+        // The place name is the same in every language, so this one may be quoted directly.
         val title = shown.notification.extras.getString("android.title").orEmpty()
         assertTrue("title was '$title'", title.contains("Dorf Tirol"))
     }
@@ -95,9 +111,11 @@ class WeatherNotifierDeviceTest {
         val shown = manager.activeNotifications.single()
         assertEquals(WeatherNotifier.CHANNEL_WARNING, shown.notification.channelId)
         assertEquals(WeatherNotifier.warningId(warning.identifier), shown.id)
+        // Against the resources, not against German: CI runs an en-US emulator, and a test that
+        // hardcodes one language only checks that the developer's phone is set to it.
         val title = shown.notification.extras.getString("android.title").orEmpty()
-        assertTrue("title was '$title'", title.contains("Gewitter"))
-        assertTrue("title was '$title'", title.contains("Orange"))
+        assertTrue("title was '$title'", title.contains(context.getString(R.string.warn_thunderstorm)))
+        assertTrue("title was '$title'", title.contains(context.getString(R.string.warn_level_orange)))
     }
 
     /** Re-posting the same warning replaces its notification rather than stacking a second copy. */
