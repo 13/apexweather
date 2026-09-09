@@ -37,7 +37,7 @@ class OpenMeteoMapperTest {
         assertEquals(expectedCount, d2.hourly.size)
         val first = d2.hourly.first()
         assertEquals(rawTemps[0].jsonPrimitive.double, first.tempC, 0.0)
-        assertEquals(hourly["wind_speed_10m_icon_d2"]!!.jsonArray[0].jsonPrimitive.double, first.windKmh, 0.0)
+        assertEquals(hourly["wind_speed_10m_icon_d2"]!!.jsonArray[0].jsonPrimitive.double, first.windKmh!!, 0.0)
         assertEquals(WmoCodes.toCondition(hourly["weather_code_icon_d2"]!!.jsonArray[0].jsonPrimitive.int), first.condition)
         val firstTime = hourly["time"]!!.jsonArray[0].jsonPrimitive.content
         assertEquals(LocalDateTime.parse(firstTime).atZone(DorfTirol.ZONE).toInstant(), first.time)

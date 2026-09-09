@@ -70,6 +70,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
 
         val feels = values.mapNotNull { it.feelsLikeC }
         val gusts = values.mapNotNull { it.gustKmh }
+        val winds = values.mapNotNull { it.windKmh }
 
         return ConsensusHour(
             time = time,
@@ -79,7 +80,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             feelsLikeC = feels.takeIf { it.isNotEmpty() }?.let(::median),
             precipMm = median(values.map { it.precipMm }),
             precipProb = precipProb,
-            windKmh = median(values.map { it.windKmh }),
+            windKmh = winds.takeIf { it.isNotEmpty() }?.let(::median),
             gustKmh = gusts.maxOrNull(),
             condition = voteCondition(values.map { it.condition }),
             agreement = agreement,

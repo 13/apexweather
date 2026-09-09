@@ -77,7 +77,7 @@ object OpenMeteoMapper {
                     feelsLikeC = feels.getOrNull(i),
                     precipMm = precip.getOrNull(i) ?: 0.0,
                     precipProb = prob.getOrNull(i),
-                    windKmh = wind.getOrNull(i) ?: 0.0,
+                    windKmh = wind.getOrNull(i),
                     gustKmh = gust.getOrNull(i),
                     windDirDeg = dir.getOrNull(i),
                     cloudPct = cloud.getOrNull(i),

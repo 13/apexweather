@@ -46,7 +46,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.apexweather.R
 import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.model.ConsensusHour
-import it.apexweather.domain.model.Source
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.label
@@ -144,6 +143,9 @@ private fun EmptyState(onRetry: () -> Unit, modifier: Modifier) {
     }
 }
 
+/** Shown where a model publishes no value at all, so absence never reads as zero. */
+private const val MISSING = "\u2013"
+
 @Composable
 private fun HourDetail(hour: ConsensusHour, state: HomeUiState) {
     val formats = LocalFormats.current
@@ -151,7 +153,7 @@ private fun HourDetail(hour: ConsensusHour, state: HomeUiState) {
         Text("${Format.time(hour.time, DorfTirol.ZONE, formats)} · ${hour.condition.label()}", style = MaterialTheme.typography.headlineMedium, color = Color.White)
         Spacer(Modifier.height(4.dp))
         Text(
-            stringResource(R.string.hour_summary, Format.temp(hour.tempC, formats), Format.temp(hour.tempMinC, formats), Format.temp(hour.tempMaxC, formats), Format.mm(hour.precipMm, formats), hour.precipProb, Format.wind(hour.windKmh, state.settings.windUnit, formats)),
+            stringResource(R.string.hour_summary, Format.temp(hour.tempC, formats), Format.temp(hour.tempMinC, formats), Format.temp(hour.tempMaxC, formats), Format.mm(hour.precipMm, formats), hour.precipProb, hour.windKmh?.let { Format.wind(it, state.settings.windUnit, formats) } ?: MISSING),
             style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f),
         )
         Spacer(Modifier.height(16.dp))
@@ -160,8 +162,7 @@ private fun HourDetail(hour: ConsensusHour, state: HomeUiState) {
         hour.perSource.entries.sortedBy { it.key.ordinal }.forEach { (source, p) ->
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(source.displayName, style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                // KMOS has no wind parameter; showing its 0.0 would read as "calm".
-                val wind = if (source == Source.SIAG_KMOS) "\u2013" else Format.wind(p.windKmh, state.settings.windUnit, formats)
+                val wind = p.windKmh?.let { Format.wind(it, state.settings.windUnit, formats) } ?: MISSING
                 Text("${Format.tempDecimal(p.tempC, formats)}  ${Format.mm(p.precipMm, formats)}  $wind", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
             }
         }

@@ -17,7 +17,7 @@ fun point(
     temp: Double,
     precip: Double = 0.0,
     prob: Int? = null,
-    wind: Double = 5.0,
+    wind: Double? = 5.0,
     gust: Double? = null,
     condition: Condition = Condition.CLEAR,
 ) = HourlyPoint(
