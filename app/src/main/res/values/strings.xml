@@ -82,4 +82,7 @@
         <item quantity="one">%1$d Grad vom Konsens entfernt</item>
         <item quantity="other">%1$d Grad vom Konsens entfernt</item>
     </plurals>
+    <!-- The place itself and the preview's sample reading: the same in every language. -->
+    <string name="location_name" translatable="false">Dorf Tirol</string>
+    <string name="widget_preview_temp" translatable="false">18°</string>
 </resources>

@@ -1,0 +1,5 @@
+<!-- Only for the widget picker's preview tile: the real widget paints its sky gradient at runtime. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="24dp" />
+    <gradient android:angle="270" android:startColor="#3E7BB8" android:endColor="#8FB8D8" />
+</shape>

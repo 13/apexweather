@@ -37,6 +37,25 @@ class WidgetStateTest {
         assertEquals(R.drawable.ic_wx_moon, w.hours[2].iconRes) // hour(3) = 05:00 local, clear → night icon
         assertEquals(R.drawable.ic_wx_sun, w.hours[5].iconRes) // hour(6) = 08:00 local, clear → day icon
         assertEquals(Format.time(hour(0), DorfTirol.ZONE, formats), w.updatedText)
+        assertFalse(w.isStale)
+    }
+
+    /**
+     * The small widget drops the condition line to make room for the age, so it must know when the
+     * data has gone old. Without this the small widget showed an arbitrarily old reading with
+     * nothing to say so.
+     */
+    @Test
+    fun `data older than three hours is marked stale`() {
+        val f = mapOf(Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 24).map { point(it, 20.0 + it) }))
+        val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = f, lastSuccessfulRefresh = hour(0))
+        fun stale(hoursLater: Long) =
+            WidgetStateBuilder.build(
+                HomeStateBuilder.build(snapshot, AppSettings(), ConsensusBlender().blend(f), hour(0).plusSeconds(hoursLater * 3600)),
+                DorfTirol.ZONE, formats,
+            ).isStale
+        assertFalse(stale(2))
+        assertTrue(stale(4))
     }
 
     @Test
@@ -46,5 +65,7 @@ class WidgetStateTest {
         assertEquals("–", w.tempText)
         assertEquals(R.string.empty_title, w.conditionRes)
         assertEquals(R.drawable.ic_wx_cloud, w.iconRes)
+        // Never refreshed at all is the oldest case there is, not the freshest.
+        assertTrue(w.isStale)
     }
 }

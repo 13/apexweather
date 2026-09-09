@@ -6,6 +6,7 @@ import it.apexweather.domain.model.Condition
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.Formats
 import it.apexweather.ui.home.HomeUiState
+import java.time.Duration
 import java.time.ZoneId
 
 data class WidgetHour(val label: String, val tempText: String, val iconRes: Int)
@@ -17,6 +18,8 @@ data class WidgetState(
     val iconRes: Int,
     val hours: List<WidgetHour>,
     val updatedText: String,
+    /** True once the data is old enough that the widget must say so rather than just show it. */
+    val isStale: Boolean,
     val topColor: Long,
     val bottomColor: Long,
 )
@@ -46,6 +49,9 @@ fun Condition.labelRes(): Int = when (this) {
 }
 
 object WidgetStateBuilder {
+    /** Three missed hourly refreshes. Below that a widget is merely a few minutes behind. */
+    private val STALE_AFTER: Duration = Duration.ofHours(3)
+
     fun build(home: HomeUiState, zone: ZoneId, formats: Formats): WidgetState {
         val hasData = !home.isEmpty && home.heroTempC != null
         return WidgetState(
@@ -57,6 +63,7 @@ object WidgetStateBuilder {
                 WidgetHour(Format.hour(h.time, zone, formats), Format.temp(h.tempC, formats), h.condition.widgetIcon(home.phaseAt(h.time)))
             } else emptyList(),
             updatedText = home.updatedAt?.let { Format.timestamp(it, zone, home.now, formats) } ?: "",
+            isStale = home.updatedAt == null || Duration.between(home.updatedAt, home.now) > STALE_AFTER,
             topColor = home.palette.top,
             bottomColor = home.palette.bottom,
         )

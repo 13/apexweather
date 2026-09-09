@@ -16,6 +16,7 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.action.actionStartActivity
@@ -111,11 +112,16 @@ private fun WidgetContent(state: WidgetState, background: Bitmap) {
                 Spacer(GlanceModifier.width(10.dp))
                 Column {
                     Text(DorfTirol.NAME, style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium))
-                    Text(androidx.glance.LocalContext.current.getString(state.conditionRes), style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.8f)), fontSize = 12.sp))
-                    if (isMedium && state.updatedText.isNotEmpty()) {
+                    // The small widget has room for two lines. While the data is current those are
+                    // the place and the sky; once it goes stale the age takes the second line,
+                    // because a small widget showing an old reading with nothing to say so is a lie.
+                    if (isMedium || !state.isStale) {
+                        Text(androidx.glance.LocalContext.current.getString(state.conditionRes), style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.8f)), fontSize = 12.sp))
+                    }
+                    if ((isMedium || state.isStale) && state.updatedText.isNotEmpty()) {
                         Text(
                             androidx.glance.LocalContext.current.getString(R.string.updated_at, state.updatedText),
-                            style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.7f)), fontSize = 11.sp),
+                            style = TextStyle(color = ColorProvider(Color.White.copy(alpha = if (state.isStale) 0.95f else 0.7f)), fontSize = 11.sp),
                         )
                     }
                 }
@@ -131,6 +137,18 @@ private fun WidgetContent(state: WidgetState, background: Bitmap) {
                         }
                     }
                 }
+            }
+        }
+        // Drawn last so it sits on top of the content column; otherwise a tap in this corner falls
+        // through to the whole-widget "open the app" click. Medium only: the small widget has no
+        // corner free of the temperature.
+        if (isMedium) {
+            Box(GlanceModifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.TopEnd) {
+                Image(
+                    ImageProvider(R.drawable.ic_refresh),
+                    contentDescription = androidx.glance.LocalContext.current.getString(R.string.refresh_now),
+                    modifier = GlanceModifier.size(20.dp).clickable(actionRunCallback<RefreshWidgetAction>()),
+                )
             }
         }
     }
