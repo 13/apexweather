@@ -17,6 +17,7 @@ import it.apexweather.ui.WeatherStateHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -95,6 +96,9 @@ class CompareViewModel @Inject constructor(
 ) : ViewModel() {
     val state: StateFlow<CompareUiState> = holder.weather
         .map { CompareStateBuilder.build(it.snapshot, it.settings, it.consensus, it.now) }
+        // The 72-hour window is truncated to the hour, so the minute tick produces an identical state
+        // 59 minutes out of 60; without this the whole compare state rebuilt every minute.
+        .distinctUntilChanged()
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CompareUiState())
 

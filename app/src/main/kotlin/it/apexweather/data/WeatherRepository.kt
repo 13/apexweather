@@ -20,11 +20,13 @@ import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.StationObservation
 import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.domain.DorfTirol
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import java.time.Clock
@@ -94,8 +96,15 @@ class WeatherRepository @Inject constructor(
             null
         }
 
-    /** Fetches every source in parallel; a failure in one never affects the others. */
-    suspend fun refresh(language: String): RefreshResult {
+    /**
+     * Fetches every source in parallel; a failure in one never affects the others.
+     *
+     * Explicitly off the caller's dispatcher: the UI calls this from `viewModelScope`, i.e. the main
+     * thread, and while Retrofit deserialises on its own thread, everything after each await resumes
+     * on the caller's — the five Open-Meteo model mappings, and seven JSON encodings of ~168 hourly
+     * points each. On the main thread that is visible jank on launch and on every pull to refresh.
+     */
+    suspend fun refresh(language: String): RefreshResult = withContext(Dispatchers.Default) {
         val now = clock.instant()
         // The blocks below run in parallel on whatever threads the network continuations resume on,
         // so the shared bookkeeping has to be synchronised.
@@ -179,7 +188,7 @@ class WeatherRepository @Inject constructor(
                 lastAttemptFailed = result.allFailed,
             )
         )
-        return result
+        result
     }
 
     private suspend fun previousSuccessMs(): Long? = dao.meta().first()?.lastSuccessMs

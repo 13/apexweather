@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.util.Locale
 import javax.inject.Inject
 
@@ -40,9 +41,13 @@ class HomeViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val weather = holder.weather.first()
-            val age = weather.snapshot.lastSuccessfulRefresh?.let { Duration.between(it, clock.instant()) }
-            if (age == null || age > Duration.ofMinutes(30)) doRefresh(weather.settings.bulletinLanguage(systemTag()))
+            // awaitCached, not weather.first(): a StateFlow hands back its placeholder immediately, and
+            // that placeholder has no lastSuccessfulRefresh — so this guard used to see a null age every
+            // time and refetch all seven models on every single cold start.
+            val weather = holder.awaitCached()
+            if (shouldRefreshOnOpen(weather.snapshot.lastSuccessfulRefresh, clock.instant())) {
+                doRefresh(weather.settings.bulletinLanguage(systemTag()))
+            }
         }
     }
 
@@ -53,6 +58,18 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun systemTag() = Locale.getDefault().toLanguageTag()
+
+    companion object {
+        private val STALE_ON_OPEN: Duration = Duration.ofMinutes(30)
+
+        /**
+         * Whether opening the app should hit the network. Null means the cache has never been
+         * filled — which is also what the holder's placeholder state reports, so the caller must
+         * await a real emission before asking, or this answers "yes" every single time.
+         */
+        fun shouldRefreshOnOpen(lastSuccessfulRefresh: Instant?, now: Instant): Boolean =
+            lastSuccessfulRefresh == null || Duration.between(lastSuccessfulRefresh, now) > STALE_ON_OPEN
+    }
 
     private suspend fun doRefresh(language: String) {
         if (refreshing.value) return
