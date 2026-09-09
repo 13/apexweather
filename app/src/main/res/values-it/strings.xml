@@ -15,7 +15,6 @@
     <string name="cond_thunderstorm">Temporale</string>
     <string name="feels_like">Percepita %1$s</string>
     <string name="now_from_station">Ora: stazione %1$s, %2$s</string>
-    <string name="now_from_consensus">Consenso di %1$d modelli</string>
     <string name="updated_at">Aggiornato %1$s</string>
     <string name="section_hourly">PROSSIME 48 ORE</string>
     <string name="section_daily">7 GIORNI</string>
@@ -64,9 +63,53 @@
     <string name="day_sun">Alba %1$s · Tramonto %2$s</string>
     <string name="day_precip_total">Precipitazioni %1$s</string>
     <string name="agreement_short">Accordo %1$d %%</string>
-    <string name="compare_cell_desc">%1$s, %2$s: da %3$s a %4$s, %5$s, a %6$d gradi dal consenso</string>
+    <string name="compare_cell_desc">%1$s, %2$s: da %3$s a %4$s, %5$s, %6$s</string>
     <string name="compare_cell_missing">%1$s: nessuna previsione per %2$s</string>
-    <string name="compare_chart_desc">%1$s nelle prossime %2$d ore, da %3$s a %4$s, %5$d modelli più il consenso</string>
+    <plurals name="compare_chart_desc">
+        <item quantity="one">%1$s nella prossima %2$d ora, da %3$s a %4$s, %5$s</item>
+        <item quantity="many">%1$s nelle prossime %2$d ore, da %3$s a %4$s, %5$s</item>
+        <item quantity="other">%1$s nelle prossime %2$d ore, da %3$s a %4$s, %5$s</item>
+    </plurals>
     <string name="about_build">Versione %1$s (%2$d) · %3$s</string>
     <string name="about_commit">Commit %1$s · %2$s</string>
+    <string name="day_source_desc">%1$s: da %2$s a %3$s, %4$s</string>
+    <string name="hour_column_desc">Ore %1$s: %2$s, %3$s, %4$d %% di probabilità di precipitazioni</string>
+    <plurals name="now_from_consensus">
+        <item quantity="one">Consenso di %1$d modello</item>
+        <item quantity="many">Consenso di %1$d modelli</item>
+        <item quantity="other">Consenso di %1$d modelli</item>
+    </plurals>
+    <plurals name="compare_chart_desc_models">
+        <item quantity="one">%1$d modello più il consenso</item>
+        <item quantity="many">%1$d modelli più il consenso</item>
+        <item quantity="other">%1$d modelli più il consenso</item>
+    </plurals>
+    <plurals name="compare_cell_degrees">
+        <item quantity="one">%1$d grado dal consenso</item>
+        <item quantity="many">%1$d gradi dal consenso</item>
+        <item quantity="other">%1$d gradi dal consenso</item>
+    </plurals>
+
+    <!-- In-app update, all of it driven by the button in the settings sheet. -->
+    <string name="update_check">Cerca aggiornamenti</string>
+    <string name="update_checking">Ricerca …</string>
+    <string name="update_up_to_date">La versione %1$s è la più recente</string>
+    <string name="update_available">Versione %1$s disponibile · %2$s</string>
+    <string name="update_download">Scarica</string>
+    <string name="update_downloading">Scaricamento %1$s …</string>
+    <string name="update_ready">Versione %1$s pronta</string>
+    <string name="update_ready_unverified">Versione %1$s pronta · pubblicata senza checksum</string>
+    <string name="update_install">Installa</string>
+    <string name="update_installing">Android chiederà la conferma</string>
+    <string name="update_needs_permission">Android deve consentire ad Apex Weather di installare app</string>
+    <string name="update_grant_permission">Consenti</string>
+    <string name="update_open_release">Apri la pagina del rilascio</string>
+    <string name="update_failed_network">GitHub non raggiungibile</string>
+    <string name="update_failed_no_apk">Questo rilascio non contiene un APK</string>
+    <string name="update_failed_version">Numero di versione non leggibile</string>
+    <string name="update_failed_digest">Il file scaricato non corrisponde al checksum</string>
+    <string name="update_failed_storage">Impossibile salvare il file</string>
+    <string name="update_install_failed">Installazione non riuscita: %1$s</string>
+    <string name="update_install_failed_unknown">Installazione non riuscita</string>
+    <string name="update_retry">Riprova</string>
 </resources>

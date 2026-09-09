@@ -58,7 +58,7 @@ object GeoSphereMapper {
             val temp = t2m.getOrNull(i) ?: return@mapNotNull null
             val precip = rrHourly.getOrNull(i) ?: 0.0
             val snow = snowHourly.getOrNull(i) ?: 0.0
-            val (wind, dir) = if (u.getOrNull(i) != null && v.getOrNull(i) != null) windFromUV(u[i]!!, v[i]!!) else 0.0 to null
+            val (wind, dir) = if (u.getOrNull(i) != null && v.getOrNull(i) != null) windFromUV(u[i]!!, v[i]!!) else null to null
             val gust = if (ug.getOrNull(i) != null && vg.getOrNull(i) != null) windFromUV(ug[i]!!, vg[i]!!).first else null
             // tcc missing for an hour: assume half-covered sky rather than biasing clear or overcast.
             val cloud = tcc.getOrNull(i) ?: 0.5

@@ -10,8 +10,10 @@ plugins {
 }
 
 // The release workflow stamps the git tag in with -PapexVersionName / -PapexVersionCode.
-val apexVersionName: String = providers.gradleProperty("apexVersionName").getOrElse("0.1.0")
-val apexVersionCode: Int = providers.gradleProperty("apexVersionCode").map(String::toInt).getOrElse(1)
+// Kept level with the newest published release, so a local build does not claim to be older than
+// what is on GitHub and the updater does not offer a version the developer already has.
+val apexVersionName: String = providers.gradleProperty("apexVersionName").getOrElse("0.2.0")
+val apexVersionCode: Int = providers.gradleProperty("apexVersionCode").map(String::toInt).getOrElse(200)
 
 // A real signing key, when one exists: environment variables on CI, or an
 // untracked keystore/keystore.properties locally. Without either, both build
@@ -54,6 +56,9 @@ android {
         versionName = apexVersionName
         testInstrumentationRunner = "it.apexweather.HiltTestRunner"
 
+        // Where the in-app updater looks for releases. Here rather than in Kotlin so the repo is
+        // named once, beside the version it is compared against.
+        buildConfigField("String", "UPDATE_REPO", "\"13/apexweather\"")
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
         buildConfigField("String", "GIT_DATE", "\"$gitDate\"")
     }
@@ -82,6 +87,27 @@ android {
                 enableV1Signing = false
             }
         }
+    }
+
+    lint {
+        // CI runs this, so a warning has to be worth failing a build over.
+        warningsAsErrors = true
+        abortOnError = true
+        sarifReport = true
+        disable += setOf(
+            // Dependency and toolchain upgrades are a decision to take deliberately, on a day set
+            // aside for it. A new release upstream is not a defect in this code.
+            "GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion",
+            // targetSdk trails compileSdk on purpose; see the comment on targetSdk above.
+            "OldTargetApi",
+            // Lint calls mipmap-anydpi-v26 unnecessary at minSdk 31, but dropping the qualifier
+            // makes aapt2 fail with "resource mipmap/ic_launcher not found". Tried, reverted.
+            "ObsoleteSdkInt",
+            // Resource shrinking is left off: Glance selects its generated layouts at runtime, and
+            // nothing here verifies a shrunk widget on a device. Revisit with a placed widget to
+            // test against.
+            "NotShrinkingResources",
+        )
     }
 
     buildTypes {

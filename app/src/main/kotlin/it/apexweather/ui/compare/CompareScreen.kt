@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,6 +52,7 @@ import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceStatus
 import it.apexweather.ui.common.Format
+import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.GlassCard
 import it.apexweather.ui.common.SourceColors
 import java.time.temporal.ChronoUnit
@@ -67,6 +69,7 @@ fun CompareScreen(viewModel: CompareViewModel = hiltViewModel()) {
 fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVariable: (CompareVariable) -> Unit) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val locale = LocalConfiguration.current.locales[0]
+    val formats = LocalFormats.current
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Text(stringResource(R.string.compare_title), style = MaterialTheme.typography.headlineMedium, color = Color.White, modifier = Modifier.padding(horizontal = 24.dp))
@@ -130,12 +133,12 @@ fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVa
                         // IntrinsicSize.Max so a missing source's one-line placeholder does not leave
                         // its neighbours' tinted backgrounds standing taller than it.
                         Row(Modifier.padding(vertical = 6.dp).height(IntrinsicSize.Max), verticalAlignment = Alignment.CenterVertically) {
-                            Text(Format.weekday(row.date, locale), Modifier.width(52.dp), style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                            DayCellText(row.consensus, deviation = 0.0, bold = true, sourceName = stringResource(R.string.consensus), date = Format.weekday(row.date, locale))
+                            Text(Format.weekday(row.date, formats), Modifier.width(52.dp), style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                            DayCellText(row.consensus, deviation = 0.0, bold = true, sourceName = stringResource(R.string.consensus), date = Format.weekday(row.date, formats))
                             state.selected.sortedBy { it.ordinal }.forEach { s ->
                                 val c = row.cells[s]
-                                if (c == null) MissingCell(s.displayName, Format.weekday(row.date, locale))
-                                else DayCellText(c, deviation = abs(c.maxC - row.consensus.maxC), bold = false, sourceName = s.displayName, date = Format.weekday(row.date, locale))
+                                if (c == null) MissingCell(s.displayName, Format.weekday(row.date, formats))
+                                else DayCellText(c, deviation = abs(c.maxC - row.consensus.maxC), bold = false, sourceName = s.displayName, date = Format.weekday(row.date, formats))
                             }
                         }
                     }
@@ -153,7 +156,7 @@ fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVa
                             Box(Modifier.size(8.dp).clip(CircleShape).background(SourceColors.of(s)))
                             Text(s.displayName, style = MaterialTheme.typography.bodyMedium, color = Color.White)
                         }
-                        Text(statusText(s, st), style = MaterialTheme.typography.labelSmall, color = statusColor(st))
+                        Text(statusText(s, st, state.now, formats), style = MaterialTheme.typography.labelSmall, color = statusColor(st))
                     }
                 }
             }
@@ -168,21 +171,23 @@ fun CompareContent(state: CompareUiState, onToggleSource: (Source) -> Unit, onVa
  */
 @Composable
 private fun DayCellText(c: DayCell, deviation: Double, bold: Boolean, sourceName: String, date: String) {
+    val formats = LocalFormats.current
     val (tint, marker) = when {
         deviation < 1.0 -> Color.Transparent to ""
         deviation < 3.0 -> Color(0x33FFD166) to " ›"
         else -> Color(0x40FF8A80) to " »"
     }
+    val away = pluralStringResource(R.plurals.compare_cell_degrees, deviation.roundToInt(), deviation.roundToInt())
     val spoken = stringResource(
         R.string.compare_cell_desc, sourceName, date,
-        Format.temp(c.minC), Format.temp(c.maxC), Format.mm(c.precipMm), deviation.roundToInt(),
+        Format.temp(c.minC, formats), Format.temp(c.maxC, formats), Format.mm(c.precipMm, formats), away,
     )
     Column(
         Modifier.width(84.dp).fillMaxHeight().background(tint).padding(horizontal = 4.dp, vertical = 2.dp)
             .semantics(mergeDescendants = true) { contentDescription = spoken },
     ) {
-        Text("${Format.temp(c.minC)} / ${Format.temp(c.maxC)}$marker", style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
-        Text(Format.mm(c.precipMm), style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5))
+        Text("${Format.temp(c.minC, formats)} / ${Format.temp(c.maxC, formats)}$marker", style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
+        Text(Format.mm(c.precipMm, formats), style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5))
     }
 }
 
@@ -205,14 +210,14 @@ private fun variableLabel(v: CompareVariable) = stringResource(
 )
 
 @Composable
-private fun statusText(source: Source, st: SourceStatus?): String = when (st) {
+private fun statusText(source: Source, st: SourceStatus?, now: java.time.Instant, formats: it.apexweather.ui.common.Formats): String = when (st) {
     null -> stringResource(R.string.status_none)
     // Only the sources that publish a run time can claim one; for the rest the timestamp is the fetch time.
     is SourceStatus.Ok -> stringResource(
         if (source.hasRunTime) R.string.status_ok else R.string.status_fetched,
-        Format.time(st.issuedAt, DorfTirol.ZONE),
+        Format.timestamp(st.issuedAt, DorfTirol.ZONE, now, formats),
     )
-    is SourceStatus.Stale -> stringResource(R.string.status_stale, Format.time(st.issuedAt, DorfTirol.ZONE))
+    is SourceStatus.Stale -> stringResource(R.string.status_stale, Format.timestamp(st.issuedAt, DorfTirol.ZONE, now, formats))
     is SourceStatus.Failed -> stringResource(R.string.status_failed, st.reason.take(40))
 }
 

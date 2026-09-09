@@ -2,6 +2,7 @@ package it.apexweather.domain
 
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.Source
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -114,8 +115,32 @@ class ConsensusBlenderTest {
             Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 10.0, wind = 12.0, gust = null))),
         )
         val h = blender.blend(f).hourly.single()
-        assertEquals(12.0, h.windKmh, 0.0)
+        assertEquals(12.0, h.windKmh!!, 0.0)
         assertEquals(50.0, h.gustKmh!!, 0.0)
+    }
+
+    /**
+     * KMOS publishes no wind. Counting its absence as a calm 0.0 used to drag the median down at
+     * every third hour, which is where the consensus wind was read from.
+     */
+    @Test
+    fun `a model without wind is left out of the wind median, not counted as calm`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, wind = 20.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0, wind = 22.0))),
+            Source.SIAG_KMOS to forecast(Source.SIAG_KMOS, listOf(point(0, 10.0, wind = null))),
+        )
+        assertEquals(21.0, blender.blend(f).hourly.single().windKmh!!, 0.0)
+    }
+
+    /** With nothing to average, the consensus has no wind to report rather than a made-up zero. */
+    @Test
+    fun `wind is absent when no model publishes it`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, wind = null))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0, wind = null))),
+        )
+        assertNull(blender.blend(f).hourly.single().windKmh)
     }
 
     @Test

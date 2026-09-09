@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -56,18 +57,38 @@ class WeatherStateHolder @Inject constructor(
     private val clock: Clock,
     @ApplicationScope scope: CoroutineScope,
 ) {
+    /** Identity matters: `awaitCached` tells a real emission from this by reference. */
+    private val initial = WeatherState()
+
     private val minuteTick = flow { while (true) { emit(Unit); delay(60_000) } }
 
+    private val settings = settingsRepository.settings
+
     /** Re-subscribes to the repository only when the bulletin language changes, not on every settings edit. */
-    private val snapshots = settingsRepository.settings
+    private val snapshots = settings
         .map { it.bulletinLanguage(Locale.getDefault().toLanguageTag()) }
         .distinctUntilChanged()
         .flatMapLatest { language -> repository.snapshot(language) }
 
+    /**
+     * The blend depends on the forecasts and nothing else, so it sits on its own upstream. Folding it
+     * into the combine below would re-blend all seven models every minute and on every settings edit —
+     * flipping the animations switch would have re-run it.
+     */
+    private val blended = snapshots
+        .map { it to blender.blend(it.forecasts) }
+        .flowOn(Dispatchers.Default)
+
     val weather: StateFlow<WeatherState> =
-        combine(snapshots, settingsRepository.settings, minuteTick) { snapshot, settings, _ ->
-            WeatherState(snapshot, settings, blender.blend(snapshot.forecasts), clock.instant())
-        }.flowOn(Dispatchers.Default).stateIn(scope, SharingStarted.WhileSubscribed(5_000), WeatherState())
+        combine(blended, settings, minuteTick) { (snapshot, consensus), settings, _ ->
+            WeatherState(snapshot, settings, consensus, clock.instant())
+        }.flowOn(Dispatchers.Default).stateIn(scope, SharingStarted.WhileSubscribed(5_000), initial)
+
+    /**
+     * The first state that came from the cache rather than the placeholder every StateFlow starts on.
+     * A caller that needs to know how old the data is has to await this, not `weather.value`.
+     */
+    suspend fun awaitCached(): WeatherState = weather.first { it !== initial }
 
     /** The home screen's state, built once and shared with the sky behind every tab. */
     val home: StateFlow<HomeUiState> =

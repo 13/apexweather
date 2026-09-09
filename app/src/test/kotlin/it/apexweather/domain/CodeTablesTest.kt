@@ -2,6 +2,7 @@ package it.apexweather.domain
 
 import it.apexweather.domain.model.Condition
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class CodeTablesTest {
@@ -36,5 +37,14 @@ class CodeTablesTest {
         assertEquals(Condition.CLEAR, SiagCodes.toCondition("a_n")) // KMOS day/night suffix
         assertEquals(Condition.CLOUDY, SiagCodes.toCondition(null))
         assertEquals("https://api-weather.services.siag.it/api/v2/graphics/icons/HDimgsource/wetter/icon_7.png", SiagCodes.iconUrl("g"))
+    }
+
+    /** An empty or junk code used to throw here, and the exception failed the entire bulletin. */
+    @Test
+    fun `iconUrl returns null rather than throwing on a code that is not a letter`() {
+        assertNull(SiagCodes.iconUrl(""))
+        assertNull(SiagCodes.iconUrl("   "))
+        assertNull(SiagCodes.iconUrl("1"))
+        assertNull(SiagCodes.iconUrl("-"))
     }
 }

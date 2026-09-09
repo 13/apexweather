@@ -40,6 +40,7 @@ import coil3.compose.AsyncImage
 import it.apexweather.R
 import it.apexweather.domain.DorfTirol
 import it.apexweather.ui.common.Format
+import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.GlassCard
 
 @Composable
@@ -52,6 +53,7 @@ fun BulletinScreen(viewModel: BulletinViewModel = hiltViewModel()) {
 fun BulletinContent(state: BulletinUiState) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val locale = LocalConfiguration.current.locales[0]
+    val formats = LocalFormats.current
     val b = state.bulletin
     LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(top = topInset + 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { Text(stringResource(R.string.bulletin_title), style = MaterialTheme.typography.headlineMedium, color = Color.White, modifier = Modifier.padding(horizontal = 24.dp)) }
@@ -63,7 +65,7 @@ fun BulletinContent(state: BulletinUiState) {
             GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 Text(b.title, style = MaterialTheme.typography.titleMedium, color = Color.White)
                 Spacer(Modifier.height(4.dp))
-                Text(stringResource(R.string.bulletin_issued, Format.time(b.issuedAt, DorfTirol.ZONE)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                Text(stringResource(R.string.bulletin_issued, Format.timestamp(b.issuedAt, DorfTirol.ZONE, state.now, formats)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                 Spacer(Modifier.height(10.dp))
                 Text(b.evolution, style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.92f), modifier = Modifier.testTag("bulletin_text"))
             }
@@ -81,7 +83,7 @@ fun BulletinContent(state: BulletinUiState) {
                 ) {
                     b.days.forEachIndexed { i, d ->
                         GlassCard(Modifier.width(150.dp).fillMaxHeight().testTag("bulletin_day_$i")) {
-                            Text(Format.weekday(d.date, locale) + " " + Format.dayMonth(d.date, locale), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                            Text(Format.weekday(d.date, formats) + " " + Format.dayMonth(d.date, formats), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
                             Spacer(Modifier.height(6.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 // The slot is always 44 dp, so a day without an icon keeps the
@@ -91,7 +93,7 @@ fun BulletinContent(state: BulletinUiState) {
                                 }
                                 Spacer(Modifier.width(8.dp))
                                 Column {
-                                    Text(listOfNotNull(d.minC?.let(Format::temp), d.maxC?.let(Format::temp)).joinToString(" / "), style = MaterialTheme.typography.titleMedium, color = Color.White)
+                                    Text(listOfNotNull(d.minC?.let { Format.temp(it, formats) }, d.maxC?.let { Format.temp(it, formats) }).joinToString(" / "), style = MaterialTheme.typography.titleMedium, color = Color.White)
                                     if (d.rainToMm != null && d.rainToMm > 0) Text("${d.rainFromMm?.toInt() ?: 0}–${d.rainToMm.toInt()} mm", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5))
                                 }
                             }
@@ -104,7 +106,7 @@ fun BulletinContent(state: BulletinUiState) {
         }
         itemsIndexed(b.conditions) { _, c ->
             GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                Text(Format.weekday(c.date, locale) + " · " + c.title, style = MaterialTheme.typography.titleMedium, color = Color.White)
+                Text(Format.weekday(c.date, formats) + " · " + c.title, style = MaterialTheme.typography.titleMedium, color = Color.White)
                 Spacer(Modifier.height(6.dp))
                 Text(c.description, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
                 c.temperatures?.let { Spacer(Modifier.height(4.dp)); Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.75f)) }

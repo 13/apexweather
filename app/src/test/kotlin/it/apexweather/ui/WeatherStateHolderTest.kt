@@ -22,6 +22,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -88,6 +89,20 @@ class WeatherStateHolderTest {
         assertTrue(weather.consensus.daily.isNotEmpty())
         // Compare and the bulletin tab read these, instead of each re-reading and re-decoding the cache.
         assertNotNull(weather.snapshot.bulletin)
+    }
+
+    /**
+     * `weather.value` is the placeholder until the cache has been read, and the placeholder claims no
+     * successful refresh — which is exactly what made the home screen refetch on every cold start.
+     */
+    @Test
+    fun `awaitCached waits for the cache instead of returning the placeholder`() = runTest {
+        repository.refresh(language())
+
+        assertNull("the placeholder must not claim a refresh", WeatherState().snapshot.lastSuccessfulRefresh)
+        val cached = holder.awaitCached()
+        assertNotNull("awaitCached must not hand back the placeholder", cached.snapshot.lastSuccessfulRefresh)
+        assertTrue(cached.snapshot.forecasts.isNotEmpty())
     }
 
     @Test

@@ -42,7 +42,8 @@ data class HourlyPoint(
     val feelsLikeC: Double? = null,
     val precipMm: Double = 0.0,
     val precipProb: Int? = null,
-    val windKmh: Double = 0.0,
+    /** Null where the model publishes no wind at all, as SIAG KMOS does. */
+    val windKmh: Double? = null,
     val gustKmh: Double? = null,
     val windDirDeg: Int? = null,
     val cloudPct: Int? = null,
@@ -145,7 +146,8 @@ data class ConsensusHour(
     val feelsLikeC: Double?,
     val precipMm: Double,
     val precipProb: Int,
-    val windKmh: Double,
+    /** Null when not one contributing model publishes wind. */
+    val windKmh: Double?,
     val gustKmh: Double?,
     val condition: Condition,
     val agreement: Float,

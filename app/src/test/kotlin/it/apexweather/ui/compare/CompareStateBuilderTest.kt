@@ -36,15 +36,16 @@ class CompareStateBuilderTest {
 
     @Test
     fun `variable picks the right value`() {
-        // KMOS reports no wind (the mapper stores 0.0), so the wind chart must leave it out.
-        val withKmos = snapshot.copy(forecasts = forecasts + (Source.SIAG_KMOS to forecast(Source.SIAG_KMOS, (0 until 72).map { point(it, 13.0, precip = 2.0) })))
+        // KMOS reports no wind at all, so the wind chart must leave it out.
+        val withKmos = snapshot.copy(forecasts = forecasts + (Source.SIAG_KMOS to forecast(Source.SIAG_KMOS, (0 until 72).map { point(it, 13.0, precip = 2.0, wind = null) })))
         val temp = CompareStateBuilder.build(withKmos, AppSettings(compareVariable = CompareVariable.TEMPERATURE), consensus, hour(0))
         val wind = CompareStateBuilder.build(withKmos, AppSettings(compareVariable = CompareVariable.WIND), consensus, hour(0))
         val precip = CompareStateBuilder.build(withKmos, AppSettings(compareVariable = CompareVariable.PRECIPITATION), consensus, hour(0))
         assertEquals(14.0, temp.series.getValue(Source.ICON_D2).first().value, 0.0)
         assertEquals(20.0, wind.series.getValue(Source.ICON_D2).first().value, 0.0)
         assertEquals(3.0, precip.series.getValue(Source.ICON_D2).first().value, 0.0)
-        // KMOS has no wind: it must not draw a fabricated flat line, but it stays for temperature.
+        // A source with no wind contributes no points, so it drops out of the wind chart on its
+        // own while staying on the temperature chart.
         assertTrue(Source.SIAG_KMOS in temp.series)
         assertFalse(Source.SIAG_KMOS in wind.series)
     }

@@ -22,8 +22,8 @@ import kotlin.coroutines.cancellation.CancellationException
  * The four upstreams, answered from the recorded fixtures. Shared by the repository tests and by
  * anything else that needs a repository backed by real payloads rather than hand-written ones.
  */
-internal class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
-    override suspend fun forecast(latitude: Double, longitude: Double, timezone: String, forecastDays: Int, models: String, hourly: String, daily: String): OpenMeteoResponse {
+internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
+    open override suspend fun forecast(latitude: Double, longitude: Double, timezone: String, forecastDays: Int, models: String, hourly: String, daily: String): OpenMeteoResponse {
         if (fail) throw IOException("open-meteo down")
         return Fixtures.json.decodeFromString(OpenMeteoResponse.serializer(), Fixtures.read("openmeteo.json"))
     }

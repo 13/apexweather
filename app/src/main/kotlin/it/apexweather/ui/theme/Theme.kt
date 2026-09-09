@@ -6,6 +6,9 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import it.apexweather.ui.common.LocalFormats
+import it.apexweather.ui.common.rememberFormats
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -45,5 +48,9 @@ val ApexShapes = Shapes(
 
 @Composable
 fun ApexTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = ApexColors, typography = ApexTypography, shapes = ApexShapes, content = content)
+    // Formats rides along with the theme: every screen that writes a number or a time needs the
+    // reader's language and clock preference, and resolving it here means no screen can forget.
+    CompositionLocalProvider(LocalFormats provides rememberFormats()) {
+        MaterialTheme(colorScheme = ApexColors, typography = ApexTypography, shapes = ApexShapes, content = content)
+    }
 }

@@ -134,7 +134,7 @@ object SiagMappers {
                 tempC = t,
                 precipMm = (precByDate[pt.date] ?: 0.0) / 3.0, // 3-hour sum spread as an hourly rate
                 precipProb = probByDate[pt.date],
-                windKmh = 0.0,
+                // KMOS publishes no wind parameter; absence travels as null rather than a calm-looking 0.0.
                 condition = SiagCodes.toCondition(symByDate[pt.date]),
             )
         }

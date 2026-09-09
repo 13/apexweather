@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -45,8 +46,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.apexweather.R
 import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.model.ConsensusHour
-import it.apexweather.domain.model.Source
 import it.apexweather.ui.common.Format
+import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.label
 import it.apexweather.ui.theme.fromArgb
 import java.time.Instant
@@ -122,7 +123,9 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
 
 @Composable
 private fun OfflineBanner(state: HomeUiState) {
-    val text = state.updatedAt?.let { stringResource(R.string.offline_banner, Format.time(it, DorfTirol.ZONE)) } ?: stringResource(R.string.offline_banner_no_time)
+    val locale = LocalConfiguration.current.locales[0]
+    val formats = LocalFormats.current
+    val text = state.updatedAt?.let { stringResource(R.string.offline_banner, Format.timestamp(it, DorfTirol.ZONE, state.now, formats)) } ?: stringResource(R.string.offline_banner_no_time)
     Text(
         text, style = MaterialTheme.typography.labelSmall, color = Color.White,
         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x66FF8A80)).padding(10.dp).testTag("offline_banner"),
@@ -140,13 +143,17 @@ private fun EmptyState(onRetry: () -> Unit, modifier: Modifier) {
     }
 }
 
+/** Shown where a model publishes no value at all, so absence never reads as zero. */
+private const val MISSING = "\u2013"
+
 @Composable
 private fun HourDetail(hour: ConsensusHour, state: HomeUiState) {
+    val formats = LocalFormats.current
     Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp).padding(bottom = 32.dp)) {
-        Text("${Format.time(hour.time, DorfTirol.ZONE)} · ${hour.condition.label()}", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+        Text("${Format.time(hour.time, DorfTirol.ZONE, formats)} · ${hour.condition.label()}", style = MaterialTheme.typography.headlineMedium, color = Color.White)
         Spacer(Modifier.height(4.dp))
         Text(
-            stringResource(R.string.hour_summary, Format.temp(hour.tempC), Format.temp(hour.tempMinC), Format.temp(hour.tempMaxC), Format.mm(hour.precipMm), hour.precipProb, Format.wind(hour.windKmh, state.settings.windUnit)),
+            stringResource(R.string.hour_summary, Format.temp(hour.tempC, formats), Format.temp(hour.tempMinC, formats), Format.temp(hour.tempMaxC, formats), Format.mm(hour.precipMm, formats), hour.precipProb, hour.windKmh?.let { Format.wind(it, state.settings.windUnit, formats) } ?: MISSING),
             style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f),
         )
         Spacer(Modifier.height(16.dp))
@@ -155,9 +162,8 @@ private fun HourDetail(hour: ConsensusHour, state: HomeUiState) {
         hour.perSource.entries.sortedBy { it.key.ordinal }.forEach { (source, p) ->
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(source.displayName, style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                // KMOS has no wind parameter; showing its 0.0 would read as "calm".
-                val wind = if (source == Source.SIAG_KMOS) "\u2013" else Format.wind(p.windKmh, state.settings.windUnit)
-                Text("${Format.tempDecimal(p.tempC)}  ${Format.mm(p.precipMm)}  $wind", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
+                val wind = p.windKmh?.let { Format.wind(it, state.settings.windUnit, formats) } ?: MISSING
+                Text("${Format.tempDecimal(p.tempC, formats)}  ${Format.mm(p.precipMm, formats)}  $wind", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
             }
         }
     }

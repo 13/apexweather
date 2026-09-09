@@ -1,0 +1,18 @@
+{
+  "tag_name": "v0.2.0",
+  "name": "Apex Weather 0.2.0",
+  "html_url": "https://github.com/13/apexweather/releases/tag/v0.2.0",
+  "draft": false,
+  "prerelease": false,
+  "published_at": "2026-09-09T10:02:19Z",
+  "body": "**Full Changelog**: https://github.com/13/apexweather/compare/v0.1.0...v0.2.0",
+  "assets": [
+    {
+      "name": "ApexWeather-0.2.0.apk",
+      "size": 5493047,
+      "content_type": "application/vnd.android.package-archive",
+      "browser_download_url": "https://github.com/13/apexweather/releases/download/v0.2.0/ApexWeather-0.2.0.apk",
+      "digest": "sha256:25830736c37b606586fcb1e4a26da855a1fa754793fb873f7d5feff434935e16"
+    }
+  ]
+}

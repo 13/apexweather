@@ -11,13 +11,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import it.apexweather.R
 import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.model.Source
 import it.apexweather.ui.common.Format
+import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.SourceColors
 import java.time.Instant
 import kotlin.math.ceil
@@ -33,22 +34,23 @@ fun MultiLineChart(
     from: Instant,
     hours: Long,
     unitLabel: String,
+    modifier: Modifier = Modifier,
     /** True for variables that cannot go below zero (precipitation, wind): keeps the axis from showing negatives. */
     nonNegative: Boolean = false,
     /** Names the plotted variable for the spoken summary; the chart itself is only lines. */
     variableName: String = "",
-    modifier: Modifier = Modifier,
 ) {
-    val locale = LocalConfiguration.current.locales[0]
+    val formats = LocalFormats.current
     val labelPaint = remember {
         android.graphics.Paint().apply { color = android.graphics.Color.argb(160, 255, 255, 255); textSize = 28f; isAntiAlias = true }
     }
     // A canvas of lines says nothing to a screen reader, so the chart carries its own summary:
     // what is plotted, over how long, across what range, and how many models are in it.
     val values = series.values.flatten().map { it.value } + consensus.map { it.value }
-    val summary = if (values.isEmpty()) variableName else stringResource(
-        R.string.compare_chart_desc, variableName, hours,
-        "${values.min().roundToInt()}$unitLabel", "${values.max().roundToInt()}$unitLabel", series.size,
+    val models = pluralStringResource(R.plurals.compare_chart_desc_models, series.size, series.size)
+    val summary = if (values.isEmpty()) variableName else pluralStringResource(
+        R.plurals.compare_chart_desc, hours.toInt(), variableName, hours,
+        "${values.min().roundToInt()}$unitLabel", "${values.max().roundToInt()}$unitLabel", models,
     )
     Canvas(modifier.testTag("compare_chart").semantics { contentDescription = summary }) {
         val all = series.values.flatten().map { it.value } + consensus.map { it.value } + band.flatMap { listOf(it.min, it.max) }
@@ -73,7 +75,7 @@ fun MultiLineChart(
         var t = from
         while (!t.isAfter(from.plusSeconds(hours * 3600))) {
             val z = t.atZone(DorfTirol.ZONE)
-            val label = if (z.hour == 0) Format.weekday(z.toLocalDate(), locale) else "${z.hour}h"
+            val label = if (z.hour == 0) Format.weekday(z.toLocalDate(), formats) else "${z.hour}h"
             drawContext.canvas.nativeCanvas.drawText(label, x(t) - 12f, size.height - 8f, labelPaint)
             drawLine(Color.White.copy(alpha = 0.06f), Offset(x(t), top), Offset(x(t), bottom), strokeWidth = 1f)
             t = t.plusSeconds(12 * 3600)

@@ -44,8 +44,14 @@ object SiagCodes {
         return table[c] ?: Condition.CLOUDY
     }
 
-    fun iconUrl(letter: String): String {
-        val c = letter.trim().lowercase().first()
+    /**
+     * Null for anything that is not one of the a-z symbol letters. Callers reach this through
+     * `?.let`, which guards null but not an empty or junk code, and an exception here used to fail
+     * the whole bulletin rather than one icon.
+     */
+    fun iconUrl(letter: String): String? {
+        val c = letter.trim().lowercase().firstOrNull() ?: return null
+        if (c !in 'a'..'z') return null
         return "$ICON_BASE${c - 'a' + 1}.png"
     }
 }

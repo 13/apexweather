@@ -17,6 +17,7 @@ import it.apexweather.ui.WeatherStateHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -51,23 +52,28 @@ object CompareStateBuilder {
     fun build(snapshot: WeatherSnapshot, settings: AppSettings, consensus: ConsensusForecast, now: Instant): CompareUiState {
         val from = now.truncatedTo(ChronoUnit.HOURS)
         val to = from.plus(WINDOW_HOURS, ChronoUnit.HOURS)
-        fun HourlyPoint.value() = when (settings.compareVariable) {
+        fun HourlyPoint.value(): Double? = when (settings.compareVariable) {
             CompareVariable.TEMPERATURE -> tempC
             CompareVariable.PRECIPITATION -> precipMm
-            CompareVariable.WIND -> settings.windUnit.fromKmh(windKmh)
+            CompareVariable.WIND -> windKmh?.let(settings.windUnit::fromKmh)
         }
-        // KMOS carries no wind at all (the mapper stores 0.0), so it must not draw a flat zero line.
+        // A model that publishes no wind contributes no points, so KMOS drops out of the wind
+        // chart on its own rather than drawing a flat zero line.
         val series = snapshot.forecasts
-            .filterKeys { it in settings.compareSources && !(settings.compareVariable == CompareVariable.WIND && it == Source.SIAG_KMOS) }
-            .mapValues { (_, fc) -> fc.hourly.filter { !it.time.isBefore(from) && it.time.isBefore(to) }.map { SeriesPoint(it.time, it.value()) } }
+            .filterKeys { it in settings.compareSources }
+            .mapValues { (_, fc) ->
+                fc.hourly.filter { !it.time.isBefore(from) && it.time.isBefore(to) }
+                    .mapNotNull { p -> p.value()?.let { SeriesPoint(p.time, it) } }
+            }
             .filterValues { it.isNotEmpty() }
         val window = consensus.hourly.filter { !it.time.isBefore(from) && it.time.isBefore(to) }
-        val consensusLine = window.map { h ->
-            SeriesPoint(h.time, when (settings.compareVariable) {
+        val consensusLine = window.mapNotNull { h ->
+            val v = when (settings.compareVariable) {
                 CompareVariable.TEMPERATURE -> h.tempC
                 CompareVariable.PRECIPITATION -> h.precipMm
-                CompareVariable.WIND -> settings.windUnit.fromKmh(h.windKmh)
-            })
+                CompareVariable.WIND -> h.windKmh?.let(settings.windUnit::fromKmh)
+            }
+            v?.let { SeriesPoint(h.time, it) }
         }
         val band = if (settings.compareVariable == CompareVariable.TEMPERATURE) window.map { BandPoint(it.time, it.tempMinC, it.tempMaxC) } else emptyList()
 
@@ -95,6 +101,9 @@ class CompareViewModel @Inject constructor(
 ) : ViewModel() {
     val state: StateFlow<CompareUiState> = holder.weather
         .map { CompareStateBuilder.build(it.snapshot, it.settings, it.consensus, it.now) }
+        // The 72-hour window is truncated to the hour, so the minute tick produces an identical state
+        // 59 minutes out of 60; without this the whole compare state rebuilt every minute.
+        .distinctUntilChanged()
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CompareUiState())
 

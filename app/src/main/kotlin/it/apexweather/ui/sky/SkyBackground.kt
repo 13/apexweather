@@ -15,7 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -43,6 +43,8 @@ fun SkyBackground(palette: SkyPalette, animationsEnabled: Boolean, modifier: Mod
     val accent = Color.fromArgb(palette.accent)
 
     val system = remember(palette.particle, palette.density) { ParticleSystem(palette.particle, palette.density) }
+    // The canvas redraws at display rate, but the ridge is fixed geometry: build it once per size.
+    val ridgePaths = remember { RidgePaths() }
     var frame by remember { mutableLongStateOf(0L) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -74,27 +76,53 @@ fun SkyBackground(palette: SkyPalette, animationsEnabled: Boolean, modifier: Mod
         Canvas(Modifier.fillMaxSize()) {
             @Suppress("UNUSED_VARIABLE") val f = frame // read state so the canvas redraws every frame
             system.draw(this, accent)
-            drawRidge(ridge)
+            ridgePaths.update(size)
+            drawPath(ridgePaths.front, ridge.copy(alpha = 0.85f))
+            drawPath(ridgePaths.back, ridge.copy(alpha = 0.45f))
         }
     }
 }
 
-/** Stylized Meran valley ridge (Ifinger / Mutspitze) at the bottom of the screen. */
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRidge(color: Color) {
-    val w = size.width; val h = size.height
-    val pts = listOf(0f to 0.86f, 0.08f to 0.80f, 0.16f to 0.84f, 0.26f to 0.74f, 0.33f to 0.79f, 0.42f to 0.70f,
-        0.50f to 0.76f, 0.58f to 0.72f, 0.66f to 0.81f, 0.74f to 0.77f, 0.84f to 0.85f, 0.92f to 0.82f, 1f to 0.88f)
-    val path = Path().apply {
-        moveTo(0f, h)
-        pts.forEach { (x, y) -> lineTo(x * w, y * h) }
-        lineTo(w, h); close()
+/**
+ * Stylized Meran valley ridge (Ifinger / Mutspitze) at the bottom of the screen, as alternating
+ * x/y fractions of the canvas.
+ */
+private val RIDGE_FRONT = floatArrayOf(
+    0f, 0.86f, 0.08f, 0.80f, 0.16f, 0.84f, 0.26f, 0.74f, 0.33f, 0.79f, 0.42f, 0.70f,
+    0.50f, 0.76f, 0.58f, 0.72f, 0.66f, 0.81f, 0.74f, 0.77f, 0.84f, 0.85f, 0.92f, 0.82f, 1f, 0.88f,
+)
+
+/** The paler range behind it, drawn higher up. */
+private val RIDGE_BACK = floatArrayOf(
+    0f, 0.78f, 0.12f, 0.70f, 0.22f, 0.75f, 0.36f, 0.62f, 0.48f, 0.69f, 0.60f, 0.60f,
+    0.72f, 0.68f, 0.86f, 0.64f, 1f, 0.74f,
+)
+
+/**
+ * The two ridge silhouettes, rebuilt only when the canvas changes size. Building them inside the
+ * draw lambda cost two paths and two lists of pairs on every frame, for geometry that never moves.
+ */
+private class RidgePaths {
+    val front = Path()
+    val back = Path()
+    private var builtFor: Size = Size.Unspecified
+
+    fun update(size: Size) {
+        if (size == builtFor) return
+        builtFor = size
+        fill(front, RIDGE_FRONT, size)
+        fill(back, RIDGE_BACK, size)
     }
-    drawPath(path, color.copy(alpha = 0.85f))
-    val back = Path().apply {
-        moveTo(0f, h)
-        listOf(0f to 0.78f, 0.12f to 0.70f, 0.22f to 0.75f, 0.36f to 0.62f, 0.48f to 0.69f, 0.60f to 0.60f, 0.72f to 0.68f, 0.86f to 0.64f, 1f to 0.74f)
-            .forEach { (x, y) -> lineTo(x * w, y * h) }
-        lineTo(w, h); close()
+
+    private fun fill(path: Path, points: FloatArray, size: Size) {
+        path.reset()
+        path.moveTo(0f, size.height)
+        var i = 0
+        while (i < points.size) {
+            path.lineTo(points[i] * size.width, points[i + 1] * size.height)
+            i += 2
+        }
+        path.lineTo(size.width, size.height)
+        path.close()
     }
-    drawPath(back, color.copy(alpha = 0.45f))
 }
