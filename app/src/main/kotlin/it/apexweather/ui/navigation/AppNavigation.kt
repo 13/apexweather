@@ -32,6 +32,7 @@ import androidx.core.os.LocaleListCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -48,6 +49,22 @@ import it.apexweather.ui.settings.SettingsViewModel
 import it.apexweather.ui.sky.SkyBackground
 import it.apexweather.ui.sky.SkyViewModel
 import kotlinx.serialization.Serializable
+
+/**
+ * The one way to reach a top-level destination.
+ *
+ * The bulletin has two entrances, its tab and the teaser card on the home screen. The card used to
+ * push it with a plain navigate while the tabs pushed it with these options, and the two shapes of
+ * back stack are not interchangeable: after opening the bulletin from the card, the home tab could
+ * no longer bring itself back. Everything that opens a tab's destination goes through here.
+ */
+internal fun NavHostController.openTopLevel(route: Any) {
+    navigate(route) {
+        popUpTo(HomeRoute) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
 
 @Serializable object HomeRoute
 @Serializable object CompareRoute
@@ -82,7 +99,7 @@ fun ApexApp() {
                         val selected = dest?.hasRoute(item.route::class) == true
                         NavigationBarItem(
                             selected = selected,
-                            onClick = { nav.navigate(item.route) { popUpTo(HomeRoute) { saveState = true }; launchSingleTop = true; restoreState = true } },
+                            onClick = { nav.openTopLevel(item.route) },
                             icon = { Icon(item.icon, null) },
                             label = { Text(stringResource(item.labelRes)) },
                             colors = NavigationBarItemDefaults.colors(selectedIconColor = Color.White, selectedTextColor = Color.White, indicatorColor = Color(0x33FFFFFF), unselectedIconColor = Color(0xAAFFFFFF), unselectedTextColor = Color(0xAAFFFFFF)),
@@ -93,7 +110,7 @@ fun ApexApp() {
             },
         ) { padding ->
             NavHost(nav, startDestination = HomeRoute, modifier = Modifier.padding(bottom = padding.calculateBottomPadding())) {
-                composable<HomeRoute> { HomeScreen(onOpenBulletin = { nav.navigate(BulletinRoute) { launchSingleTop = true } }, viewModel = homeVm) }
+                composable<HomeRoute> { HomeScreen(onOpenBulletin = { nav.openTopLevel(BulletinRoute) }, viewModel = homeVm) }
                 composable<CompareRoute> { CompareScreen() }
                 composable<BulletinRoute> { BulletinScreen() }
             }
