@@ -3,11 +3,15 @@ package it.apexweather.update
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 
@@ -125,8 +129,13 @@ class UpdateViewModel @Inject constructor(
             return
         }
         mutableState.value = UpdateUiState.Installing
-        runCatching { installer.install(file.file) }.onFailure {
-            mutableState.value = UpdateUiState.InstallFailed(it.message, file.releaseUrl)
+        work?.cancel()
+        work = viewModelScope.launch {
+            // The session write copies the whole APK, so it does not belong on the main thread.
+            runCatching { withContext(Dispatchers.IO) { installer.install(file.file) } }.onFailure {
+                currentCoroutineContext().ensureActive()
+                mutableState.value = UpdateUiState.InstallFailed(it.message, file.releaseUrl)
+            }
         }
     }
 
@@ -152,6 +161,8 @@ class UpdateViewModel @Inject constructor(
 
     fun dismiss() {
         work?.cancel()
+        available = null
+        ready = null
         mutableState.value = UpdateUiState.Idle
     }
 }
