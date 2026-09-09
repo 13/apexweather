@@ -15,7 +15,6 @@
     <string name="cond_thunderstorm">Gewitter</string>
     <string name="feels_like">Gefühlt %1$s</string>
     <string name="now_from_station">Jetzt: Station %1$s, %2$s</string>
-    <string name="now_from_consensus">Konsens aus %1$d Modellen</string>
     <string name="updated_at">Aktualisiert %1$s</string>
     <string name="section_hourly">NÄCHSTE 48 STUNDEN</string>
     <string name="section_daily">7 TAGE</string>
@@ -64,9 +63,23 @@
     <string name="day_sun">Sonnenaufgang %1$s · Sonnenuntergang %2$s</string>
     <string name="day_precip_total">Niederschlag %1$s</string>
     <string name="agreement_short">Übereinstimmung %1$d %%</string>
-    <string name="compare_cell_desc">%1$s, %2$s: %3$s bis %4$s, %5$s, %6$d Grad vom Konsens entfernt</string>
+    <string name="compare_cell_desc">%1$s, %2$s: %3$s bis %4$s, %5$s, %6$s</string>
     <string name="compare_cell_missing">%1$s: keine Vorhersage für %2$s</string>
-    <string name="compare_chart_desc">%1$s der nächsten %2$d Stunden, %3$s bis %4$s, %5$d Modelle plus Konsens</string>
+    <string name="compare_chart_desc">%1$s der nächsten %2$d Stunden, %3$s bis %4$s, %5$s</string>
     <string name="about_build">Version %1$s (%2$d) · %3$s</string>
     <string name="about_commit">Commit %1$s · %2$s</string>
+    <string name="day_source_desc">%1$s: %2$s bis %3$s, %4$s</string>
+    <string name="hour_column_desc">%1$s Uhr: %2$s, %3$s, %4$d %% Niederschlagswahrscheinlichkeit</string>
+    <plurals name="now_from_consensus">
+        <item quantity="one">Konsens aus %1$d Modell</item>
+        <item quantity="other">Konsens aus %1$d Modellen</item>
+    </plurals>
+    <plurals name="compare_chart_desc_models">
+        <item quantity="one">%1$d Modell plus Konsens</item>
+        <item quantity="other">%1$d Modelle plus Konsens</item>
+    </plurals>
+    <plurals name="compare_cell_degrees">
+        <item quantity="one">%1$d Grad vom Konsens entfernt</item>
+        <item quantity="other">%1$d Grad vom Konsens entfernt</item>
+    </plurals>
 </resources>

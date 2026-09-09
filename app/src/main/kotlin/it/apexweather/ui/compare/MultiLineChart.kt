@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -46,9 +47,10 @@ fun MultiLineChart(
     // A canvas of lines says nothing to a screen reader, so the chart carries its own summary:
     // what is plotted, over how long, across what range, and how many models are in it.
     val values = series.values.flatten().map { it.value } + consensus.map { it.value }
+    val models = pluralStringResource(R.plurals.compare_chart_desc_models, series.size, series.size)
     val summary = if (values.isEmpty()) variableName else stringResource(
         R.string.compare_chart_desc, variableName, hours,
-        "${values.min().roundToInt()}$unitLabel", "${values.max().roundToInt()}$unitLabel", series.size,
+        "${values.min().roundToInt()}$unitLabel", "${values.max().roundToInt()}$unitLabel", models,
     )
     Canvas(modifier.testTag("compare_chart").semantics { contentDescription = summary }) {
         val all = series.values.flatten().map { it.value } + consensus.map { it.value } + band.flatMap { listOf(it.min, it.max) }

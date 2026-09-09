@@ -15,7 +15,6 @@
     <string name="cond_thunderstorm">Thunderstorm</string>
     <string name="feels_like">Feels like %1$s</string>
     <string name="now_from_station">Now: station %1$s, %2$s</string>
-    <string name="now_from_consensus">Consensus of %1$d models</string>
     <string name="updated_at">Updated %1$s</string>
     <string name="section_hourly">NEXT 48 HOURS</string>
     <string name="section_daily">7 DAYS</string>
@@ -64,9 +63,23 @@
     <string name="day_sun">Sunrise %1$s · Sunset %2$s</string>
     <string name="day_precip_total">Precipitation %1$s</string>
     <string name="agreement_short">Agreement %1$d %%</string>
-    <string name="compare_cell_desc">%1$s, %2$s: %3$s to %4$s, %5$s, %6$d degrees from the consensus</string>
+    <string name="compare_cell_desc">%1$s, %2$s: %3$s to %4$s, %5$s, %6$s</string>
     <string name="compare_cell_missing">%1$s: no forecast for %2$s</string>
-    <string name="compare_chart_desc">%1$s over the next %2$d hours, %3$s to %4$s, %5$d models plus the consensus</string>
+    <string name="compare_chart_desc">%1$s over the next %2$d hours, %3$s to %4$s, %5$s</string>
     <string name="about_build">Version %1$s (%2$d) · %3$s</string>
     <string name="about_commit">Commit %1$s · %2$s</string>
+    <string name="day_source_desc">%1$s: %2$s to %3$s, %4$s</string>
+    <string name="hour_column_desc">%1$s: %2$s, %3$s, %4$d %% chance of precipitation</string>
+    <plurals name="now_from_consensus">
+        <item quantity="one">Consensus of %1$d model</item>
+        <item quantity="other">Consensus of %1$d models</item>
+    </plurals>
+    <plurals name="compare_chart_desc_models">
+        <item quantity="one">%1$d model plus the consensus</item>
+        <item quantity="other">%1$d models plus the consensus</item>
+    </plurals>
+    <plurals name="compare_cell_degrees">
+        <item quantity="one">%1$d degree from the consensus</item>
+        <item quantity="other">%1$d degrees from the consensus</item>
+    </plurals>
 </resources>

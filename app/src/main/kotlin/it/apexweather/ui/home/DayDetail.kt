@@ -1,5 +1,7 @@
 package it.apexweather.ui.home
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import it.apexweather.R
@@ -42,7 +46,12 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState) {
     val hours = state.hoursByDate[day.date].orEmpty()
     val sources = state.sourcesForDay(day.date)
 
-    Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp)) {
+    // ModalBottomSheet adds no scrolling of its own, and this content runs past a phone screen in
+    // landscape or at a large font scale, where the per-source rows would simply be unreachable.
+    Column(
+        Modifier.verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp).padding(bottom = 32.dp),
+    ) {
         Text(
             Format.weekdayFull(day.date, locale) + ", " + Format.dayMonth(day.date, locale),
             style = MaterialTheme.typography.headlineMedium, color = Color.White,
@@ -93,7 +102,15 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState) {
             Text(stringResource(R.string.per_source), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
             Spacer(Modifier.height(6.dp))
             sources.forEach { (source, p) ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                val spoken = stringResource(
+                    R.string.day_source_desc, source.displayName,
+                    Format.temp(p.minC), Format.temp(p.maxC), Format.mm(p.precipMm),
+                )
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                        .semantics(mergeDescendants = true) { contentDescription = spoken },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
                     Text(source.displayName, style = MaterialTheme.typography.bodyMedium, color = Color.White)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(

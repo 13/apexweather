@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -74,8 +75,9 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier) {
             state.bandHalfWidth?.let { AgreementBadge(it, state.currentHour?.agreement ?: 0.5f) }
         }
         Spacer(Modifier.height(4.dp))
+        val sourceCount = state.currentHour?.sourceCount ?: 0
         val source = state.observation?.let { stringResource(R.string.now_from_station, it.stationName, Format.time(it.time, DorfTirol.ZONE)) }
-            ?: stringResource(R.string.now_from_consensus, state.currentHour?.sourceCount ?: 0)
+            ?: pluralStringResource(R.plurals.now_from_consensus, sourceCount, sourceCount)
         Text(source, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.65f))
         state.updatedAt?.let {
             Text(stringResource(R.string.updated_at, Format.time(it, DorfTirol.ZONE)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
@@ -137,10 +139,16 @@ fun HourStrip(
         val openLabel = stringResource(R.string.open_hour_details)
         Row {
             hours.forEachIndexed { i, h ->
-                val clickable = if (onHourClick == null) Modifier
+                // clickable is what merges a column into one spoken node, so the inert strip has to
+                // say so itself — otherwise every hour is read as four unrelated fragments.
+                val spoken = stringResource(
+                    R.string.hour_column_desc, Format.hour(h.time, DorfTirol.ZONE),
+                    h.condition.label(), Format.temp(h.tempC), h.precipProb,
+                )
+                val behaviour = if (onHourClick == null) Modifier.semantics(mergeDescendants = true) { contentDescription = spoken }
                 else Modifier.clickable(onClickLabel = openLabel) { onHourClick(h.time) }
                 Column(
-                    Modifier.width(HourColumnWidth).then(clickable)
+                    Modifier.width(HourColumnWidth).then(behaviour)
                         .padding(vertical = 6.dp).testTag("${tagPrefix}_$i"),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {

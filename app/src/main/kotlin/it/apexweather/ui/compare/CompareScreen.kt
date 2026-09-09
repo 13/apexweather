@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -173,9 +174,10 @@ private fun DayCellText(c: DayCell, deviation: Double, bold: Boolean, sourceName
         deviation < 3.0 -> Color(0x33FFD166) to " ›"
         else -> Color(0x40FF8A80) to " »"
     }
+    val away = pluralStringResource(R.plurals.compare_cell_degrees, deviation.roundToInt(), deviation.roundToInt())
     val spoken = stringResource(
         R.string.compare_cell_desc, sourceName, date,
-        Format.temp(c.minC), Format.temp(c.maxC), Format.mm(c.precipMm), deviation.roundToInt(),
+        Format.temp(c.minC), Format.temp(c.maxC), Format.mm(c.precipMm), away,
     )
     Column(
         Modifier.width(84.dp).fillMaxHeight().background(tint).padding(horizontal = 4.dp, vertical = 2.dp)
