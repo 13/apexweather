@@ -29,8 +29,8 @@ jobs:
           fi
           echo "name=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
-          # versionCode must increase monotonically: 1.2.3 -> 10203
-          echo "code=$(echo "$version" | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')" >> "$GITHUB_OUTPUT"
+          # versionCode must increase monotonically: 1.2.3 -> 10203, 0.1.0 -> 100
+          echo "code=$(echo "$version" | awk -F. '{print $1 * 10000 + $2 * 100 + $3}')" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -75,7 +75,13 @@ jobs:
         id: artifact
         run: |
           version='${{ steps.version.outputs.name }}'
-          src=$(ls app/build/outputs/apk/release/ApexWeather-release*.apk | head -1)
+          shopt -s nullglob
+          candidates=(app/build/outputs/apk/release/ApexWeather-release*.apk)
+          if [ ${#candidates[@]} -eq 0 ]; then
+            echo "No release APK was produced" >&2
+            exit 1
+          fi
+          src="${candidates[0]}"
           case "$src" in
             *unsigned*) out="ApexWeather-${version}-unsigned.apk" ;;
             *)          out="ApexWeather-${version}.apk" ;;
