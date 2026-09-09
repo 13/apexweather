@@ -57,6 +57,7 @@ import kotlin.math.roundToInt
 
 @Composable
 fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier) {
+    val locale = LocalConfiguration.current.locales[0]
     Column(modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.Start) {
         Text(DorfTirol.NAME, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
         Text(
@@ -76,11 +77,11 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.height(4.dp))
         val sourceCount = state.currentHour?.sourceCount ?: 0
-        val source = state.observation?.let { stringResource(R.string.now_from_station, it.stationName, Format.time(it.time, DorfTirol.ZONE)) }
+        val source = state.observation?.let { stringResource(R.string.now_from_station, it.stationName, Format.timestamp(it.time, DorfTirol.ZONE, state.now, locale)) }
             ?: pluralStringResource(R.plurals.now_from_consensus, sourceCount, sourceCount)
         Text(source, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.65f))
         state.updatedAt?.let {
-            Text(stringResource(R.string.updated_at, Format.time(it, DorfTirol.ZONE)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
+            Text(stringResource(R.string.updated_at, Format.timestamp(it, DorfTirol.ZONE, state.now, locale)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
         }
     }
 }

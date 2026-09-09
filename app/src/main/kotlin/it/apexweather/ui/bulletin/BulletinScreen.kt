@@ -63,7 +63,7 @@ fun BulletinContent(state: BulletinUiState) {
             GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 Text(b.title, style = MaterialTheme.typography.titleMedium, color = Color.White)
                 Spacer(Modifier.height(4.dp))
-                Text(stringResource(R.string.bulletin_issued, Format.time(b.issuedAt, DorfTirol.ZONE)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                Text(stringResource(R.string.bulletin_issued, Format.timestamp(b.issuedAt, DorfTirol.ZONE, state.now, locale)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                 Spacer(Modifier.height(10.dp))
                 Text(b.evolution, style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.92f), modifier = Modifier.testTag("bulletin_text"))
             }

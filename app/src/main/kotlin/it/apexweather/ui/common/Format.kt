@@ -31,6 +31,17 @@ object Format {
     }
     fun hour(t: Instant, zone: ZoneId): String = DateTimeFormatter.ofPattern("HH").format(t.atZone(zone))
     fun time(t: Instant, zone: ZoneId): String = DateTimeFormatter.ofPattern("HH:mm").format(t.atZone(zone))
+    /**
+     * A timestamp that answers "how old is this". Within today it is the clock time alone; older
+     * than that it carries its date, because data from three days ago must not be able to read as a
+     * plausible time this afternoon.
+     */
+    fun timestamp(t: Instant, zone: ZoneId, now: Instant, locale: Locale): String {
+        val day = t.atZone(zone).toLocalDate()
+        return if (day == now.atZone(zone).toLocalDate()) time(t, zone)
+        else "${dayMonth(day, locale)} ${time(t, zone)}"
+    }
+
     fun weekday(d: LocalDate, locale: Locale): String = d.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
     fun weekdayFull(d: LocalDate, locale: Locale): String = d.dayOfWeek.getDisplayName(TextStyle.FULL, locale)
     fun dayMonth(d: LocalDate, locale: Locale): String = DateTimeFormatter.ofPattern("d. MMM", locale).format(d)

@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -122,7 +123,8 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
 
 @Composable
 private fun OfflineBanner(state: HomeUiState) {
-    val text = state.updatedAt?.let { stringResource(R.string.offline_banner, Format.time(it, DorfTirol.ZONE)) } ?: stringResource(R.string.offline_banner_no_time)
+    val locale = LocalConfiguration.current.locales[0]
+    val text = state.updatedAt?.let { stringResource(R.string.offline_banner, Format.timestamp(it, DorfTirol.ZONE, state.now, locale)) } ?: stringResource(R.string.offline_banner_no_time)
     Text(
         text, style = MaterialTheme.typography.labelSmall, color = Color.White,
         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x66FF8A80)).padding(10.dp).testTag("offline_banner"),

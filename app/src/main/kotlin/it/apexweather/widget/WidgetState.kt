@@ -6,6 +6,7 @@ import it.apexweather.domain.model.Condition
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.home.HomeUiState
 import java.time.ZoneId
+import java.util.Locale
 
 data class WidgetHour(val label: String, val tempText: String, val iconRes: Int)
 
@@ -45,7 +46,7 @@ fun Condition.labelRes(): Int = when (this) {
 }
 
 object WidgetStateBuilder {
-    fun build(home: HomeUiState, zone: ZoneId): WidgetState {
+    fun build(home: HomeUiState, zone: ZoneId, locale: Locale = Locale.getDefault()): WidgetState {
         val hasData = !home.isEmpty && home.heroTempC != null
         return WidgetState(
             hasData = hasData,
@@ -55,7 +56,7 @@ object WidgetStateBuilder {
             hours = if (hasData) home.upcomingHours.drop(1).take(6).map { h ->
                 WidgetHour(Format.hour(h.time, zone), Format.temp(h.tempC), h.condition.widgetIcon(home.phaseAt(h.time)))
             } else emptyList(),
-            updatedText = home.updatedAt?.let { Format.time(it, zone) } ?: "",
+            updatedText = home.updatedAt?.let { Format.timestamp(it, zone, home.now, locale) } ?: "",
             topColor = home.palette.top,
             bottomColor = home.palette.bottom,
         )
