@@ -27,7 +27,15 @@
     <string name="empty_title">No data yet</string>
     <string name="empty_body">Apex Weather needs internet once to load the forecasts for %1$s.</string>
     <string name="retry">Retry</string>
-    <string name="hour_summary">%1$s (%2$s to %3$s) · %4$s · %5$d %% · wind %6$s</string>
+    <string name="stat_temp">Temperature</string>
+    <string name="stat_feels">Feels like</string>
+    <string name="stat_precip">Precipitation</string>
+    <string name="stat_wind">Wind</string>
+    <string name="stat_gust">Gusts %1$s</string>
+    <string name="stat_chance">%1$d %%</string>
+    <string name="col_model">Model</string>
+    <string name="col_temp">Temp</string>
+    <string name="col_precip">mm</string>
     <string name="agreement_desc">Model agreement %1$d %%</string>
     <string name="open_hour_details">Open hour details</string>
     <string name="per_source">PER SOURCE</string>
@@ -79,6 +87,7 @@
     <string name="about_build">Version %1$s (%2$d) · %3$s</string>
     <string name="about_commit">Commit %1$s · %2$s</string>
     <string name="day_source_desc">%1$s: %2$s to %3$s, %4$s</string>
+    <string name="hour_source_desc">%1$s: %2$s, %3$s, %4$s</string>
     <string name="hour_column_desc">%1$s: %2$s, %3$s, %4$d %% chance of precipitation, %5$s</string>
     <plurals name="now_from_consensus">
         <item quantity="one">Consensus of %1$d model</item>

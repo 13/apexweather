@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -45,10 +44,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.apexweather.R
 import it.apexweather.domain.SouthTyrol
-import it.apexweather.domain.model.ConsensusHour
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
-import it.apexweather.ui.common.label
 import it.apexweather.ui.theme.fromArgb
 import java.time.Instant
 import java.time.LocalDate
@@ -131,7 +128,7 @@ fun HomeContent(
     val hour = selectedHour?.let { t -> state.upcomingHours.firstOrNull { it.time == t } }
     if (hour != null) {
         ModalBottomSheet(onDismissRequest = { selectedHour = null }, containerColor = MaterialTheme.colorScheme.surface, modifier = Modifier.testTag("hour_detail_sheet")) {
-            HourDetail(hour, state)
+            HourDetail(hour, state, onClose = { selectedHour = null })
         }
     }
 
@@ -175,35 +172,5 @@ private fun EmptyState(placeName: String, onRetry: () -> Unit, modifier: Modifie
         Text(stringResource(R.string.empty_body, placeName), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f))
         Spacer(Modifier.height(20.dp))
         Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
-    }
-}
-
-/** Shown where a model publishes no value at all, so absence never reads as zero. */
-private const val MISSING = "\u2013"
-
-@Composable
-private fun HourDetail(hour: ConsensusHour, state: HomeUiState) {
-    val formats = LocalFormats.current
-    Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp).padding(bottom = 32.dp)) {
-        Text("${Format.time(hour.time, SouthTyrol.ZONE, formats)} · ${hour.condition.label()}", style = MaterialTheme.typography.headlineMedium, color = Color.White)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            stringResource(R.string.hour_summary, Format.temp(hour.tempC, formats), Format.temp(hour.tempMinC, formats), Format.temp(hour.tempMaxC, formats), Format.mm(hour.precipMm, formats), hour.precipProb, hour.windKmh?.let { Format.wind(it, state.settings.windUnit, formats) } ?: MISSING),
-            style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f),
-        )
-        hour.freezingLevelM?.let {
-            Spacer(Modifier.height(4.dp))
-            Text(freezingLevelText(it, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f), modifier = Modifier.testTag("hour_freezing_level"))
-        }
-        Spacer(Modifier.height(16.dp))
-        Text(stringResource(R.string.per_source), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
-        Spacer(Modifier.height(6.dp))
-        hour.perSource.entries.sortedBy { it.key.ordinal }.forEach { (source, p) ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(source.displayName, style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                val wind = p.windKmh?.let { Format.wind(it, state.settings.windUnit, formats) } ?: MISSING
-                Text("${Format.tempDecimal(p.tempC, formats)}  ${Format.mm(p.precipMm, formats)}  $wind", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
-            }
-        }
     }
 }

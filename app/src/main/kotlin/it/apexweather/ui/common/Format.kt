@@ -45,21 +45,27 @@ object Format {
     fun tempDelta(c: Double, f: Formats): String =
         (if (c > 0) "+" else "") + f.oneDecimal(c) + "°"
 
-    fun wind(kmh: Double, unit: WindUnit, f: Formats): String = when (unit) {
-        WindUnit.KMH -> "${f.whole(unit.fromKmh(kmh).roundToInt())} km/h"
-        WindUnit.MS -> "${f.oneDecimal(unit.fromKmh(kmh))} m/s"
+    /** The speed alone, in the reader's unit, for a column whose header says which unit that is. */
+    fun windValue(kmh: Double, unit: WindUnit, f: Formats): String = when (unit) {
+        WindUnit.KMH -> f.whole(unit.fromKmh(kmh).roundToInt())
+        WindUnit.MS -> f.oneDecimal(unit.fromKmh(kmh))
     }
+
+    fun wind(kmh: Double, unit: WindUnit, f: Formats): String = windValue(kmh, unit, f) + windUnitLabel(unit)
 
     fun windUnitLabel(unit: WindUnit): String = when (unit) {
         WindUnit.KMH -> " km/h"
         WindUnit.MS -> " m/s"
     }
 
-    fun mm(mm: Double, f: Formats): String = when {
-        abs(mm) < 0.05 -> "${f.whole(0)} mm"
-        mm < 10 -> "${f.oneDecimal(mm)} mm"
-        else -> "${f.whole(mm.roundToInt())} mm"
+    /** The millimetres alone, for a column whose header says "mm". */
+    fun mmValue(mm: Double, f: Formats): String = when {
+        abs(mm) < 0.05 -> f.whole(0)
+        mm < 10 -> f.oneDecimal(mm)
+        else -> f.whole(mm.roundToInt())
     }
+
+    fun mm(mm: Double, f: Formats): String = "${mmValue(mm, f)} mm"
 
     /**
      * A height above sea level. Rounded to 50 m: the models do not agree to better than that, and a
