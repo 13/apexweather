@@ -50,7 +50,10 @@ echo "== reading the screen back"
 "${ADB[@]}" pull /sdcard/apex-smoke.xml "$OUT/ui.xml" >/dev/null 2>&1 || true
 "${ADB[@]}" exec-out screencap -p > "$OUT/screen.png" 2>/dev/null || true
 
-if grep -q "Dorf Tirol" "$OUT/ui.xml" 2>/dev/null; then
+# "Tirol" and not "Dorf Tirol": the default place is named Dorf Tirol in German, Tirolo in Italian
+# and Tirol in English, and this runs on whatever locale the device is set to. The stem the three
+# share is the only spelling that is not a bet on the emulator's language.
+if grep -q "Tirol" "$OUT/ui.xml" 2>/dev/null; then
     echo "  the home screen rendered"
 else
     echo "FAIL: the home screen never showed the location; see $OUT/ui.xml"

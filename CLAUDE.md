@@ -145,6 +145,9 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
 - Strings live in `values` (German, default), `values-it`, `values-en`; add every new key to all three.
 - Nothing user-visible may name Dorf Tirol. The place is a setting now, so a hardcoded place name is
   a bug — three of them survived the first pass and were only caught by switching place on the phone.
+- Nothing that runs on a device may assert a German string: CI's emulators are **en-US**. That covers
+  the instrumented tests and `tools/release-smoke.sh` alike, and it has now caught both. Resolve the
+  string from the resources the code itself uses, or match a spelling every language shares.
 - Source colours are in `ui/common/SourceColors.kt`; SIAG letter codes in `domain/SiagCodes.kt`.
 - Weather icons are hand-drawn vectors in `res/drawable/ic_wx_*.xml`, mapped once in
   `ui/common/WeatherIcons.kt` and used by both the app and the widget. Every condition has its own
