@@ -26,24 +26,47 @@ optical size and its adaptive-icon safe margin.
 | Part | Geometry | Colour |
 |------|----------|--------|
 | Ridge | `M10.02,176L100,151.9L189.98,176L100,100.5Z` — the lower chevron, unchanged | `#9CC9FF` |
-| Sun | circle, centre (100, 74), r 38 | `#FFD166` |
-| Rays | 8 strokes, r 50 to r 62, width 9, round caps, every 45° from 0° | `#FFD166` |
+| Sun | disc, centre (100, 80), r 52, with the peak and its gap cut out of the lower edge | `#FFD166` |
+| Rays | 5 strokes, r 63 to r 74, width 9, round caps, at 180°, 225°, 270°, 315° and 0° | `#FFD166` |
 
 The upper chevron is deleted. The background colour is unchanged at `#0B1020`.
 
-Furthest extent: rays reach y 12 and x 38..162; the ridge still spans x 10..190. Scaled and
-translated that is 22.9 dp from the canvas centre vertically and 24.3 dp horizontally, inside the
-33 dp adaptive-icon safe radius.
+Furthest extent: the rays reach y 6 and x 26..174; the ridge still spans x 10..190 and down to
+y 176. Scaled and translated, the topmost ray tip is 24.6 dp from the canvas centre and the ridge's
+bottom corners are 32.3 dp — inside the 33 dp adaptive-icon safe radius, which the ridge has always
+been closest to.
+
+## The sun is behind the peak, with a gap
+
+The sun is centred on the peak — `cx` 100, the apex's own x — and drawn *behind* it. What makes that
+legible is a gap: the ridge's two upper edges, pushed 8 units outward, are cut out of the disc, so
+between the amber and the blue there is a band of night sky in the shape of the peak. Without it the
+disc and the chevron touch and the mark reads as a sun *resting on* a hill; with it the peak clearly
+stands in front, and the whole thing reads as a sunset.
+
+The cut is taken against the two **rays running down from the apex**, not against the infinite lines
+through the ridge's edges. The distinction is the whole difference between this working and not: the
+lines carry on upward past the apex, and clipping against them punches a V through the middle of the
+disc and leaves a bowtie. Constructing it as rays — offset the two edges, intersect them to find the
+raised apex, then walk down each ray to where it first meets the circle — takes only the shallow
+notch out of the bottom that the eye reads as the peak.
+
+Offsetting by a gap `g` raises the effective cutting apex by about `g / sin 40°`, roughly 12 units
+here. That is why the disc is large (r 52) and set low (`cy` 80): the notch has to be small next to
+the disc, or it eats the sun.
 
 ## Why the sun has rays
 
 The first drafts were a plain disc above the ridge. In colour they work, because amber and blue
 separate the two shapes. Flattened to one colour — which is exactly what Android's themed icons do —
-they read as **head and shoulders**. A person, not a sunrise.
+they read as **head and shoulders**. A person, not a sunset.
 
-Rays fix it in both renditions, and there is room for them only because the disc is smaller than the
-chevron it replaces. This was not in the first sketches; rendering the monochrome layer is what found
-it, and it is the reason the monochrome layer is part of the design rather than an afterthought.
+Rays fix it in both renditions. This was not in the first sketches; rendering the monochrome layer is
+what found it, and it is the reason the monochrome layer is part of the design rather than an
+afterthought.
+
+Only the five upper rays are drawn. A ray pointing down, or down-left, or down-right, runs into the
+ridge — which is invisible in a render of the foreground alone and obvious on a launcher.
 
 ## Scope
 

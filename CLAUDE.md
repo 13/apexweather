@@ -149,14 +149,18 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   purpose, copied from Apex Maps) so a debug build updates a sideloaded release build in place. A real key
   overrides it through the `APEX_KEYSTORE_*` env vars or `keystore/keystore.properties`. Do not ship the
   debug-signed APK to a store.
-- The launcher icon is a sun rising over the *lower* chevron of the Apex Maps A-sharp glyph. The
+- The launcher icon is a sun setting behind the *lower* chevron of the Apex Maps A-sharp glyph. The
   chevron keeps that glyph's geometry, scale and translate; the upper chevron is gone, because an
   arrow says nothing about weather. What is left of the family resemblance is the ridge and the
   palette. Design and what it cost: `docs/superpowers/specs/2026-09-10-sun-launcher-icon-design.md`.
-  The sun's rays are not decoration — without them a disc above a chevron reads as head and
-  shoulders once Android flattens it for a themed icon — and the ray pointing straight down is
-  omitted, because the ridge stands in front of the sun there. `ic_notification.xml` deliberately
-  keeps the old A-sharp silhouette: at 24 dp the rays turn to mush. Source of the original glyph:
+  The sun is centred on the apex and its lower edge is the disc with the ridge's silhouette, offset
+  outward by 8 units, cut away — that offset is the gap, and the gap is what makes the peak read as
+  standing in front. Cut against the two rays *down from the apex*, never against the infinite lines
+  through the ridge's edges: those carry on upward and slice the disc into a bowtie. The sun's rays
+  are not decoration either — without them the disc and the chevron read as head and shoulders once
+  Android flattens them for a themed icon — and only the five upper ones are drawn, because a
+  downward ray runs into the ridge. `ic_notification.xml` deliberately keeps the old A-sharp
+  silhouette: at 24 dp the rays turn to mush. Source of the original glyph:
   `assets/apexmaps-A-sharp-source.svg`.
 
 ## Conventions
