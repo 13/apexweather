@@ -1,0 +1,2090 @@
+[
+ {
+  "istat": "021001",
+  "nameDe": "Aldein",
+  "nameIt": "Aldino",
+  "nameEn": "Aldein",
+  "lat": 46.367,
+  "lon": 11.3502,
+  "altitudeM": 1225,
+  "district": 1,
+  "station": {
+   "code": "86900MS",
+   "name": "Auer",
+   "lat": 46.3469,
+   "lon": 11.305,
+   "altitudeM": 250,
+   "distanceKm": 4.12
+  }
+ },
+ {
+  "istat": "021002",
+  "nameDe": "Andrian",
+  "nameIt": "Andriano",
+  "nameEn": "Andrian",
+  "lat": 46.51878,
+  "lon": 11.23347,
+  "altitudeM": 274,
+  "district": 1,
+  "station": {
+   "code": "83200MS",
+   "name": "Bozen",
+   "lat": 46.4977,
+   "lon": 11.3128,
+   "altitudeM": 245,
+   "distanceKm": 6.51
+  }
+ },
+ {
+  "istat": "021003",
+  "nameDe": "Altrei",
+  "nameIt": "Anterivo",
+  "nameEn": "Altrei",
+  "lat": 46.277805,
+  "lon": 11.366058,
+  "altitudeM": 1209,
+  "district": 1,
+  "station": {
+   "code": "87300MS",
+   "name": "Radein",
+   "lat": 46.3465,
+   "lon": 11.3968,
+   "altitudeM": 1551,
+   "distanceKm": 7.95
+  }
+ },
+ {
+  "istat": "021004",
+  "nameDe": "Eppan",
+  "nameIt": "Appiano",
+  "nameEn": "Eppan",
+  "lat": 46.455256,
+  "lon": 11.258966,
+  "altitudeM": 416,
+  "district": 1,
+  "station": {
+   "code": "89190MS",
+   "name": "Kaltern Oberplanitzing",
+   "lat": 46.4423,
+   "lon": 11.2525,
+   "altitudeM": 495,
+   "distanceKm": 1.52
+  }
+ },
+ {
+  "istat": "021005",
+  "nameDe": "Hafling",
+  "nameIt": "Avelengo",
+  "nameEn": "Hafling",
+  "lat": 46.644404,
+  "lon": 11.223537,
+  "altitudeM": 1290,
+  "district": 2,
+  "station": {
+   "code": "27100MS",
+   "name": "Gargazon",
+   "lat": 46.5767,
+   "lon": 11.2008,
+   "altitudeM": 254,
+   "distanceKm": 7.69
+  }
+ },
+ {
+  "istat": "021006",
+  "nameDe": "Abtei",
+  "nameIt": "Badia",
+  "nameEn": "Badia",
+  "lat": 46.610492,
+  "lon": 11.893384,
+  "altitudeM": 1315,
+  "district": 7,
+  "station": {
+   "code": "61300MS",
+   "name": "Corvara",
+   "lat": 46.5504,
+   "lon": 11.8733,
+   "altitudeM": 1530,
+   "distanceKm": 6.82
+  }
+ },
+ {
+  "istat": "021007",
+  "nameDe": "Barbian",
+  "nameIt": "Barbiano",
+  "nameEn": "Barbian",
+  "lat": 46.6028,
+  "lon": 11.5198,
+  "altitudeM": 830,
+  "district": 4,
+  "station": {
+   "code": "74900MS",
+   "name": "Barbian Kollmann",
+   "lat": 46.5951,
+   "lon": 11.5291,
+   "altitudeM": 490,
+   "distanceKm": 1.11
+  }
+ },
+ {
+  "istat": "021008",
+  "nameDe": "Bozen",
+  "nameIt": "Bolzano",
+  "nameEn": "Bolzano",
+  "lat": 46.4983,
+  "lon": 11.35476,
+  "altitudeM": 262,
+  "district": 1,
+  "station": {
+   "code": "83200MS",
+   "name": "Bozen",
+   "lat": 46.4977,
+   "lon": 11.3128,
+   "altitudeM": 245,
+   "distanceKm": 3.22
+  }
+ },
+ {
+  "istat": "021009",
+  "nameDe": "Prags",
+  "nameIt": "Braies",
+  "nameEn": "Prags",
+  "lat": 46.7191,
+  "lon": 12.1298,
+  "altitudeM": 1213,
+  "district": 6,
+  "station": {
+   "code": "42700MS",
+   "name": "St. Veit in Prags",
+   "lat": 46.7119,
+   "lon": 12.1,
+   "altitudeM": 1285,
+   "distanceKm": 2.41
+  }
+ },
+ {
+  "istat": "021010",
+  "nameDe": "Brenner",
+  "nameIt": "Brennero",
+  "nameEn": "Brenner",
+  "lat": 46.93803,
+  "lon": 11.44402,
+  "altitudeM": 1098,
+  "district": 5,
+  "station": {
+   "code": "31410MS",
+   "name": "Pflersch",
+   "lat": 46.9557,
+   "lon": 11.3793,
+   "altitudeM": 1154,
+   "distanceKm": 5.29
+  }
+ },
+ {
+  "istat": "021011",
+  "nameDe": "Brixen",
+  "nameIt": "Bressanone",
+  "nameEn": "Brixen",
+  "lat": 46.715869,
+  "lon": 11.657157,
+  "altitudeM": 559,
+  "district": 4,
+  "station": {
+   "code": "39100MS",
+   "name": "Brixen - Vahrn",
+   "lat": 46.731,
+   "lon": 11.6451,
+   "altitudeM": 585,
+   "distanceKm": 1.91
+  }
+ },
+ {
+  "istat": "021012",
+  "nameDe": "Branzoll",
+  "nameIt": "Bronzolo",
+  "nameEn": "Branzoll",
+  "lat": 46.40455,
+  "lon": 11.3196,
+  "altitudeM": 238,
+  "district": 1,
+  "station": {
+   "code": "85700MS",
+   "name": "Branzoll",
+   "lat": 46.4065,
+   "lon": 11.3111,
+   "altitudeM": 226,
+   "distanceKm": 0.69
+  }
+ },
+ {
+  "istat": "021013",
+  "nameDe": "Bruneck",
+  "nameIt": "Brunico",
+  "nameEn": "Bruneck",
+  "lat": 46.79632,
+  "lon": 11.93533,
+  "altitudeM": 838,
+  "district": 6,
+  "station": {
+   "code": "59700MS",
+   "name": "Bruneck",
+   "lat": 46.8043,
+   "lon": 11.9315,
+   "altitudeM": 828,
+   "distanceKm": 0.93
+  }
+ },
+ {
+  "istat": "021014",
+  "nameDe": "Kuens",
+  "nameIt": "Caines",
+  "nameEn": "Kuens",
+  "lat": 46.6974,
+  "lon": 11.1716,
+  "altitudeM": 592,
+  "district": 2,
+  "station": {
+   "code": "23200MS",
+   "name": "Meran",
+   "lat": 46.688,
+   "lon": 11.1366,
+   "altitudeM": 330,
+   "distanceKm": 2.87
+  }
+ },
+ {
+  "istat": "021015",
+  "nameDe": "Kaltern",
+  "nameIt": "Caldaro",
+  "nameEn": "Kaltern",
+  "lat": 46.41325,
+  "lon": 11.24549,
+  "altitudeM": 425,
+  "district": 1,
+  "station": {
+   "code": "89190MS",
+   "name": "Kaltern Oberplanitzing",
+   "lat": 46.4423,
+   "lon": 11.2525,
+   "altitudeM": 495,
+   "distanceKm": 3.26
+  }
+ },
+ {
+  "istat": "021016",
+  "nameDe": "Freienfeld",
+  "nameIt": "Campo di Trens",
+  "nameEn": "Freienfeld",
+  "lat": 46.8758,
+  "lon": 11.4859,
+  "altitudeM": 937,
+  "district": 5,
+  "station": {
+   "code": "37100MS",
+   "name": "Sterzing",
+   "lat": 46.885,
+   "lon": 11.4386,
+   "altitudeM": 943,
+   "distanceKm": 3.74
+  }
+ },
+ {
+  "istat": "021017",
+  "nameDe": "Sand i.T.",
+  "nameIt": "Campo Tures",
+  "nameEn": "Sand i.T.",
+  "lat": 46.91956,
+  "lon": 11.95228,
+  "altitudeM": 864,
+  "district": 6,
+  "station": {
+   "code": "56900MS",
+   "name": "Sand i.T. Mühlen",
+   "lat": 46.9003,
+   "lon": 11.9474,
+   "altitudeM": 851,
+   "distanceKm": 2.16
+  }
+ },
+ {
+  "istat": "021018",
+  "nameDe": "Kastelbell-Tschars",
+  "nameIt": "Castelbell-Ciardes",
+  "nameEn": "Kastelbell-Tschars",
+  "lat": 46.62841,
+  "lon": 10.90152,
+  "altitudeM": 587,
+  "district": 3,
+  "station": {
+   "code": "19300MS",
+   "name": "Naturns",
+   "lat": 46.6477,
+   "lon": 10.9912,
+   "altitudeM": 541,
+   "distanceKm": 7.18
+  }
+ },
+ {
+  "istat": "021019",
+  "nameDe": "Kastelruth",
+  "nameIt": "Castelrotto",
+  "nameEn": "Kastelruth",
+  "lat": 46.5679,
+  "lon": 11.5594,
+  "altitudeM": 1060,
+  "district": 4,
+  "station": {
+   "code": "74900MS",
+   "name": "Barbian Kollmann",
+   "lat": 46.5951,
+   "lon": 11.5291,
+   "altitudeM": 490,
+   "distanceKm": 3.8
+  }
+ },
+ {
+  "istat": "021020",
+  "nameDe": "Tscherms",
+  "nameIt": "Cermes",
+  "nameEn": "Tscherms",
+  "lat": 46.632622,
+  "lon": 11.145132,
+  "altitudeM": 292,
+  "district": 2,
+  "station": {
+   "code": "23200MS",
+   "name": "Meran",
+   "lat": 46.688,
+   "lon": 11.1366,
+   "altitudeM": 330,
+   "distanceKm": 6.16
+  }
+ },
+ {
+  "istat": "021021",
+  "nameDe": "Kiens",
+  "nameIt": "Chienes",
+  "nameEn": "Kiens",
+  "lat": 46.80646,
+  "lon": 11.83622,
+  "altitudeM": 784,
+  "district": 6,
+  "station": {
+   "code": "65600MS",
+   "name": "Terenten",
+   "lat": 46.8345,
+   "lon": 11.7856,
+   "altitudeM": 1349,
+   "distanceKm": 4.95
+  }
+ },
+ {
+  "istat": "021022",
+  "nameDe": "Klausen",
+  "nameIt": "Chiusa",
+  "nameEn": "Klausen",
+  "lat": 46.64,
+  "lon": 11.5662,
+  "altitudeM": 523,
+  "district": 4,
+  "station": {
+   "code": "74900MS",
+   "name": "Barbian Kollmann",
+   "lat": 46.5951,
+   "lon": 11.5291,
+   "altitudeM": 490,
+   "distanceKm": 5.72
+  }
+ },
+ {
+  "istat": "021023",
+  "nameDe": "Karneid",
+  "nameIt": "Cornedo all`Isarco",
+  "nameEn": "Karneid",
+  "lat": 46.4857,
+  "lon": 11.455,
+  "altitudeM": 290,
+  "district": 1,
+  "station": {
+   "code": "79300MS",
+   "name": "Ritten Siffian",
+   "lat": 46.529,
+   "lon": 11.4638,
+   "altitudeM": 987,
+   "distanceKm": 4.83
+  }
+ },
+ {
+  "istat": "021024",
+  "nameDe": "Kurtatsch",
+  "nameIt": "Cortaccia",
+  "nameEn": "Kurtatsch",
+  "lat": 46.3142,
+  "lon": 11.2247,
+  "altitudeM": 333,
+  "district": 1,
+  "station": {
+   "code": "86900MS",
+   "name": "Auer",
+   "lat": 46.3469,
+   "lon": 11.305,
+   "altitudeM": 250,
+   "distanceKm": 7.15
+  }
+ },
+ {
+  "istat": "021025",
+  "nameDe": "Kurtinig",
+  "nameIt": "Cortina s.s.d.v.",
+  "nameEn": "Kurtinig",
+  "lat": 46.2706,
+  "lon": 11.2233,
+  "altitudeM": 212,
+  "district": 1,
+  "station": {
+   "code": "88820MS",
+   "name": "Salurn",
+   "lat": 46.2362,
+   "lon": 11.1855,
+   "altitudeM": 212,
+   "distanceKm": 4.79
+  }
+ },
+ {
+  "istat": "021026",
+  "nameDe": "Corvara",
+  "nameIt": "Corvara i.B.",
+  "nameEn": "Corvara",
+  "lat": 46.549634,
+  "lon": 11.873902,
+  "altitudeM": 1568,
+  "district": 7,
+  "station": {
+   "code": "61300MS",
+   "name": "Corvara",
+   "lat": 46.5504,
+   "lon": 11.8733,
+   "altitudeM": 1530,
+   "distanceKm": 0.1
+  }
+ },
+ {
+  "istat": "021027",
+  "nameDe": "Graun",
+  "nameIt": "Curon",
+  "nameEn": "Graun",
+  "lat": 46.806806,
+  "lon": 10.542155,
+  "altitudeM": 1520,
+  "district": 3,
+  "station": {
+   "code": "02200MS",
+   "name": "St. Valentin a.d. Haide",
+   "lat": 46.7759,
+   "lon": 10.5289,
+   "altitudeM": 1499,
+   "distanceKm": 3.56
+  }
+ },
+ {
+  "istat": "021028",
+  "nameDe": "Toblach",
+  "nameIt": "Dobbiaco",
+  "nameEn": "Toblach",
+  "lat": 46.7351,
+  "lon": 12.2241,
+  "altitudeM": 1256,
+  "district": 6,
+  "station": {
+   "code": "41000MS",
+   "name": "Toblach",
+   "lat": 46.7299,
+   "lon": 12.2191,
+   "altitudeM": 1219,
+   "distanceKm": 0.69
+  }
+ },
+ {
+  "istat": "021029",
+  "nameDe": "Neumarkt",
+  "nameIt": "Egna",
+  "nameEn": "Neumarkt",
+  "lat": 46.31279,
+  "lon": 11.27117,
+  "altitudeM": 214,
+  "district": 1,
+  "station": {
+   "code": "86900MS",
+   "name": "Auer",
+   "lat": 46.3469,
+   "lon": 11.305,
+   "altitudeM": 250,
+   "distanceKm": 4.58
+  }
+ },
+ {
+  "istat": "021030",
+  "nameDe": "Pfalzen",
+  "nameIt": "Falzes",
+  "nameEn": "Pfalzen",
+  "lat": 46.8117,
+  "lon": 11.8826,
+  "altitudeM": 1022,
+  "district": 6,
+  "station": {
+   "code": "59700MS",
+   "name": "Bruneck",
+   "lat": 46.8043,
+   "lon": 11.9315,
+   "altitudeM": 828,
+   "distanceKm": 3.81
+  }
+ },
+ {
+  "istat": "021031",
+  "nameDe": "Völs am Schlern",
+  "nameIt": "Fiè",
+  "nameEn": "Völs",
+  "lat": 46.51757,
+  "lon": 11.502934,
+  "altitudeM": 880,
+  "district": 4,
+  "station": {
+   "code": "75600MS",
+   "name": "Völs am Schlern",
+   "lat": 46.5134,
+   "lon": 11.506,
+   "altitudeM": 840,
+   "distanceKm": 0.52
+  }
+ },
+ {
+  "istat": "021032",
+  "nameDe": "Franzensfeste",
+  "nameIt": "Fortezza",
+  "nameEn": "Franzensfeste",
+  "lat": 46.7888,
+  "lon": 11.612,
+  "altitudeM": 749,
+  "district": 4,
+  "station": {
+   "code": "37700MS",
+   "name": "Franzensfeste Grasstein",
+   "lat": 46.8125,
+   "lon": 11.5488,
+   "altitudeM": 850,
+   "distanceKm": 5.48
+  }
+ },
+ {
+  "istat": "021033",
+  "nameDe": "Villnöß",
+  "nameIt": "Funes",
+  "nameEn": "Villnöß",
+  "lat": 46.642256,
+  "lon": 11.680796,
+  "altitudeM": 1132,
+  "district": 4,
+  "station": {
+   "code": "71510MS",
+   "name": "Villnöss",
+   "lat": 46.6479,
+   "lon": 11.6894,
+   "altitudeM": 1327,
+   "distanceKm": 0.91
+  }
+ },
+ {
+  "istat": "021034",
+  "nameDe": "Gais",
+  "nameIt": "Gais",
+  "nameEn": "Gais",
+  "lat": 46.8372,
+  "lon": 11.9462,
+  "altitudeM": 841,
+  "district": 6,
+  "station": {
+   "code": "59700MS",
+   "name": "Bruneck",
+   "lat": 46.8043,
+   "lon": 11.9315,
+   "altitudeM": 828,
+   "distanceKm": 3.81
+  }
+ },
+ {
+  "istat": "021035",
+  "nameDe": "Gargazon",
+  "nameIt": "Gargazzone",
+  "nameEn": "Gargazon",
+  "lat": 46.584865,
+  "lon": 11.202158,
+  "altitudeM": 267,
+  "district": 2,
+  "station": {
+   "code": "27100MS",
+   "name": "Gargazon",
+   "lat": 46.5767,
+   "lon": 11.2008,
+   "altitudeM": 254,
+   "distanceKm": 0.91
+  }
+ },
+ {
+  "istat": "021036",
+  "nameDe": "Glurns",
+  "nameIt": "Glorenza",
+  "nameEn": "Glurns",
+  "lat": 46.6711,
+  "lon": 10.5565,
+  "altitudeM": 907,
+  "district": 3,
+  "station": {
+   "code": "02500MS",
+   "name": "Marienberg",
+   "lat": 46.7057,
+   "lon": 10.5213,
+   "altitudeM": 1310,
+   "distanceKm": 4.68
+  }
+ },
+ {
+  "istat": "021037",
+  "nameDe": "Latsch",
+  "nameIt": "Laces",
+  "nameEn": "Latsch",
+  "lat": 46.617399,
+  "lon": 10.859521,
+  "altitudeM": 639,
+  "district": 3,
+  "station": {
+   "code": "09700MS",
+   "name": "Schlanders",
+   "lat": 46.6238,
+   "lon": 10.7803,
+   "altitudeM": 698,
+   "distanceKm": 6.1
+  }
+ },
+ {
+  "istat": "021038",
+  "nameDe": "Algund",
+  "nameIt": "Lagundo",
+  "nameEn": "Algund",
+  "lat": 46.68275,
+  "lon": 11.12201,
+  "altitudeM": 350,
+  "district": 2,
+  "station": {
+   "code": "23200MS",
+   "name": "Meran",
+   "lat": 46.688,
+   "lon": 11.1366,
+   "altitudeM": 330,
+   "distanceKm": 1.26
+  }
+ },
+ {
+  "istat": "021039",
+  "nameDe": "Lajen",
+  "nameIt": "Laion",
+  "nameEn": "Lajen",
+  "lat": 46.609236,
+  "lon": 11.564673,
+  "altitudeM": 1093,
+  "district": 4,
+  "station": {
+   "code": "74900MS",
+   "name": "Barbian Kollmann",
+   "lat": 46.5951,
+   "lon": 11.5291,
+   "altitudeM": 490,
+   "distanceKm": 3.14
+  }
+ },
+ {
+  "istat": "021040",
+  "nameDe": "Leifers",
+  "nameIt": "Laives",
+  "nameEn": "Laives",
+  "lat": 46.4269,
+  "lon": 11.3371,
+  "altitudeM": 255,
+  "district": 1,
+  "station": {
+   "code": "85700MS",
+   "name": "Branzoll",
+   "lat": 46.4065,
+   "lon": 11.3111,
+   "altitudeM": 226,
+   "distanceKm": 3.01
+  }
+ },
+ {
+  "istat": "021041",
+  "nameDe": "Lana",
+  "nameIt": "Lana",
+  "nameEn": "Lana",
+  "lat": 46.615934,
+  "lon": 11.144807,
+  "altitudeM": 310,
+  "district": 2,
+  "station": {
+   "code": "27100MS",
+   "name": "Gargazon",
+   "lat": 46.5767,
+   "lon": 11.2008,
+   "altitudeM": 254,
+   "distanceKm": 6.1
+  }
+ },
+ {
+  "istat": "021042",
+  "nameDe": "Laas",
+  "nameIt": "Lasa",
+  "nameEn": "Laas",
+  "lat": 46.6165,
+  "lon": 10.7007,
+  "altitudeM": 868,
+  "district": 3,
+  "station": {
+   "code": "08200MS",
+   "name": "Laas Eyrs",
+   "lat": 46.6249,
+   "lon": 10.6496,
+   "altitudeM": 874,
+   "distanceKm": 4.02
+  }
+ },
+ {
+  "istat": "021043",
+  "nameDe": "Laurein",
+  "nameIt": "Lauregno",
+  "nameEn": "Laurein",
+  "lat": 46.4547,
+  "lon": 11.0619,
+  "altitudeM": 1150,
+  "district": 2,
+  "station": {
+   "code": "25900MS",
+   "name": "St. Walburg",
+   "lat": 46.5417,
+   "lon": 10.9898,
+   "altitudeM": 1142,
+   "distanceKm": 11.09
+  }
+ },
+ {
+  "istat": "021044",
+  "nameDe": "Lüsen",
+  "nameIt": "Luson",
+  "nameEn": "Lüsen",
+  "lat": 46.7458,
+  "lon": 11.761,
+  "altitudeM": 972,
+  "district": 4,
+  "station": {
+   "code": "65350MS",
+   "name": "Obervintl",
+   "lat": 46.8111,
+   "lon": 11.7534,
+   "altitudeM": 746,
+   "distanceKm": 7.24
+  }
+ },
+ {
+  "istat": "021045",
+  "nameDe": "Margreid",
+  "nameIt": "Magrè",
+  "nameEn": "Margreid",
+  "lat": 46.287406,
+  "lon": 11.20985,
+  "altitudeM": 241,
+  "district": 1,
+  "station": {
+   "code": "88820MS",
+   "name": "Salurn",
+   "lat": 46.2362,
+   "lon": 11.1855,
+   "altitudeM": 212,
+   "distanceKm": 5.96
+  }
+ },
+ {
+  "istat": "021046",
+  "nameDe": "Mals",
+  "nameIt": "Malles",
+  "nameEn": "Mals",
+  "lat": 46.69081,
+  "lon": 10.54436,
+  "altitudeM": 1051,
+  "district": 3,
+  "station": {
+   "code": "02500MS",
+   "name": "Marienberg",
+   "lat": 46.7057,
+   "lon": 10.5213,
+   "altitudeM": 1310,
+   "distanceKm": 2.41
+  }
+ },
+ {
+  "istat": "021047",
+  "nameDe": "Enneberg",
+  "nameIt": "Marebbe",
+  "nameEn": "Mareo",
+  "lat": 46.69807,
+  "lon": 11.93095,
+  "altitudeM": 1285,
+  "district": 7,
+  "station": {
+   "code": "62600MS",
+   "name": "St. Martin in Thurn",
+   "lat": 46.6792,
+   "lon": 11.8979,
+   "altitudeM": 1150,
+   "distanceKm": 3.27
+  }
+ },
+ {
+  "istat": "021048",
+  "nameDe": "Marling",
+  "nameIt": "Marlengo",
+  "nameEn": "Marling",
+  "lat": 46.65471,
+  "lon": 11.14075,
+  "altitudeM": 363,
+  "district": 2,
+  "station": {
+   "code": "23200MS",
+   "name": "Meran",
+   "lat": 46.688,
+   "lon": 11.1366,
+   "altitudeM": 330,
+   "distanceKm": 3.69
+  }
+ },
+ {
+  "istat": "021049",
+  "nameDe": "Martell",
+  "nameIt": "Martello",
+  "nameEn": "Martell",
+  "lat": 46.565954,
+  "lon": 10.78271,
+  "altitudeM": 1312,
+  "district": 3,
+  "station": {
+   "code": "09700MS",
+   "name": "Schlanders",
+   "lat": 46.6238,
+   "lon": 10.7803,
+   "altitudeM": 698,
+   "distanceKm": 6.4
+  }
+ },
+ {
+  "istat": "021050",
+  "nameDe": "Mölten",
+  "nameIt": "Meltina",
+  "nameEn": "Mölten",
+  "lat": 46.58658,
+  "lon": 11.2553,
+  "altitudeM": 1142,
+  "district": 1,
+  "station": {
+   "code": "27100MS",
+   "name": "Gargazon",
+   "lat": 46.5767,
+   "lon": 11.2008,
+   "altitudeM": 254,
+   "distanceKm": 4.31
+  }
+ },
+ {
+  "istat": "021051",
+  "nameDe": "Meran",
+  "nameIt": "Merano",
+  "nameEn": "Meran",
+  "lat": 46.67018,
+  "lon": 11.1594,
+  "altitudeM": 325,
+  "district": 2,
+  "station": {
+   "code": "23200MS",
+   "name": "Meran",
+   "lat": 46.688,
+   "lon": 11.1366,
+   "altitudeM": 330,
+   "distanceKm": 2.63
+  }
+ },
+ {
+  "istat": "021052",
+  "nameDe": "Welsberg-Taisten",
+  "nameIt": "Monguelfo-Tesido",
+  "nameEn": "Welsberg-Taisten",
+  "lat": 46.75658,
+  "lon": 12.10528,
+  "altitudeM": 1087,
+  "district": 6,
+  "station": {
+   "code": "43200MS",
+   "name": "Welsberg",
+   "lat": 46.7431,
+   "lon": 12.1289,
+   "altitudeM": 1131,
+   "distanceKm": 2.34
+  }
+ },
+ {
+  "istat": "021053",
+  "nameDe": "Montan",
+  "nameIt": "Montagna",
+  "nameEn": "Montan",
+  "lat": 46.33114,
+  "lon": 11.30419,
+  "altitudeM": 497,
+  "district": 1,
+  "station": {
+   "code": "86900MS",
+   "name": "Auer",
+   "lat": 46.3469,
+   "lon": 11.305,
+   "altitudeM": 250,
+   "distanceKm": 1.74
+  }
+ },
+ {
+  "istat": "021054",
+  "nameDe": "Moos",
+  "nameIt": "Moso i.P.",
+  "nameEn": "Moos i.P.",
+  "lat": 46.8311,
+  "lon": 11.166,
+  "altitudeM": 1007,
+  "district": 2,
+  "station": {
+   "code": "20910MS",
+   "name": "Platt in Passeier",
+   "lat": 46.8215,
+   "lon": 11.1762,
+   "altitudeM": 1145,
+   "distanceKm": 1.32
+  }
+ },
+ {
+  "istat": "021055",
+  "nameDe": "Nals",
+  "nameIt": "Nalles",
+  "nameEn": "Nals",
+  "lat": 46.542989,
+  "lon": 11.20345,
+  "altitudeM": 321,
+  "district": 2,
+  "station": {
+   "code": "27100MS",
+   "name": "Gargazon",
+   "lat": 46.5767,
+   "lon": 11.2008,
+   "altitudeM": 254,
+   "distanceKm": 3.73
+  }
+ },
+ {
+  "istat": "021056",
+  "nameDe": "Naturns",
+  "nameIt": "Naturno",
+  "nameEn": "Naturns",
+  "lat": 46.65082,
+  "lon": 11.004847,
+  "altitudeM": 528,
+  "district": 2,
+  "station": {
+   "code": "19300MS",
+   "name": "Naturns",
+   "lat": 46.6477,
+   "lon": 10.9912,
+   "altitudeM": 541,
+   "distanceKm": 1.1
+  }
+ },
+ {
+  "istat": "021057",
+  "nameDe": "Natz-Schabs",
+  "nameIt": "Naz Sciaves",
+  "nameEn": "Natz-Schabs",
+  "lat": 46.75261,
+  "lon": 11.680314,
+  "altitudeM": 772,
+  "district": 4,
+  "station": {
+   "code": "39100MS",
+   "name": "Brixen - Vahrn",
+   "lat": 46.731,
+   "lon": 11.6451,
+   "altitudeM": 585,
+   "distanceKm": 3.6
+  }
+ },
+ {
+  "istat": "021058",
+  "nameDe": "Welschnofen",
+  "nameIt": "Nova Levante",
+  "nameEn": "Welschnofen",
+  "lat": 46.4311,
+  "lon": 11.5431,
+  "altitudeM": 1182,
+  "district": 1,
+  "station": {
+   "code": "78305MS",
+   "name": "Welschnofen",
+   "lat": 46.4289,
+   "lon": 11.5366,
+   "altitudeM": 1128,
+   "distanceKm": 0.55
+  }
+ },
+ {
+  "istat": "021059",
+  "nameDe": "Deutschnofen",
+  "nameIt": "Nova Ponente",
+  "nameEn": "Deutschnofen",
+  "lat": 46.413943,
+  "lon": 11.425651,
+  "altitudeM": 1357,
+  "district": 1,
+  "station": {
+   "code": "85120MS",
+   "name": "Deutschnofen",
+   "lat": 46.4205,
+   "lon": 11.4269,
+   "altitudeM": 1470,
+   "distanceKm": 0.73
+  }
+ },
+ {
+  "istat": "021060",
+  "nameDe": "Auer",
+  "nameIt": "Ora",
+  "nameEn": "Auer",
+  "lat": 46.34812,
+  "lon": 11.29923,
+  "altitudeM": 242,
+  "district": 1,
+  "station": {
+   "code": "86900MS",
+   "name": "Auer",
+   "lat": 46.3469,
+   "lon": 11.305,
+   "altitudeM": 250,
+   "distanceKm": 0.46
+  }
+ },
+ {
+  "istat": "021061",
+  "nameDe": "St.Ulrich",
+  "nameIt": "Ortisei",
+  "nameEn": "Urtijëi",
+  "lat": 46.57381,
+  "lon": 11.67322,
+  "altitudeM": 1234,
+  "district": 7,
+  "station": {
+   "code": "73500MS",
+   "name": "Wolkenstein",
+   "lat": 46.5456,
+   "lon": 11.7684,
+   "altitudeM": 1594,
+   "distanceKm": 7.93
+  }
+ },
+ {
+  "istat": "021062",
+  "nameDe": "Partschins",
+  "nameIt": "Parcines",
+  "nameEn": "Partschins",
+  "lat": 46.683,
+  "lon": 11.0725,
+  "altitudeM": 626,
+  "district": 2,
+  "station": {
+   "code": "23200MS",
+   "name": "Meran",
+   "lat": 46.688,
+   "lon": 11.1366,
+   "altitudeM": 330,
+   "distanceKm": 4.93
+  }
+ },
+ {
+  "istat": "021063",
+  "nameDe": "Percha",
+  "nameIt": "Perca",
+  "nameEn": "Percha",
+  "lat": 46.7917,
+  "lon": 11.9813,
+  "altitudeM": 972,
+  "district": 6,
+  "station": {
+   "code": "59700MS",
+   "name": "Bruneck",
+   "lat": 46.8043,
+   "lon": 11.9315,
+   "altitudeM": 828,
+   "distanceKm": 4.04
+  }
+ },
+ {
+  "istat": "021064",
+  "nameDe": "Plaus",
+  "nameIt": "Plaus",
+  "nameEn": "Plaus",
+  "lat": 46.65574,
+  "lon": 11.042289,
+  "altitudeM": 519,
+  "district": 2,
+  "station": {
+   "code": "19300MS",
+   "name": "Naturns",
+   "lat": 46.6477,
+   "lon": 10.9912,
+   "altitudeM": 541,
+   "distanceKm": 4.0
+  }
+ },
+ {
+  "istat": "021065",
+  "nameDe": "Waidbruck",
+  "nameIt": "Ponte Gardena",
+  "nameEn": "Waidbruck",
+  "lat": 46.598,
+  "lon": 11.5317,
+  "altitudeM": 470,
+  "district": 4,
+  "station": {
+   "code": "74900MS",
+   "name": "Barbian Kollmann",
+   "lat": 46.5951,
+   "lon": 11.5291,
+   "altitudeM": 490,
+   "distanceKm": 0.38
+  }
+ },
+ {
+  "istat": "021066",
+  "nameDe": "Burgstall",
+  "nameIt": "Postal",
+  "nameEn": "Burgstall",
+  "lat": 46.60819,
+  "lon": 11.192835,
+  "altitudeM": 270,
+  "district": 2,
+  "station": {
+   "code": "27100MS",
+   "name": "Gargazon",
+   "lat": 46.5767,
+   "lon": 11.2008,
+   "altitudeM": 254,
+   "distanceKm": 3.53
+  }
+ },
+ {
+  "istat": "021067",
+  "nameDe": "Prad",
+  "nameIt": "Prato a.S.",
+  "nameEn": "Prad",
+  "lat": 46.617112,
+  "lon": 10.591742,
+  "altitudeM": 915,
+  "district": 3,
+  "station": {
+   "code": "08200MS",
+   "name": "Laas Eyrs",
+   "lat": 46.6249,
+   "lon": 10.6496,
+   "altitudeM": 874,
+   "distanceKm": 4.51
+  }
+ },
+ {
+  "istat": "021068",
+  "nameDe": "Prettau",
+  "nameIt": "Predoi",
+  "nameEn": "Prettau",
+  "lat": 47.0215,
+  "lon": 12.0611,
+  "altitudeM": 1475,
+  "district": 6,
+  "station": {
+   "code": "50500MS",
+   "name": "Prettau",
+   "lat": 47.0366,
+   "lon": 12.0991,
+   "altitudeM": 1450,
+   "distanceKm": 3.33
+  }
+ },
+ {
+  "istat": "021069",
+  "nameDe": "Proveis",
+  "nameIt": "Provès",
+  "nameEn": "Proveis",
+  "lat": 46.476084,
+  "lon": 11.022036,
+  "altitudeM": 1420,
+  "district": 2,
+  "station": {
+   "code": "25900MS",
+   "name": "St. Walburg",
+   "lat": 46.5417,
+   "lon": 10.9898,
+   "altitudeM": 1142,
+   "distanceKm": 7.66
+  }
+ },
+ {
+  "istat": "021070",
+  "nameDe": "Ratschings",
+  "nameIt": "Racines",
+  "nameEn": "Ratschings",
+  "lat": 46.88466,
+  "lon": 11.4108,
+  "altitudeM": 976,
+  "district": 5,
+  "station": {
+   "code": "37100MS",
+   "name": "Sterzing",
+   "lat": 46.885,
+   "lon": 11.4386,
+   "altitudeM": 943,
+   "distanceKm": 2.12
+  }
+ },
+ {
+  "istat": "021071",
+  "nameDe": "Rasen-Antholz",
+  "nameIt": "Rasun-Anterselva",
+  "nameEn": "Rasen-Antholz",
+  "lat": 46.780735,
+  "lon": 12.049478,
+  "altitudeM": 1030,
+  "district": 6,
+  "station": {
+   "code": "43200MS",
+   "name": "Welsberg",
+   "lat": 46.7431,
+   "lon": 12.1289,
+   "altitudeM": 1131,
+   "distanceKm": 7.35
+  }
+ },
+ {
+  "istat": "021072",
+  "nameDe": "Ritten",
+  "nameIt": "Renon",
+  "nameEn": "Ritten",
+  "lat": 46.5368,
+  "lon": 11.4637,
+  "altitudeM": 1154,
+  "district": 1,
+  "station": {
+   "code": "79300MS",
+   "name": "Ritten Siffian",
+   "lat": 46.529,
+   "lon": 11.4638,
+   "altitudeM": 987,
+   "distanceKm": 0.86
+  }
+ },
+ {
+  "istat": "021073",
+  "nameDe": "Riffian",
+  "nameIt": "Rifiano",
+  "nameEn": "Riffian",
+  "lat": 46.701741,
+  "lon": 11.180605,
+  "altitudeM": 504,
+  "district": 2,
+  "station": {
+   "code": "23200MS",
+   "name": "Meran",
+   "lat": 46.688,
+   "lon": 11.1366,
+   "altitudeM": 330,
+   "distanceKm": 3.69
+  }
+ },
+ {
+  "istat": "021074",
+  "nameDe": "Mühlbach",
+  "nameIt": "Rio Pusteria",
+  "nameEn": "Mühlbach",
+  "lat": 46.7961,
+  "lon": 11.6665,
+  "altitudeM": 777,
+  "district": 4,
+  "station": {
+   "code": "68600MS",
+   "name": "Vals",
+   "lat": 46.8483,
+   "lon": 11.6272,
+   "altitudeM": 1410,
+   "distanceKm": 6.5
+  }
+ },
+ {
+  "istat": "021075",
+  "nameDe": "Rodeneck",
+  "nameIt": "Rodengo",
+  "nameEn": "Rodeneck",
+  "lat": 46.777,
+  "lon": 11.6905,
+  "altitudeM": 885,
+  "district": 4,
+  "station": {
+   "code": "65350MS",
+   "name": "Obervintl",
+   "lat": 46.8111,
+   "lon": 11.7534,
+   "altitudeM": 746,
+   "distanceKm": 6.1
+  }
+ },
+ {
+  "istat": "021076",
+  "nameDe": "Salurn",
+  "nameIt": "Salorno",
+  "nameEn": "Salurn",
+  "lat": 46.23917,
+  "lon": 11.21214,
+  "altitudeM": 224,
+  "district": 1,
+  "station": {
+   "code": "88820MS",
+   "name": "Salurn",
+   "lat": 46.2362,
+   "lon": 11.1855,
+   "altitudeM": 212,
+   "distanceKm": 2.08
+  }
+ },
+ {
+  "istat": "021077",
+  "nameDe": "Innichen",
+  "nameIt": "S.Candido",
+  "nameEn": "Innichen",
+  "lat": 46.732828,
+  "lon": 12.281497,
+  "altitudeM": 1175,
+  "district": 6,
+  "station": {
+   "code": "41000MS",
+   "name": "Toblach",
+   "lat": 46.7299,
+   "lon": 12.2191,
+   "altitudeM": 1219,
+   "distanceKm": 4.77
+  }
+ },
+ {
+  "istat": "021079",
+  "nameDe": "Jenesien",
+  "nameIt": "S.Genesio",
+  "nameEn": "Jenesien",
+  "lat": 46.535349,
+  "lon": 11.331161,
+  "altitudeM": 1087,
+  "district": 1,
+  "station": {
+   "code": "82910MS",
+   "name": "Jenesien",
+   "lat": 46.5304,
+   "lon": 11.3319,
+   "altitudeM": 970,
+   "distanceKm": 0.55
+  }
+ },
+ {
+  "istat": "021080",
+  "nameDe": "St.Leonhard  i.P.",
+  "nameIt": "S.Leonardo i.P.",
+  "nameEn": "St.Leonhard  i.P.",
+  "lat": 46.81226,
+  "lon": 11.24587,
+  "altitudeM": 689,
+  "district": 2,
+  "station": {
+   "code": "22210MS",
+   "name": "St. Martin in Passeier",
+   "lat": 46.7822,
+   "lon": 11.2294,
+   "altitudeM": 588,
+   "distanceKm": 3.55
+  }
+ },
+ {
+  "istat": "021081",
+  "nameDe": "St.Lorenzen",
+  "nameIt": "S.Lorenzo d.S.",
+  "nameEn": "St.Lorenzen",
+  "lat": 46.7832,
+  "lon": 11.9015,
+  "altitudeM": 810,
+  "district": 6,
+  "station": {
+   "code": "59700MS",
+   "name": "Bruneck",
+   "lat": 46.8043,
+   "lon": 11.9315,
+   "altitudeM": 828,
+   "distanceKm": 3.27
+  }
+ },
+ {
+  "istat": "021082",
+  "nameDe": "St.Martin i.T.",
+  "nameIt": "S.Martino i.B.",
+  "nameEn": "S.Martin d.T.",
+  "lat": 46.68201,
+  "lon": 11.89786,
+  "altitudeM": 1135,
+  "district": 7,
+  "station": {
+   "code": "62600MS",
+   "name": "St. Martin in Thurn",
+   "lat": 46.6792,
+   "lon": 11.8979,
+   "altitudeM": 1150,
+   "distanceKm": 0.31
+  }
+ },
+ {
+  "istat": "021083",
+  "nameDe": "St.Martin i.P.",
+  "nameIt": "S.Martino i.P.",
+  "nameEn": "St.Martin i.P.",
+  "lat": 46.783615,
+  "lon": 11.2271,
+  "altitudeM": 689,
+  "district": 2,
+  "station": {
+   "code": "22210MS",
+   "name": "St. Martin in Passeier",
+   "lat": 46.7822,
+   "lon": 11.2294,
+   "altitudeM": 588,
+   "distanceKm": 0.23
+  }
+ },
+ {
+  "istat": "021084",
+  "nameDe": "St.Pankraz",
+  "nameIt": "S.Pancrazio",
+  "nameEn": "St.Pankraz",
+  "lat": 46.586351,
+  "lon": 11.086701,
+  "altitudeM": 735,
+  "district": 2,
+  "station": {
+   "code": "27100MS",
+   "name": "Gargazon",
+   "lat": 46.5767,
+   "lon": 11.2008,
+   "altitudeM": 254,
+   "distanceKm": 8.79
+  }
+ },
+ {
+  "istat": "021085",
+  "nameDe": "St.Christina",
+  "nameIt": "S.Cristina",
+  "nameEn": "S.Cristina",
+  "lat": 46.558991,
+  "lon": 11.715505,
+  "altitudeM": 1428,
+  "district": 7,
+  "station": {
+   "code": "73500MS",
+   "name": "Wolkenstein",
+   "lat": 46.5456,
+   "lon": 11.7684,
+   "altitudeM": 1594,
+   "distanceKm": 4.31
+  }
+ },
+ {
+  "istat": "021086",
+  "nameDe": "Sarntal",
+  "nameIt": "Sarentino",
+  "nameEn": "Sarntal",
+  "lat": 46.64293,
+  "lon": 11.3567,
+  "altitudeM": 961,
+  "district": 4,
+  "station": {
+   "code": "82200MS",
+   "name": "Sarnthein",
+   "lat": 46.6406,
+   "lon": 11.3551,
+   "altitudeM": 970,
+   "distanceKm": 0.29
+  }
+ },
+ {
+  "istat": "021087",
+  "nameDe": "Schenna",
+  "nameIt": "Scena",
+  "nameEn": "Schenna",
+  "lat": 46.69002,
+  "lon": 11.18736,
+  "altitudeM": 600,
+  "district": 2,
+  "station": {
+   "code": "23200MS",
+   "name": "Meran",
+   "lat": 46.688,
+   "lon": 11.1366,
+   "altitudeM": 330,
+   "distanceKm": 3.88
+  }
+ },
+ {
+  "istat": "021088",
+  "nameDe": "Mühlwald",
+  "nameIt": "Selva dei Molini",
+  "nameEn": "Mühlwald",
+  "lat": 46.8907,
+  "lon": 11.8647,
+  "altitudeM": 1229,
+  "district": 6,
+  "station": {
+   "code": "56500MS",
+   "name": "Mühlwald",
+   "lat": 46.8901,
+   "lon": 11.8744,
+   "altitudeM": 1141,
+   "distanceKm": 0.74
+  }
+ },
+ {
+  "istat": "021089",
+  "nameDe": "Wolkenstein",
+  "nameIt": "Selva Gardena",
+  "nameEn": "Sëlva",
+  "lat": 46.5563,
+  "lon": 11.7552,
+  "altitudeM": 1563,
+  "district": 7,
+  "station": {
+   "code": "73500MS",
+   "name": "Wolkenstein",
+   "lat": 46.5456,
+   "lon": 11.7684,
+   "altitudeM": 1594,
+   "distanceKm": 1.56
+  }
+ },
+ {
+  "istat": "021091",
+  "nameDe": "Schnals",
+  "nameIt": "Senales",
+  "nameEn": "Schnals",
+  "lat": 46.706,
+  "lon": 10.9097,
+  "altitudeM": 1327,
+  "district": 3,
+  "station": {
+   "code": "15800MS",
+   "name": "Schnals Vernagt",
+   "lat": 46.7357,
+   "lon": 10.8493,
+   "altitudeM": 1700,
+   "distanceKm": 5.66
+  }
+ },
+ {
+  "istat": "021092",
+  "nameDe": "Sexten",
+  "nameIt": "Sesto",
+  "nameEn": "Sexten",
+  "lat": 46.702071,
+  "lon": 12.3503,
+  "altitudeM": 1310,
+  "district": 6,
+  "station": {
+   "code": "91510MS",
+   "name": "Sexten",
+   "lat": 46.6915,
+   "lon": 12.3577,
+   "altitudeM": 1322,
+   "distanceKm": 1.3
+  }
+ },
+ {
+  "istat": "021093",
+  "nameDe": "Schlanders",
+  "nameIt": "Silandro",
+  "nameEn": "Schlanders",
+  "lat": 46.62885,
+  "lon": 10.775,
+  "altitudeM": 721,
+  "district": 3,
+  "station": {
+   "code": "09700MS",
+   "name": "Schlanders",
+   "lat": 46.6238,
+   "lon": 10.7803,
+   "altitudeM": 698,
+   "distanceKm": 0.69
+  }
+ },
+ {
+  "istat": "021094",
+  "nameDe": "Schluderns",
+  "nameIt": "Sluderno",
+  "nameEn": "Schluderns",
+  "lat": 46.66437,
+  "lon": 10.58528,
+  "altitudeM": 921,
+  "district": 3,
+  "station": {
+   "code": "08200MS",
+   "name": "Laas Eyrs",
+   "lat": 46.6249,
+   "lon": 10.6496,
+   "altitudeM": 874,
+   "distanceKm": 6.57
+  }
+ },
+ {
+  "istat": "021095",
+  "nameDe": "Stilfs",
+  "nameIt": "Stelvio",
+  "nameEn": "Stilfs",
+  "lat": 46.5984,
+  "lon": 10.5472,
+  "altitudeM": 1310,
+  "district": 3,
+  "station": {
+   "code": "08200MS",
+   "name": "Laas Eyrs",
+   "lat": 46.6249,
+   "lon": 10.6496,
+   "altitudeM": 874,
+   "distanceKm": 8.36
+  }
+ },
+ {
+  "istat": "021096",
+  "nameDe": "Terenten",
+  "nameIt": "Terento",
+  "nameEn": "Terenten",
+  "lat": 46.829655,
+  "lon": 11.77708,
+  "altitudeM": 1210,
+  "district": 4,
+  "station": {
+   "code": "65600MS",
+   "name": "Terenten",
+   "lat": 46.8345,
+   "lon": 11.7856,
+   "altitudeM": 1349,
+   "distanceKm": 0.84
+  }
+ },
+ {
+  "istat": "021097",
+  "nameDe": "Terlan",
+  "nameIt": "Terlano",
+  "nameEn": "Terlan",
+  "lat": 46.5294,
+  "lon": 11.2487,
+  "altitudeM": 248,
+  "district": 1,
+  "station": {
+   "code": "83200MS",
+   "name": "Bozen",
+   "lat": 46.4977,
+   "lon": 11.3128,
+   "altitudeM": 245,
+   "distanceKm": 6.03
+  }
+ },
+ {
+  "istat": "021098",
+  "nameDe": "Tramin",
+  "nameIt": "Termeno",
+  "nameEn": "Tramin",
+  "lat": 46.341087,
+  "lon": 11.239634,
+  "altitudeM": 276,
+  "district": 1,
+  "station": {
+   "code": "86900MS",
+   "name": "Auer",
+   "lat": 46.3469,
+   "lon": 11.305,
+   "altitudeM": 250,
+   "distanceKm": 5.06
+  }
+ },
+ {
+  "istat": "021099",
+  "nameDe": "Tisens",
+  "nameIt": "Tesimo",
+  "nameEn": "Tisens",
+  "lat": 46.56361,
+  "lon": 11.169507,
+  "altitudeM": 635,
+  "district": 2,
+  "station": {
+   "code": "27100MS",
+   "name": "Gargazon",
+   "lat": 46.5767,
+   "lon": 11.2008,
+   "altitudeM": 254,
+   "distanceKm": 2.8
+  }
+ },
+ {
+  "istat": "021100",
+  "nameDe": "Tiers",
+  "nameIt": "Tires",
+  "nameEn": "Tiers",
+  "lat": 46.46824,
+  "lon": 11.52461,
+  "altitudeM": 1028,
+  "district": 4,
+  "station": {
+   "code": "78305MS",
+   "name": "Welschnofen",
+   "lat": 46.4289,
+   "lon": 11.5366,
+   "altitudeM": 1128,
+   "distanceKm": 4.45
+  }
+ },
+ {
+  "istat": "021101",
+  "nameDe": "Dorf Tirol",
+  "nameIt": "Tirolo",
+  "nameEn": "Tirol",
+  "lat": 46.688958,
+  "lon": 11.156624,
+  "altitudeM": 594,
+  "district": 2,
+  "station": {
+   "code": "23200MS",
+   "name": "Meran",
+   "lat": 46.688,
+   "lon": 11.1366,
+   "altitudeM": 330,
+   "distanceKm": 1.53
+  }
+ },
+ {
+  "istat": "021102",
+  "nameDe": "Truden",
+  "nameIt": "Trodena",
+  "nameEn": "Truden",
+  "lat": 46.321336,
+  "lon": 11.350175,
+  "altitudeM": 1127,
+  "district": 1,
+  "station": {
+   "code": "86900MS",
+   "name": "Auer",
+   "lat": 46.3469,
+   "lon": 11.305,
+   "altitudeM": 250,
+   "distanceKm": 4.48
+  }
+ },
+ {
+  "istat": "021103",
+  "nameDe": "Taufers i.M.",
+  "nameIt": "Tubre",
+  "nameEn": "Taufers i.M.",
+  "lat": 46.64631,
+  "lon": 10.46438,
+  "altitudeM": 1240,
+  "district": 3,
+  "station": {
+   "code": "02500MS",
+   "name": "Marienberg",
+   "lat": 46.7057,
+   "lon": 10.5213,
+   "altitudeM": 1310,
+   "distanceKm": 7.88
+  }
+ },
+ {
+  "istat": "021104",
+  "nameDe": "Ulten",
+  "nameIt": "Ultimo",
+  "nameEn": "Ulten",
+  "lat": 46.548923,
+  "lon": 11.004865,
+  "altitudeM": 1190,
+  "district": 2,
+  "station": {
+   "code": "25900MS",
+   "name": "St. Walburg",
+   "lat": 46.5417,
+   "lon": 10.9898,
+   "altitudeM": 1142,
+   "distanceKm": 1.4
+  }
+ },
+ {
+  "istat": "021105",
+  "nameDe": "Pfatten",
+  "nameIt": "Vadena",
+  "nameEn": "Pfatten",
+  "lat": 46.4134,
+  "lon": 11.3055,
+  "altitudeM": 243,
+  "district": 1,
+  "station": {
+   "code": "85700MS",
+   "name": "Branzoll",
+   "lat": 46.4065,
+   "lon": 11.3111,
+   "altitudeM": 226,
+   "distanceKm": 0.88
+  }
+ },
+ {
+  "istat": "021106",
+  "nameDe": "Olang",
+  "nameIt": "Valdaora",
+  "nameEn": "Olang",
+  "lat": 46.76149,
+  "lon": 12.03049,
+  "altitudeM": 1048,
+  "district": 6,
+  "station": {
+   "code": "42700MS",
+   "name": "St. Veit in Prags",
+   "lat": 46.7119,
+   "lon": 12.1,
+   "altitudeM": 1285,
+   "distanceKm": 7.63
+  }
+ },
+ {
+  "istat": "021107",
+  "nameDe": "Pfitsch",
+  "nameIt": "Val di Vizze",
+  "nameEn": "Pfitsch",
+  "lat": 46.901,
+  "lon": 11.47,
+  "altitudeM": 948,
+  "district": 5,
+  "station": {
+   "code": "37100MS",
+   "name": "Sterzing",
+   "lat": 46.885,
+   "lon": 11.4386,
+   "altitudeM": 943,
+   "distanceKm": 2.97
+  }
+ },
+ {
+  "istat": "021108",
+  "nameDe": "Ahrntal",
+  "nameIt": "Valle Aurina",
+  "nameEn": "Ahrntal",
+  "lat": 46.994853,
+  "lon": 11.980325,
+  "altitudeM": 1054,
+  "district": 6,
+  "station": {
+   "code": "54500MS",
+   "name": "Rein in Taufers",
+   "lat": 46.9428,
+   "lon": 12.0825,
+   "altitudeM": 1562,
+   "distanceKm": 9.66
+  }
+ },
+ {
+  "istat": "021109",
+  "nameDe": "Gsies",
+  "nameIt": "Valle di Casies",
+  "nameEn": "Gsies",
+  "lat": 46.81112,
+  "lon": 12.2274,
+  "altitudeM": 1206,
+  "district": 6,
+  "station": {
+   "code": "44500MS",
+   "name": "St. Magdalena in Gsies",
+   "lat": 46.8353,
+   "lon": 12.2427,
+   "altitudeM": 1412,
+   "distanceKm": 2.92
+  }
+ },
+ {
+  "istat": "021110",
+  "nameDe": "Vintl",
+  "nameIt": "Vandoies",
+  "nameEn": "Vintl",
+  "lat": 46.8167,
+  "lon": 11.7233,
+  "altitudeM": 755,
+  "district": 4,
+  "station": {
+   "code": "65350MS",
+   "name": "Obervintl",
+   "lat": 46.8111,
+   "lon": 11.7534,
+   "altitudeM": 746,
+   "distanceKm": 2.38
+  }
+ },
+ {
+  "istat": "021111",
+  "nameDe": "Vahrn",
+  "nameIt": "Varna",
+  "nameEn": "Vahrn",
+  "lat": 46.7432,
+  "lon": 11.6358,
+  "altitudeM": 671,
+  "district": 4,
+  "station": {
+   "code": "39100MS",
+   "name": "Brixen - Vahrn",
+   "lat": 46.731,
+   "lon": 11.6451,
+   "altitudeM": 585,
+   "distanceKm": 1.52
+  }
+ },
+ {
+  "istat": "021112",
+  "nameDe": "Vöran",
+  "nameIt": "Verano",
+  "nameEn": "Vöran",
+  "lat": 46.6061,
+  "lon": 11.2264,
+  "altitudeM": 1204,
+  "district": 2,
+  "station": {
+   "code": "27100MS",
+   "name": "Gargazon",
+   "lat": 46.5767,
+   "lon": 11.2008,
+   "altitudeM": 254,
+   "distanceKm": 3.8
+  }
+ },
+ {
+  "istat": "021113",
+  "nameDe": "Niederdorf",
+  "nameIt": "Villa Bassa",
+  "nameEn": "Niederdorf",
+  "lat": 46.73804,
+  "lon": 12.16911,
+  "altitudeM": 1158,
+  "district": 6,
+  "station": {
+   "code": "43200MS",
+   "name": "Welsberg",
+   "lat": 46.7431,
+   "lon": 12.1289,
+   "altitudeM": 1131,
+   "distanceKm": 3.12
+  }
+ },
+ {
+  "istat": "021114",
+  "nameDe": "Villanders",
+  "nameIt": "Villandro",
+  "nameEn": "Villanders",
+  "lat": 46.6307,
+  "lon": 11.538,
+  "altitudeM": 880,
+  "district": 4,
+  "station": {
+   "code": "74900MS",
+   "name": "Barbian Kollmann",
+   "lat": 46.5951,
+   "lon": 11.5291,
+   "altitudeM": 490,
+   "distanceKm": 3.99
+  }
+ },
+ {
+  "istat": "021115",
+  "nameDe": "Sterzing",
+  "nameIt": "Vipiteno",
+  "nameEn": "Sterzing",
+  "lat": 46.892,
+  "lon": 11.4339,
+  "altitudeM": 948,
+  "district": 5,
+  "station": {
+   "code": "37100MS",
+   "name": "Sterzing",
+   "lat": 46.885,
+   "lon": 11.4386,
+   "altitudeM": 943,
+   "distanceKm": 0.85
+  }
+ },
+ {
+  "istat": "021116",
+  "nameDe": "Feldthurns",
+  "nameIt": "Velturno",
+  "nameEn": "Feldthurns",
+  "lat": 46.6689,
+  "lon": 11.5985,
+  "altitudeM": 851,
+  "district": 4,
+  "station": {
+   "code": "71510MS",
+   "name": "Villnöss",
+   "lat": 46.6479,
+   "lon": 11.6894,
+   "altitudeM": 1327,
+   "distanceKm": 7.32
+  }
+ },
+ {
+  "istat": "021117",
+  "nameDe": "Wengen",
+  "nameIt": "La Valle",
+  "nameEn": "La Val",
+  "lat": 46.657658,
+  "lon": 11.925152,
+  "altitudeM": 1348,
+  "district": 7,
+  "station": {
+   "code": "62600MS",
+   "name": "St. Martin in Thurn",
+   "lat": 46.6792,
+   "lon": 11.8979,
+   "altitudeM": 1150,
+   "distanceKm": 3.16
+  }
+ },
+ {
+  "istat": "021118",
+  "nameDe": "St.Felix",
+  "nameIt": "San Felice",
+  "nameEn": "St.Felix",
+  "lat": 46.511585,
+  "lon": 11.109038,
+  "altitudeM": 1279,
+  "district": 2,
+  "station": {
+   "code": "25900MS",
+   "name": "St. Walburg",
+   "lat": 46.5417,
+   "lon": 10.9898,
+   "altitudeM": 1142,
+   "distanceKm": 9.72
+  }
+ }
+]
