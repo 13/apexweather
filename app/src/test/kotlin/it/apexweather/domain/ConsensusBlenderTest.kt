@@ -429,6 +429,51 @@ class ConsensusBlenderTest {
         assertTrue(ConsensusBlender.voteCondition(half, precipMm = 0.13).isPrecipitation)
     }
 
+    /**
+     * Fog is not precipitation, so the wet-pool rule discarded it outright: once a third of the
+     * models forecast drizzle, a source saying Talnebel could not be heard. In a valley where fog
+     * and drizzle are the same grey afternoon that loses real fog, and it is why the app had never
+     * once shown any.
+     */
+    @Test
+    fun `fog is not voted away by models forecasting drizzle`() {
+        val greyAfternoon = listOf(
+            Condition.FOG, Condition.FOG, Condition.CLOUDY,
+            Condition.DRIZZLE, Condition.DRIZZLE, Condition.CLOUDY,
+        )
+        assertEquals(Condition.FOG, ConsensusBlender.voteCondition(greyAfternoon, precipMm = 0.3))
+    }
+
+    /** Being told it is foggy while a downpour arrives is the same mistake facing the other way. */
+    @Test
+    fun `real rain outranks fog`() {
+        val stormy = listOf(Condition.FOG, Condition.FOG, Condition.RAIN, Condition.RAIN, Condition.RAIN, Condition.CLOUDY)
+        assertTrue(ConsensusBlender.voteCondition(stormy, precipMm = 3.0).isPrecipitation)
+    }
+
+    /** One source in ten is not a consensus, so on its own it does not carry the hour. */
+    @Test
+    fun `a lone fog model does not decide the hour`() {
+        val mostlyCloudy = List(9) { Condition.CLOUDY } + Condition.FOG
+        assertEquals(Condition.CLOUDY, ConsensusBlender.voteCondition(mostlyCloudy, precipMm = 0.0))
+    }
+
+    /**
+     * ...unless the station is standing in saturated air, which is ground truth against a forecast.
+     * It lowers the bar from a third of the sources to one; it never invents fog on its own.
+     */
+    @Test
+    fun `a saturated station lets a single source carry the fog`() {
+        val mostlyCloudy = List(9) { Condition.CLOUDY } + Condition.FOG
+        assertEquals(Condition.FOG, ConsensusBlender.voteCondition(mostlyCloudy, precipMm = 0.0, stationSaturated = true))
+    }
+
+    @Test
+    fun `a saturated station does not invent fog nobody forecast`() {
+        val allCloudy = List(10) { Condition.CLOUDY }
+        assertEquals(Condition.CLOUDY, ConsensusBlender.voteCondition(allCloudy, precipMm = 0.0, stationSaturated = true))
+    }
+
     /** Models that all agree on a trace and nothing else to fall back on keep their own answer. */
     @Test
     fun `with no dry model to fall back on the wet labels stand`() {

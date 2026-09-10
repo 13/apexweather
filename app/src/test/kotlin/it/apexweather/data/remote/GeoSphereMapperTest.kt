@@ -107,4 +107,45 @@ class GeoSphereMapperTest {
         assertEquals(0.0, result.hourly[1].precipMm, 1e-9)
         assertEquals(2.0, result.hourly[2].precipMm, 1e-9)
     }
+    /**
+     * AROME publishes no weather code and this mapper had no fog branch at all, so one of the app's
+     * ten sources could never vote for fog however saturated the air it was forecasting. The dataset
+     * offers nineteen parameters and not one of them is visibility, so saturation under a covered
+     * sky stands in for it.
+     */
+    @Test
+    fun `saturated air under a covered sky is fog`() {
+        assertEquals(
+            Condition.FOG,
+            GeoSphereMapper.condition(precipMm = 0.0, snowMm = 0.0, tcc = 1.0, tempC = 9.0, cape = 0.0, rh2m = 99.0),
+        )
+    }
+
+    /** Rain saturates the air too, and rain is the more useful thing to be told. */
+    @Test
+    fun `saturated air with rain in it is rain`() {
+        assertEquals(
+            Condition.RAIN,
+            GeoSphereMapper.condition(precipMm = 1.2, snowMm = 0.0, tcc = 1.0, tempC = 9.0, cape = 0.0, rh2m = 100.0),
+        )
+    }
+
+    /** Saturated but with a broken sky is not cloud on the ground. */
+    @Test
+    fun `saturated air under a clearing sky is not fog`() {
+        assertEquals(
+            Condition.PARTLY_CLOUDY,
+            GeoSphereMapper.condition(precipMm = 0.0, snowMm = 0.0, tcc = 0.5, tempC = 9.0, cape = 0.0, rh2m = 99.0),
+        )
+    }
+
+    /** Humidity missing for an hour must not read as saturated. */
+    @Test
+    fun `no humidity is not fog`() {
+        assertEquals(
+            Condition.CLOUDY,
+            GeoSphereMapper.condition(precipMm = 0.0, snowMm = 0.0, tcc = 1.0, tempC = 9.0, cape = 0.0, rh2m = null),
+        )
+    }
+
 }

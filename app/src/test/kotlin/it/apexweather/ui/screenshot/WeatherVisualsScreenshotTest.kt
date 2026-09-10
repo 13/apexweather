@@ -143,7 +143,13 @@ class WeatherVisualsScreenshotTest {
         }
     }
 
-    /** The sky gradients, which are chosen by the same conditions and are just as easy to break. */
+    /**
+     * The sky gradients, which are chosen by the same conditions and are just as easy to break.
+     *
+     * Fog is here because nothing else covers it. Its palette and its drifting bands are built and
+     * are almost never reached in this valley — no model voted fog on 2026-09-10 while it was foggy
+     * outside — so a golden is the only thing that would notice them rotting.
+     */
     @Test
     fun `the sky palettes`() {
         captureRoboImage("src/test/screenshots/sky_palettes.png") {
@@ -151,7 +157,7 @@ class WeatherVisualsScreenshotTest {
                 SunPhase.entries.forEach { phase ->
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(phase.name, color = Color.White, fontSize = 9.sp, modifier = Modifier.width(70.dp))
-                        listOf(Condition.CLEAR, Condition.CLOUDY, Condition.RAIN, Condition.SNOW, Condition.THUNDERSTORM).forEach { condition ->
+                        listOf(Condition.CLEAR, Condition.CLOUDY, Condition.FOG, Condition.RAIN, Condition.SNOW, Condition.THUNDERSTORM).forEach { condition ->
                             Swatch(condition, phase)
                         }
                     }

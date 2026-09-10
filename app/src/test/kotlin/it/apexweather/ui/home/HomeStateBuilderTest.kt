@@ -210,4 +210,55 @@ class HomeStateBuilderTest {
         assertNull(s.station)
         assertEquals("Sterzing", s.place?.nameDe)
     }
+    /**
+     * The evening of 2026-09-10: foggy in Dorf Tirol, and not one of the ten sources said so. The
+     * station said 100 % relative humidity, which is the only ground truth the app has about the
+     * sky — so where a source *has* forecast fog, a saturated station is enough to carry it, for
+     * this hour and no other.
+     */
+    @Test
+    fun `a saturated station lets the current hour read as fog`() {
+        val t0 = hour(0)
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 15.0, condition = Condition.CLOUDY))),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(point(0, 15.0, condition = Condition.CLOUDY))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 15.0, condition = Condition.CLOUDY))),
+            Source.GEOSPHERE_AROME to forecast(Source.GEOSPHERE_AROME, listOf(point(0, 15.0, condition = Condition.FOG))),
+        )
+        val snapshot = WeatherSnapshot.EMPTY.copy(
+            forecasts = f,
+            observation = StationObservation(
+                stationName = "Meran", time = t0, tempC = 15.9, humidityPct = 100, windKmh = null,
+                windDir = null, gustKmh = null, precipTodayMm = null, pressureHpa = null,
+            ),
+        )
+        val consensus = ConsensusBlender().blend(f)
+        val state = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), consensus, t0)
+
+        assertEquals(Condition.FOG, state.heroCondition)
+        // and the strip's first column is the same hour, so it must not disagree with the hero
+        assertEquals(Condition.FOG, state.upcomingHours.first().condition)
+    }
+
+    /** A dry station leaves the vote exactly as the models cast it. */
+    @Test
+    fun `without a saturated station one fog source does not carry the hour`() {
+        val t0 = hour(0)
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 15.0, condition = Condition.CLOUDY))),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(point(0, 15.0, condition = Condition.CLOUDY))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 15.0, condition = Condition.CLOUDY))),
+            Source.GEOSPHERE_AROME to forecast(Source.GEOSPHERE_AROME, listOf(point(0, 15.0, condition = Condition.FOG))),
+        )
+        val snapshot = WeatherSnapshot.EMPTY.copy(
+            forecasts = f,
+            observation = StationObservation(
+                stationName = "Meran", time = t0, tempC = 15.9, humidityPct = 60, windKmh = null,
+                windDir = null, gustKmh = null, precipTodayMm = null, pressureHpa = null,
+            ),
+        )
+        val state = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), ConsensusBlender().blend(f), t0)
+        assertEquals(Condition.CLOUDY, state.heroCondition)
+    }
+
 }
