@@ -138,7 +138,7 @@ class HomeScreenTest {
         val observed = state.copy(
             station = it.apexweather.domain.model.StationObservation(
                 stationName = "Meran", time = t0, tempC = 18.8, humidityPct = 100, windKmh = 13.0,
-                windDir = "SW", gustKmh = 35.0, precipMm = 1.2, pressureHpa = 1013.0,
+                windDir = "SW", gustKmh = 35.0, precipTodayMm = 1.2, pressureHpa = 1013.0,
             ),
         )
         rule.setContent { ApexTheme { HomeContent(observed, onRefresh = {}, onOpenBulletin = {}) } }

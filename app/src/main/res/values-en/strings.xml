@@ -149,7 +149,7 @@
     <string name="station_gust">Gusts</string>
     <string name="station_humidity">Humidity</string>
     <string name="station_pressure">Pressure</string>
-    <string name="station_precip">Precipitation</string>
+    <string name="station_precip">Precipitation today</string>
     <string name="station_wind_with_dir">%1$s from %2$s</string>
     <string name="unit_percent">%1$d %%</string>
     <string name="unit_hpa">%1$s hPa</string>

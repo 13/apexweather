@@ -115,4 +115,18 @@ class SiagMappersTest {
         assertEquals(4.3, "4.3".siagDouble()!!, 0.0)
         assertTrue(null.siagDouble() == null)
     }
+
+    /**
+     * The station's precipitation figure is a daily accumulation, not a rate. Checked against the
+     * live network on 2026-09-10: every one of the 57 stations reported a non-zero value between 8
+     * and 27.6 mm at the same timestamp, which no hourly reading would do. Reading it as "it is
+     * raining now" is the obvious mistake, so the field and the label both say what it is.
+     */
+    @Test
+    fun `the station's precipitation is the total so far today`() {
+        val resp = Fixtures.json.decodeFromString(SiagStationsResponse.serializer(), Fixtures.read("siag_stations.json"))
+        val obs = SiagMappers.mapObservation(resp, MERAN)!!
+        val row = resp.rows.first { it.code == MERAN.code }
+        assertEquals(row.n.siagDouble(), obs.precipTodayMm)
+    }
 }

@@ -152,7 +152,7 @@
     <string name="station_gust">Böen</string>
     <string name="station_humidity">Luftfeuchte</string>
     <string name="station_pressure">Luftdruck</string>
-    <string name="station_precip">Niederschlag</string>
+    <string name="station_precip">Niederschlag heute</string>
     <string name="station_wind_with_dir">%1$s aus %2$s</string>
     <string name="unit_percent">%1$d %%</string>
     <string name="unit_hpa">%1$s hPa</string>

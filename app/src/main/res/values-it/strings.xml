@@ -154,7 +154,7 @@
     <string name="station_gust">Raffiche</string>
     <string name="station_humidity">Umidità</string>
     <string name="station_pressure">Pressione</string>
-    <string name="station_precip">Precipitazioni</string>
+    <string name="station_precip">Precipitazioni oggi</string>
     <string name="station_wind_with_dir">%1$s da %2$s</string>
     <string name="unit_percent">%1$d %%</string>
     <string name="unit_hpa">%1$s hPa</string>

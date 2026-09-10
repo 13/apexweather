@@ -230,7 +230,7 @@ object SiagMappers {
             windKmh = msToKmh(row.ff.siagDouble()),
             windDir = row.dd?.takeIf { it != "--" },
             gustKmh = msToKmh(row.wMax.siagDouble()),
-            precipMm = row.n.siagDouble(),
+            precipTodayMm = row.n.siagDouble(),
             pressureHpa = row.p.siagDouble(),
         )
     }
