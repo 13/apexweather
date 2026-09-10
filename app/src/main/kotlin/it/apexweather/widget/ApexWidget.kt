@@ -45,6 +45,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import it.apexweather.MainActivity
 import it.apexweather.R
+import it.apexweather.data.PlaceCatalogue
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
 import it.apexweather.domain.ConsensusBlender
@@ -61,6 +62,7 @@ import java.util.Locale
 interface WidgetEntryPoint {
     fun repository(): WeatherRepository
     fun settings(): SettingsRepository
+    fun places(): PlaceCatalogue
     fun blender(): ConsensusBlender
     fun clock(): Clock
 }
@@ -72,8 +74,11 @@ class ApexWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val ep = EntryPointAccessors.fromApplication(context, WidgetEntryPoint::class.java)
         val settings = ep.settings().settings.first()
-        val snapshot = ep.repository().snapshot(settings.bulletinLanguage(Locale.getDefault().toLanguageTag())).first()
-        val home = HomeStateBuilder.build(snapshot, settings, ep.blender().blend(snapshot.forecastsForBlend), ep.clock().instant())
+        // The widget shows the place the app is showing; there is only ever one.
+        val place = ep.places().byIstat(settings.placeIstat)
+            ?: checkNotNull(ep.places().byIstat(SouthTyrol.DEFAULT_ISTAT))
+        val snapshot = ep.repository().snapshot(place, settings.bulletinLanguage(Locale.getDefault().toLanguageTag())).first()
+        val home = HomeStateBuilder.build(place, snapshot, settings, ep.blender().blend(snapshot.forecastsForBlend), ep.clock().instant())
         // The widget renders outside the composition, so it resolves the reader's language and
         // clock preference from its own context.
         val formats = Formats(

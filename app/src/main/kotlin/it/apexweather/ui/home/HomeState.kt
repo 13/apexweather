@@ -1,6 +1,7 @@
 package it.apexweather.ui.home
 
 import it.apexweather.data.AppSettings
+import it.apexweather.domain.Place
 import it.apexweather.domain.SkyPalette
 import it.apexweather.domain.SkyPaletteSelector
 import it.apexweather.domain.SunPhase
@@ -24,6 +25,8 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 data class HomeUiState(
+    /** Which municipality all of this is about. Null only before the catalogue has been read. */
+    val place: Place? = null,
     val loading: Boolean = true,
     val refreshing: Boolean = false,
     val isEmpty: Boolean = true,
@@ -92,7 +95,7 @@ object HomeStateBuilder {
      */
     const val MAX_DAYS = 14
 
-    fun build(snapshot: WeatherSnapshot, settings: AppSettings, consensus: ConsensusForecast, now: Instant): HomeUiState {
+    fun build(place: Place?, snapshot: WeatherSnapshot, settings: AppSettings, consensus: ConsensusForecast, now: Instant): HomeUiState {
         val thisHour = now.truncatedTo(ChronoUnit.HOURS)
         val upcoming = consensus.hourly.filter { !it.time.isBefore(thisHour) }.take(48)
         val current = upcoming.firstOrNull()
@@ -107,6 +110,7 @@ object HomeStateBuilder {
         val heroCondition = current?.condition ?: Condition.PARTLY_CLOUDY
         val isEmpty = current == null && obs == null && snapshot.bulletin == null
         return HomeUiState(
+            place = place,
             loading = false,
             isEmpty = isEmpty,
             now = now,

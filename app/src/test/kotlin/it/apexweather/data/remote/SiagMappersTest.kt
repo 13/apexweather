@@ -2,6 +2,7 @@ package it.apexweather.data.remote
 
 import it.apexweather.Fixtures
 import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.NearbyStation
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.SiagCodes
 import it.apexweather.domain.model.Source
@@ -19,6 +20,10 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 
 class SiagMappersTest {
+
+    /** Dorf Tirol's station, as the generated catalogue has it. */
+    private val MERAN = NearbyStation("23200MS", "Meran", 46.688, 11.1366, 330, 1.53)
+
     private val fetchedAt = Instant.parse("2026-09-08T14:00:00Z")
 
     @Test
@@ -77,10 +82,10 @@ class SiagMappersTest {
     }
 
     @Test
-    fun `observation picks the Meran station and converts units`() {
+    fun `observation picks the place's own station and converts units`() {
         val resp = Fixtures.json.decodeFromString(SiagStationsResponse.serializer(), Fixtures.read("siag_stations.json"))
-        val obs = SiagMappers.mapObservation(resp)!!
-        val row = resp.rows.first { it.code == DorfTirol.STATION_CODE }
+        val obs = SiagMappers.mapObservation(resp, MERAN)!!
+        val row = resp.rows.first { it.code == MERAN.code }
         assertEquals(row.name, obs.stationName)
         assertEquals(row.t.siagDouble(), obs.tempC)
         row.ff.siagDouble()?.let { assertEquals(it * 3.6, obs.windKmh!!, 0.051) } ?: assertNull(obs.windKmh) // km/h rounded to 1 decimal
@@ -88,8 +93,21 @@ class SiagMappersTest {
     }
 
     @Test
-    fun `observation is null when station missing`() {
-        assertNull(SiagMappers.mapObservation(SiagStationsResponse(rows = emptyList())))
+    fun `observation is null when there is no station at all`() {
+        assertNull(SiagMappers.mapObservation(SiagStationsResponse(rows = emptyList()), MERAN))
+    }
+
+    /**
+     * A station decommissioned since the catalogue was generated must not take the whole observation
+     * with it: the nearest one still reporting stands in.
+     */
+    @Test
+    fun `a station that has gone falls back to the nearest one still reporting`() {
+        val resp = Fixtures.json.decodeFromString(SiagStationsResponse.serializer(), Fixtures.read("siag_stations.json"))
+        val vanished = NearbyStation("00000XX", "Nowhere", MERAN.lat, MERAN.lon, 330, 0.0)
+        val obs = SiagMappers.mapObservation(resp, vanished)
+        assertNotNull(obs)
+        assertEquals("Meran", obs!!.stationName)
     }
 
     @Test

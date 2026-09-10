@@ -9,6 +9,7 @@ import it.apexweather.domain.T0
 import it.apexweather.domain.forecast
 import it.apexweather.domain.hour
 import it.apexweather.domain.point
+import it.apexweather.domain.DORF_TIROL
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.ConsensusForecast
 import it.apexweather.domain.model.DailyPoint
@@ -34,7 +35,7 @@ class HomeStateBuilderTest {
 
     @Test
     fun `hero uses consensus hour when no fresh observation`() {
-        val s = HomeStateBuilder.build(snapshot, AppSettings(), consensus, now = hour(3).plusSeconds(600))
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), consensus, now = hour(3).plusSeconds(600))
         assertEquals(consensus.hourly[3].tempC, s.heroTempC!!, 0.0)
         assertEquals(Condition.RAIN, s.heroCondition)
         assertEquals(ParticleKind.RAIN, s.palette.particle)
@@ -61,8 +62,7 @@ class HomeStateBuilderTest {
      */
     @Test
     fun `a fresh observation is carried up to the village before it becomes the hero`() {
-        val s = HomeStateBuilder.build(
-            snapshot.copy(observation = observation(25.5), stationReference = reference(warmerBy = 2.0)),
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(observation = observation(25.5), stationReference = reference(warmerBy = 2.0)),
             AppSettings(), consensus, now = hour(3).plusSeconds(600),
         )
         assertEquals(23.5, s.heroTempC!!, 1e-9)
@@ -77,8 +77,7 @@ class HomeStateBuilderTest {
      */
     @Test
     fun `without a reference the consensus is preferred to an uncorrected station reading`() {
-        val s = HomeStateBuilder.build(
-            snapshot.copy(observation = observation(25.5)),
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(observation = observation(25.5)),
             AppSettings(), consensus, now = hour(3).plusSeconds(600),
         )
         assertEquals(consensus.hourly[3].tempC, s.heroTempC!!, 0.0)
@@ -91,8 +90,7 @@ class HomeStateBuilderTest {
     /** A reference from days ago describes air that has since moved on. */
     @Test
     fun `a stale reference is not used to correct anything`() {
-        val s = HomeStateBuilder.build(
-            snapshot.copy(observation = observation(25.5), stationReference = reference(2.0, fetchedAt = hour(3).minusSeconds(48 * 3600))),
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(observation = observation(25.5), stationReference = reference(2.0, fetchedAt = hour(3).minusSeconds(48 * 3600))),
             AppSettings(), consensus, now = hour(3).plusSeconds(600),
         )
         assertNull(s.heroAdjustmentC)
@@ -101,14 +99,14 @@ class HomeStateBuilderTest {
     @Test
     fun `stale observation is ignored`() {
         val obs = StationObservation("Meran", hour(0), tempC = 25.5, null, null, null, null, null, null)
-        val s = HomeStateBuilder.build(snapshot.copy(observation = obs), AppSettings(), consensus, now = hour(0).plus(Duration.ofMinutes(91)))
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(observation = obs), AppSettings(), consensus, now = hour(0).plus(Duration.ofMinutes(91)))
         assertNull(s.observation)
         assertEquals(consensus.hourly[1].tempC, s.heroTempC!!, 0.0)
     }
 
     @Test
     fun `upcoming hours start at the current hour and cap at 48`() {
-        val s = HomeStateBuilder.build(snapshot, AppSettings(), consensus, now = hour(5).plusSeconds(1))
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), consensus, now = hour(5).plusSeconds(1))
         assertEquals(hour(5), s.upcomingHours.first().time)
         assertTrue(s.upcomingHours.size <= 48)
     }
@@ -123,8 +121,7 @@ class HomeStateBuilderTest {
             sunset = d.atTime(20, 0).atZone(ROME).toInstant(),
         )
         val withSun = forecasts.mapValues { (_, f) -> f.copy(daily = listOf(daily(today), daily(tomorrow))) }
-        val s = HomeStateBuilder.build(
-            WeatherSnapshot.EMPTY.copy(forecasts = withSun), AppSettings(), blender.blend(withSun), now = hour(3),
+        val s = HomeStateBuilder.build(DORF_TIROL, WeatherSnapshot.EMPTY.copy(forecasts = withSun), AppSettings(), blender.blend(withSun), now = hour(3),
         )
         assertEquals(SunPhase.DAY, s.phaseAt(tomorrow.atTime(12, 0).atZone(ROME).toInstant()))
         assertEquals(SunPhase.NIGHT, s.phaseAt(tomorrow.atTime(3, 0).atZone(ROME).toInstant()))
@@ -140,7 +137,7 @@ class HomeStateBuilderTest {
             Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 168).map { point(it, 10.0 + it % 10) }),
             Source.ECMWF to forecast(Source.ECMWF, (0 until 168).map { point(it, 12.0 + it % 10) }),
         )
-        val s = HomeStateBuilder.build(WeatherSnapshot.EMPTY.copy(forecasts = week), AppSettings(), blender.blend(week), now = hour(0))
+        val s = HomeStateBuilder.build(DORF_TIROL, WeatherSnapshot.EMPTY.copy(forecasts = week), AppSettings(), blender.blend(week), now = hour(0))
 
         val dayFive = hour(24 * 5).atZone(ROME).toLocalDate()
         assertTrue(s.upcomingHours.none { it.time.atZone(ROME).toLocalDate() == dayFive })
@@ -150,13 +147,13 @@ class HomeStateBuilderTest {
 
     @Test
     fun `a day no model reaches has no per-source rows`() {
-        val s = HomeStateBuilder.build(snapshot, AppSettings(), consensus, now = hour(0))
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), consensus, now = hour(0))
         assertTrue(s.sourcesForDay(hour(0).atZone(ROME).toLocalDate().plusDays(30)).isEmpty())
     }
 
     @Test
     fun `empty snapshot gives empty state with default palette`() {
-        val s = HomeStateBuilder.build(WeatherSnapshot.EMPTY, AppSettings(), consensus = ConsensusForecast.EMPTY, now = hour(0))
+        val s = HomeStateBuilder.build(DORF_TIROL, WeatherSnapshot.EMPTY, AppSettings(), consensus = ConsensusForecast.EMPTY, now = hour(0))
         assertTrue(s.isEmpty)
         assertNull(s.heroTempC)
     }
@@ -172,8 +169,7 @@ class HomeStateBuilderTest {
             stationName = "Meran", time = hour(0), tempC = 18.0, humidityPct = 60, windKmh = 5.0,
             windDir = "NO", gustKmh = 12.0, precipMm = 0.0, pressureHpa = 1013.0,
         )
-        val s = HomeStateBuilder.build(
-            snapshot.copy(observation = old), AppSettings(), consensus,
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(observation = old), AppSettings(), consensus,
             now = hour(0).plusSeconds(4 * 3600),
         )
         assertNull("the hero must not quote a four-hour-old reading", s.observation)
@@ -187,12 +183,28 @@ class HomeStateBuilderTest {
             level = it.apexweather.domain.model.WarningLevel.ORANGE, areaDesc = "Trentino Alto Adige",
             onset = hour(0), expires = hour(6), headline = "Orange Rain Warning",
         )
-        val s = HomeStateBuilder.build(snapshot.copy(warnings = listOf(w)), AppSettings(), consensus, now = hour(0))
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(warnings = listOf(w)), AppSettings(), consensus, now = hour(0))
         assertEquals(listOf(w), s.warnings)
     }
 
     @Test
     fun `the day list runs two weeks rather than one`() {
         assertEquals(14, HomeStateBuilder.MAX_DAYS)
+    }
+
+    /**
+     * Not every municipality has a thermometer near enough to speak for it. Such a place shows the
+     * consensus, which is already at the right altitude, and says nothing about a measurement.
+     */
+    @Test
+    fun `a place with no station shows the consensus and claims no measurement`() {
+        val s = HomeStateBuilder.build(
+            it.apexweather.domain.STERZING, snapshot.copy(observation = null, stationReference = null),
+            AppSettings(), consensus, now = hour(3).plusSeconds(600),
+        )
+        assertEquals(consensus.hourly[3].tempC, s.heroTempC!!, 0.0)
+        assertNull(s.heroAdjustmentC)
+        assertNull(s.station)
+        assertEquals("Sterzing", s.place?.nameDe)
     }
 }

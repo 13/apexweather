@@ -6,14 +6,16 @@ import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
-@Entity(tableName = "source_forecast")
+@Entity(tableName = "source_forecast", primaryKeys = ["place", "source"])
 data class SourceForecastEntity(
-    @PrimaryKey val source: String,
+    val place: String,
+    val source: String,
     val json: String?,
     val issuedAtMs: Long?,
     val fetchedAtMs: Long?,
@@ -21,9 +23,11 @@ data class SourceForecastEntity(
     val lastErrorAtMs: Long?,
 )
 
-@Entity(tableName = "bulletin")
+/** Keyed by district, not by place: one document serves every municipality in the valley. */
+@Entity(tableName = "bulletin", primaryKeys = ["district", "language"])
 data class BulletinEntity(
-    @PrimaryKey val language: String,
+    val district: Int,
+    val language: String,
     val json: String?,
     val fetchedAtMs: Long?,
     val lastError: String?,
@@ -32,7 +36,7 @@ data class BulletinEntity(
 
 @Entity(tableName = "observation")
 data class ObservationEntity(
-    @PrimaryKey val id: Int = 0,
+    @PrimaryKey val place: String,
     val json: String?,
     val fetchedAtMs: Long?,
     val lastError: String?,
@@ -42,6 +46,7 @@ data class ObservationEntity(
 /** The civil-protection warnings for the province, as one JSON list in a single row. */
 @Entity(tableName = "warnings")
 data class WarningsEntity(
+    /** A single row: MeteoAlarm publishes for the region, not for a place inside it. */
     @PrimaryKey val id: Int = 0,
     val json: String?,
     val fetchedAtMs: Long?,
@@ -52,7 +57,7 @@ data class WarningsEntity(
 /** The models' temperature down at the weather station, used to carry its reading up to the village. */
 @Entity(tableName = "station_reference")
 data class StationReferenceEntity(
-    @PrimaryKey val id: Int = 0,
+    @PrimaryKey val place: String,
     val json: String?,
     val fetchedAtMs: Long?,
     val lastError: String?,
@@ -61,7 +66,7 @@ data class StationReferenceEntity(
 
 @Entity(tableName = "refresh_meta")
 data class RefreshMetaEntity(
-    @PrimaryKey val id: Int = 0,
+    @PrimaryKey val place: String,
     val lastSuccessMs: Long?,
     val lastAttemptMs: Long?,
     val lastAttemptFailed: Boolean,
@@ -69,28 +74,49 @@ data class RefreshMetaEntity(
 
 @Dao
 interface WeatherDao {
-    @Query("SELECT * FROM source_forecast") fun forecasts(): Flow<List<SourceForecastEntity>>
-    @Query("SELECT * FROM source_forecast WHERE source = :source") suspend fun forecastOnce(source: String): SourceForecastEntity?
+    @Query("SELECT * FROM source_forecast WHERE place = :place") fun forecasts(place: String): Flow<List<SourceForecastEntity>>
+    @Query("SELECT * FROM source_forecast WHERE place = :place AND source = :source") suspend fun forecastOnce(place: String, source: String): SourceForecastEntity?
     @Upsert suspend fun upsertForecast(entity: SourceForecastEntity)
 
-    @Query("SELECT * FROM bulletin WHERE language = :language") fun bulletin(language: String): Flow<BulletinEntity?>
-    @Query("SELECT * FROM bulletin WHERE language = :language") suspend fun bulletinOnce(language: String): BulletinEntity?
+    @Query("SELECT * FROM bulletin WHERE district = :district AND language = :language") fun bulletin(district: Int, language: String): Flow<BulletinEntity?>
+    @Query("SELECT * FROM bulletin WHERE district = :district AND language = :language") suspend fun bulletinOnce(district: Int, language: String): BulletinEntity?
     @Upsert suspend fun upsertBulletin(entity: BulletinEntity)
 
-    @Query("SELECT * FROM observation WHERE id = 0") fun observation(): Flow<ObservationEntity?>
-    @Query("SELECT * FROM observation WHERE id = 0") suspend fun observationOnce(): ObservationEntity?
+    @Query("SELECT * FROM observation WHERE place = :place") fun observation(place: String): Flow<ObservationEntity?>
+    @Query("SELECT * FROM observation WHERE place = :place") suspend fun observationOnce(place: String): ObservationEntity?
     @Upsert suspend fun upsertObservation(entity: ObservationEntity)
+
+    @Query("SELECT * FROM station_reference WHERE place = :place") fun stationReference(place: String): Flow<StationReferenceEntity?>
+    @Query("SELECT * FROM station_reference WHERE place = :place") suspend fun stationReferenceOnce(place: String): StationReferenceEntity?
+    @Upsert suspend fun upsertStationReference(entity: StationReferenceEntity)
 
     @Query("SELECT * FROM warnings WHERE id = 0") fun warnings(): Flow<WarningsEntity?>
     @Query("SELECT * FROM warnings WHERE id = 0") suspend fun warningsOnce(): WarningsEntity?
     @Upsert suspend fun upsertWarnings(entity: WarningsEntity)
 
-    @Query("SELECT * FROM station_reference WHERE id = 0") fun stationReference(): Flow<StationReferenceEntity?>
-    @Query("SELECT * FROM station_reference WHERE id = 0") suspend fun stationReferenceOnce(): StationReferenceEntity?
-    @Upsert suspend fun upsertStationReference(entity: StationReferenceEntity)
-
-    @Query("SELECT * FROM refresh_meta WHERE id = 0") fun meta(): Flow<RefreshMetaEntity?>
+    @Query("SELECT * FROM refresh_meta WHERE place = :place") fun meta(place: String): Flow<RefreshMetaEntity?>
+    @Query("SELECT * FROM refresh_meta WHERE place = :place") suspend fun metaOnce(place: String): RefreshMetaEntity?
     @Upsert suspend fun upsertMeta(entity: RefreshMetaEntity)
+
+    /**
+     * Drops everything belonging to a place the reader has not been near lately. Called after a
+     * refresh that produced something, never after one that failed — a failed refresh must not
+     * clear the cache it was supposed to top up.
+     */
+    @Transaction
+    suspend fun evict(keepPlaces: List<String>, keepDistricts: List<Int>) {
+        evictForecasts(keepPlaces)
+        evictObservations(keepPlaces)
+        evictStationReferences(keepPlaces)
+        evictMeta(keepPlaces)
+        evictBulletins(keepDistricts)
+    }
+
+    @Query("DELETE FROM source_forecast WHERE place NOT IN (:keep)") suspend fun evictForecasts(keep: List<String>)
+    @Query("DELETE FROM observation WHERE place NOT IN (:keep)") suspend fun evictObservations(keep: List<String>)
+    @Query("DELETE FROM station_reference WHERE place NOT IN (:keep)") suspend fun evictStationReferences(keep: List<String>)
+    @Query("DELETE FROM refresh_meta WHERE place NOT IN (:keep)") suspend fun evictMeta(keep: List<String>)
+    @Query("DELETE FROM bulletin WHERE district NOT IN (:keep)") suspend fun evictBulletins(keep: List<Int>)
 }
 
 @Database(
@@ -98,10 +124,10 @@ interface WeatherDao {
         SourceForecastEntity::class, BulletinEntity::class, ObservationEntity::class,
         WarningsEntity::class, StationReferenceEntity::class, RefreshMetaEntity::class,
     ],
-    // 2: the warnings table. 3: the station reference. Every row here is a cache of something
-    // fetchable, so a schema change drops the database rather than migrating it; the next refresh
-    // fills it again.
-    version = 3,
+    // 2: the warnings table. 3: the station reference. 4: every row keyed by the place it belongs
+    // to, and the bulletin by its district. Every row here is a cache of something fetchable, so a
+    // schema change drops the database rather than migrating it; the next refresh fills it again.
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

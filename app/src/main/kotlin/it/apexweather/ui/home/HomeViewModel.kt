@@ -6,8 +6,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.apexweather.data.AppSettings
+import it.apexweather.data.PlaceCatalogue
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
+import it.apexweather.domain.Place
 import it.apexweather.ui.WeatherStateHolder
 import it.apexweather.widget.ApexWidget
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +32,7 @@ class HomeViewModel @Inject constructor(
     private val holder: WeatherStateHolder,
     private val repository: WeatherRepository,
     private val settingsRepository: SettingsRepository,
+    private val catalogue: PlaceCatalogue,
     private val clock: Clock,
 ) : ViewModel() {
 
@@ -45,17 +49,31 @@ class HomeViewModel @Inject constructor(
             // that placeholder has no lastSuccessfulRefresh — so this guard used to see a null age every
             // time and refetch all seven models on every single cold start.
             val weather = holder.awaitCached()
+            val place = weather.place ?: return@launch
             if (shouldRefreshOnOpen(weather.snapshot.lastSuccessfulRefresh, clock.instant())) {
-                doRefresh(weather.settings.bulletinLanguage(systemTag()))
+                doRefresh(place, weather.settings.bulletinLanguage(systemTag()), keep(weather.settings, place))
             }
         }
     }
 
     fun refresh() {
         viewModelScope.launch {
-            doRefresh(settingsRepository.settings.first().bulletinLanguage(systemTag()))
+            val place = holder.awaitCached().place ?: return@launch
+            val settings = settingsRepository.settings.first()
+            doRefresh(place, settings.bulletinLanguage(systemTag()), keep(settings, place))
         }
     }
+
+    /**
+     * The places whose cache survives this refresh: the ones the reader has been near lately, and
+     * the place being refreshed, which on a first run is not yet in that list.
+     */
+    private suspend fun keep(settings: AppSettings, place: Place): List<String> =
+        (listOf(place.istat) + settings.recentPlaces).distinct()
+
+    /** The districts those places read their bulletin from, so eviction keeps exactly those. */
+    private suspend fun districtsOf(places: List<String>, current: Place): List<Int> =
+        (places.mapNotNull { catalogue.byIstat(it)?.district } + current.district).distinct()
 
     private fun systemTag() = Locale.getDefault().toLanguageTag()
 
@@ -71,11 +89,11 @@ class HomeViewModel @Inject constructor(
             lastSuccessfulRefresh == null || Duration.between(lastSuccessfulRefresh, now) > STALE_ON_OPEN
     }
 
-    private suspend fun doRefresh(language: String) {
+    private suspend fun doRefresh(place: Place, language: String, keepPlaces: List<String>) {
         if (refreshing.value) return
         refreshing.value = true
         try {
-            repository.refresh(language)
+            repository.refresh(place, language, keepPlaces, districtsOf(keepPlaces, place))
             runCatching { ApexWidget().updateAll(context) }
         } finally {
             refreshing.value = false

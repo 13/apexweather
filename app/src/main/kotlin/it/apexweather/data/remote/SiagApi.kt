@@ -1,6 +1,7 @@
 package it.apexweather.data.remote
 
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.NearbyStation
+import it.apexweather.domain.distanceKm
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.SiagCodes
 import it.apexweather.domain.model.Bulletin
@@ -27,7 +28,7 @@ import kotlin.math.roundToInt
 /** api-weather.services.siag.it — the backend of the official "Wetter Südtirol" app. */
 interface SiagApi {
     @GET("api/v2/municipality/MunicipalityBulletin/{istat}")
-    suspend fun municipality(@Path("istat") istat: String = DorfTirol.ISTAT): KmosResponse
+    suspend fun municipality(@Path("istat") istat: String): KmosResponse
 
     @GET("api/v2/station")
     suspend fun stations(@Query("categoryId") categoryId: Int = 1, @Query("visibility") visibility: Int = 11): SiagStationsResponse
@@ -41,7 +42,7 @@ interface OdhApi {
     suspend fun weather(@Query("language") language: String): OdhWeatherResponse
 
     @GET("v1/Weather/District/{id}")
-    suspend fun district(@Path("id") id: Int = DorfTirol.DISTRICT_ID, @Query("language") language: String): OdhDistrictResponse
+    suspend fun district(@Path("id") id: Int, @Query("language") language: String): OdhDistrictResponse
 
     companion object { const val BASE_URL = "https://tourism.opendatahub.com/" }
 }
@@ -117,9 +118,23 @@ data class SiagStationRow(
     val wMax: String? = null,
     val n: String? = null,
     val lastUpdated: String? = null,
+    /** Comma-decimal strings, as everything numeric from this endpoint is. */
+    val latitude: String? = null,
+    val longitude: String? = null,
 )
 
 object SiagMappers {
+
+    private fun nearestTo(resp: SiagStationsResponse, station: NearbyStation): SiagStationRow? =
+        resp.rows
+            .mapNotNull { row ->
+                val lat = row.latitude.siagDouble() ?: return@mapNotNull null
+                val lon = row.longitude.siagDouble() ?: return@mapNotNull null
+                row to distanceKm(station.lat, station.lon, lat, lon)
+            }
+            .minByOrNull { it.second }
+            ?.first
+
 
     fun mapKmos(resp: KmosResponse, fetchedAt: Instant): SourceForecast {
         val m = resp.municipality
@@ -196,12 +211,19 @@ object SiagMappers {
         )
     }
 
-    fun mapObservation(resp: SiagStationsResponse): StationObservation? {
-        val row = resp.rows.firstOrNull { it.code == DorfTirol.STATION_CODE } ?: return null
+    /**
+     * The reading from the station a place was matched to.
+     *
+     * With a fallback to the nearest station that is still reporting: the catalogue precomputes
+     * which station speaks for a place, and a station decommissioned since then should cost a
+     * slightly more distant reading rather than the whole observation.
+     */
+    fun mapObservation(resp: SiagStationsResponse, station: NearbyStation): StationObservation? {
+        val row = resp.rows.firstOrNull { it.code == station.code } ?: nearestTo(resp, station) ?: return null
         val updated = row.lastUpdated ?: return null
         fun msToKmh(v: Double?) = v?.let { (it * 3.6 * 10).roundToInt() / 10.0 }
         return StationObservation(
-            stationName = row.name ?: "Meran",
+            stationName = row.name ?: station.name,
             time = LocalDateTime.parse(updated).atZone(SouthTyrol.ZONE).toInstant(),
             tempC = row.t.siagDouble(),
             humidityPct = row.rh.siagDouble()?.roundToInt(),

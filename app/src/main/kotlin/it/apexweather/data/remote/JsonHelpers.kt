@@ -26,5 +26,12 @@ internal fun parseLocal(s: String, zone: ZoneId): Instant = LocalDateTime.parse(
 /** "2026-09-08T06:00:00+02:00" or "2026-09-08T16:00+00:00". */
 internal fun parseOffset(s: String): Instant = OffsetDateTime.parse(s).toInstant()
 
-/** SIAG station strings: "31.1" or "--". */
-internal fun String?.siagDouble(): Double? = this?.trim()?.takeIf { it != "--" && it.isNotEmpty() }?.toDoubleOrNull()
+/**
+ * SIAG station strings: "31.1", or "--" where the sensor has nothing to say.
+ *
+ * The comma is not decoration: the measurements come back with a full stop but the station's own
+ * coordinates come back as "46,6880", and reading those as null quietly emptied the list the
+ * nearest-station fallback searches.
+ */
+internal fun String?.siagDouble(): Double? =
+    this?.trim()?.takeIf { it != "--" && it.isNotEmpty() }?.replace(',', '.')?.toDoubleOrNull()

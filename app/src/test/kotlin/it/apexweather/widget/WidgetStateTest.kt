@@ -7,6 +7,7 @@ import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.forecast
 import it.apexweather.domain.hour
 import it.apexweather.domain.point
+import it.apexweather.domain.DORF_TIROL
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.WeatherSnapshot
@@ -27,7 +28,7 @@ class WidgetStateTest {
     fun `builds temperature, six upcoming hours and icons`() {
         val f = mapOf(Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 24).map { point(it, 20.0 + it, condition = if (it < 3) Condition.RAIN else Condition.CLEAR) }))
         val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = f, lastSuccessfulRefresh = hour(0))
-        val home = HomeStateBuilder.build(snapshot, AppSettings(), ConsensusBlender().blend(f), hour(0).plusSeconds(30))
+        val home = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), ConsensusBlender().blend(f), hour(0).plusSeconds(30))
         val w = WidgetStateBuilder.build(home, SouthTyrol.ZONE, formats)
         assertTrue(w.hasData)
         assertEquals("20°", w.tempText)
@@ -51,7 +52,7 @@ class WidgetStateTest {
         val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = f, lastSuccessfulRefresh = hour(0))
         fun stale(hoursLater: Long) =
             WidgetStateBuilder.build(
-                HomeStateBuilder.build(snapshot, AppSettings(), ConsensusBlender().blend(f), hour(0).plusSeconds(hoursLater * 3600)),
+                HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), ConsensusBlender().blend(f), hour(0).plusSeconds(hoursLater * 3600)),
                 SouthTyrol.ZONE, formats,
             ).isStale
         assertFalse(stale(2))

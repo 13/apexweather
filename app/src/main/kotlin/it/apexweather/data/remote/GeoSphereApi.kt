@@ -1,7 +1,6 @@
 package it.apexweather.data.remote
 
 import it.apexweather.domain.DailyAggregator
-import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.HourlyPoint
@@ -19,7 +18,7 @@ import kotlin.math.sqrt
 interface GeoSphereApi {
     @GET("v1/timeseries/forecast/nwp-v1-1h-2500m")
     suspend fun forecast(
-        @Query("lat_lon") latLon: String = "${DorfTirol.LAT},${DorfTirol.LON}",
+        @Query("lat_lon") latLon: String,
         @Query("parameters") parameters: String = GeoSphereMapper.PARAMS,
     ): GeoSphereResponse
 

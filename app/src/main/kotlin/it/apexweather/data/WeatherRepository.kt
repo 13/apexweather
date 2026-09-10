@@ -26,8 +26,7 @@ import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.StationObservation
 import it.apexweather.domain.model.Warning
 import it.apexweather.domain.model.WeatherSnapshot
-import it.apexweather.domain.DorfTirol
-import it.apexweather.domain.SouthTyrol
+import it.apexweather.domain.Place
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -66,9 +65,12 @@ class WeatherRepository @Inject constructor(
     /** [combine] is typed only up to five flows, so the two single-row caches arrive as one. */
     private data class Sidecars(val warnings: WarningsEntity?, val reference: StationReferenceEntity?)
 
-    fun snapshot(language: String): Flow<WeatherSnapshot> {
-        val sidecars = combine(dao.warnings(), dao.stationReference(), ::Sidecars)
-        return combine(dao.forecasts(), dao.bulletin(language), dao.observation(), sidecars, dao.meta()) { rows, bulletinRow, obsRow, (warningRow, referenceRow), meta ->
+    fun snapshot(place: Place, language: String): Flow<WeatherSnapshot> {
+        val sidecars = combine(dao.warnings(), dao.stationReference(place.istat), ::Sidecars)
+        return combine(
+            dao.forecasts(place.istat), dao.bulletin(place.district, language),
+            dao.observation(place.istat), sidecars, dao.meta(place.istat),
+        ) { rows, bulletinRow, obsRow, (warningRow, referenceRow), meta ->
             val now = clock.instant()
             val forecasts = mutableMapOf<Source, SourceForecast>()
             val status = mutableMapOf<Source, SourceStatus>()
@@ -131,7 +133,12 @@ class WeatherRepository @Inject constructor(
      * on the caller's — the five Open-Meteo model mappings, and seven JSON encodings of ~168 hourly
      * points each. On the main thread that is visible jank on launch and on every pull to refresh.
      */
-    suspend fun refresh(language: String): RefreshResult = withContext(Dispatchers.Default) {
+    suspend fun refresh(
+        place: Place,
+        language: String,
+        keepPlaces: List<String> = listOf(place.istat),
+        keepDistricts: List<Int> = listOf(place.district),
+    ): RefreshResult = withContext(Dispatchers.Default) {
         val now = clock.instant()
         // The blocks below run in parallel on whatever threads the network continuations resume on,
         // so the shared bookkeeping has to be synchronised.
@@ -186,52 +193,64 @@ class WeatherRepository @Inject constructor(
         supervisorScope {
             val om = async {
                 isolate("OPEN_METEO") {
-                    val mapped = attempt("OPEN_METEO") { OpenMeteoMapper.map(openMeteo.forecast(), now) }
+                    val mapped = attempt("OPEN_METEO") { OpenMeteoMapper.map(openMeteo.forecast(place.lat, place.lon), now) }
                     OpenMeteoMapper.MODELS.keys.forEach { source ->
-                        storeForecast(source, mapped?.get(source), failed["OPEN_METEO"], now)
+                        storeForecast(place, source, mapped?.get(source), failed["OPEN_METEO"], now)
                     }
                 }
             }
             val gs = async {
                 isolate("GEOSPHERE_AROME") {
-                    val fc = attempt("GEOSPHERE_AROME") { GeoSphereMapper.map(geoSphere.forecast(), now) }
-                    storeForecast(Source.GEOSPHERE_AROME, fc, failed["GEOSPHERE_AROME"], now)
+                    val fc = attempt("GEOSPHERE_AROME") { GeoSphereMapper.map(geoSphere.forecast("${'$'}{place.lat},${'$'}{place.lon}"), now) }
+                    storeForecast(place, Source.GEOSPHERE_AROME, fc, failed["GEOSPHERE_AROME"], now)
                 }
             }
             val km = async {
                 isolate("SIAG_KMOS") {
-                    val fc = attempt("SIAG_KMOS") { SiagMappers.mapKmos(siag.municipality(), now) }
-                    storeForecast(Source.SIAG_KMOS, fc, failed["SIAG_KMOS"], now)
+                    val fc = attempt("SIAG_KMOS") { SiagMappers.mapKmos(siag.municipality(place.istat), now) }
+                    storeForecast(place, Source.SIAG_KMOS, fc, failed["SIAG_KMOS"], now)
                 }
             }
             val bl = async {
                 isolate("SIAG_BULLETIN") {
-                    val b = attempt("SIAG_BULLETIN") { SiagMappers.mapBulletin(odh.weather(language), odh.district(language = language), language) }
-                    val prev = dao.bulletinOnce(language)
+                    val b = attempt("SIAG_BULLETIN") {
+                        SiagMappers.mapBulletin(odh.weather(language), odh.district(place.district, language), language)
+                    }
+                    val prev = dao.bulletinOnce(place.district, language)
                     dao.upsertBulletin(
-                        if (b != null) BulletinEntity(language, json.encodeToString(Bulletin.serializer(), b), now.toEpochMilli(), null, null)
-                        else BulletinEntity(language, prev?.json, prev?.fetchedAtMs, failed["SIAG_BULLETIN"], now.toEpochMilli())
+                        if (b != null) BulletinEntity(place.district, language, json.encodeToString(Bulletin.serializer(), b), now.toEpochMilli(), null, null)
+                        else BulletinEntity(place.district, language, prev?.json, prev?.fetchedAtMs, failed["SIAG_BULLETIN"], now.toEpochMilli())
                     )
                 }
             }
+            // Both station halves only run where the place has a station near enough to speak for
+            // it. A place without one is not a failure; it simply has nothing to measure.
             val ob = async {
-                isolate("SIAG_STATION") {
-                    val o = attempt("SIAG_STATION") { SiagMappers.mapObservation(siag.stations()) ?: error("station ${DorfTirol.STATION_CODE} not in response") }
-                    val prev = dao.observationOnce()
-                    dao.upsertObservation(
-                        if (o != null) ObservationEntity(0, json.encodeToString(StationObservation.serializer(), o), now.toEpochMilli(), null, null)
-                        else ObservationEntity(0, prev?.json, prev?.fetchedAtMs, failed["SIAG_STATION"], now.toEpochMilli())
-                    )
+                place.station?.let { station ->
+                    isolate("SIAG_STATION") {
+                        val o = attempt("SIAG_STATION") {
+                            SiagMappers.mapObservation(siag.stations(), station) ?: error("station ${'$'}{station.code} not in response")
+                        }
+                        val prev = dao.observationOnce(place.istat)
+                        dao.upsertObservation(
+                            if (o != null) ObservationEntity(place.istat, json.encodeToString(StationObservation.serializer(), o), now.toEpochMilli(), null, null)
+                            else ObservationEntity(place.istat, prev?.json, prev?.fetchedAtMs, failed["SIAG_STATION"], now.toEpochMilli())
+                        )
+                    }
                 }
             }
             val sr = async {
-                isolate("OPEN_METEO_STATION") {
-                    val ref = attempt("OPEN_METEO_STATION") { OpenMeteoStationMapper.map(openMeteo.stationForecast(), now) }
-                    val prev = dao.stationReferenceOnce()
-                    dao.upsertStationReference(
-                        if (ref != null) StationReferenceEntity(0, json.encodeToString(StationReference.serializer(), ref), now.toEpochMilli(), null, null)
-                        else StationReferenceEntity(0, prev?.json, prev?.fetchedAtMs, failed["OPEN_METEO_STATION"], now.toEpochMilli())
-                    )
+                place.station?.let { station ->
+                    isolate("OPEN_METEO_STATION") {
+                        val ref = attempt("OPEN_METEO_STATION") {
+                            OpenMeteoStationMapper.map(openMeteo.stationForecast(station.lat, station.lon, station.altitudeM), now)
+                        }
+                        val prev = dao.stationReferenceOnce(place.istat)
+                        dao.upsertStationReference(
+                            if (ref != null) StationReferenceEntity(place.istat, json.encodeToString(StationReference.serializer(), ref), now.toEpochMilli(), null, null)
+                            else StationReferenceEntity(place.istat, prev?.json, prev?.fetchedAtMs, failed["OPEN_METEO_STATION"], now.toEpochMilli())
+                        )
+                    }
                 }
             }
             val wa = async {
@@ -250,20 +269,25 @@ class WeatherRepository @Inject constructor(
         val result = RefreshResult(succeeded.toList(), LinkedHashMap(failed))
         dao.upsertMeta(
             RefreshMetaEntity(
-                lastSuccessMs = if (succeeded.isNotEmpty()) now.toEpochMilli() else previousSuccessMs(),
+                place = place.istat,
+                lastSuccessMs = if (succeeded.isNotEmpty()) now.toEpochMilli() else previousSuccessMs(place),
                 lastAttemptMs = now.toEpochMilli(),
                 lastAttemptFailed = result.allFailed,
             )
         )
+        // Only after a refresh that produced something: a failed one must not clear the cache it
+        // was supposed to top up.
+        if (result.succeeded.isNotEmpty()) dao.evict(keepPlaces, keepDistricts)
         result
     }
 
-    private suspend fun previousSuccessMs(): Long? = dao.meta().first()?.lastSuccessMs
+    private suspend fun previousSuccessMs(place: Place): Long? = dao.metaOnce(place.istat)?.lastSuccessMs
 
-    private suspend fun storeForecast(source: Source, fc: SourceForecast?, error: String?, now: Instant) {
-        val prev = dao.forecastOnce(source.name)
+    private suspend fun storeForecast(place: Place, source: Source, fc: SourceForecast?, error: String?, now: Instant) {
+        val prev = dao.forecastOnce(place.istat, source.name)
         dao.upsertForecast(
             if (fc != null) SourceForecastEntity(
+                place = place.istat,
                 source = source.name,
                 json = json.encodeToString(SourceForecast.serializer(), fc),
                 issuedAtMs = fc.issuedAt.toEpochMilli(),
@@ -271,6 +295,7 @@ class WeatherRepository @Inject constructor(
                 lastError = null,
                 lastErrorAtMs = null,
             ) else SourceForecastEntity(
+                place = place.istat,
                 source = source.name,
                 json = prev?.json,
                 issuedAtMs = prev?.issuedAtMs,

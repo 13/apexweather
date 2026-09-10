@@ -61,7 +61,9 @@ internal class FakeGeoSphere(var fail: Boolean = false, var cancel: Boolean = fa
 internal class FakeSiag(var fail: Boolean = false) : SiagApi {
     override suspend fun municipality(istat: String): KmosResponse {
         if (fail) throw IOException("siag down")
-        return Fixtures.json.decodeFromString(KmosResponse.serializer(), Fixtures.read("siag_kmos.json"))
+        // Two municipalities, so a test can prove one place's cache is not the other's.
+        val fixture = if (istat == "021101") "siag_kmos.json" else "siag_kmos_sterzing.json"
+        return Fixtures.json.decodeFromString(KmosResponse.serializer(), Fixtures.read(fixture))
     }
     override suspend fun stations(categoryId: Int, visibility: Int): SiagStationsResponse {
         if (fail) throw IOException("siag down")

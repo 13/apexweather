@@ -1,10 +1,13 @@
 package it.apexweather.ui
 
 import it.apexweather.data.AppSettings
+import it.apexweather.data.PlaceCatalogue
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
 import it.apexweather.di.ApplicationScope
 import it.apexweather.domain.ConsensusBlender
+import it.apexweather.domain.Place
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.ConsensusForecast
 import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.ui.home.HomeStateBuilder
@@ -13,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -31,6 +35,7 @@ import javax.inject.Singleton
 
 /** Everything the screens derive their state from, blended once. */
 data class WeatherState(
+    val place: Place? = null,
     val snapshot: WeatherSnapshot = WeatherSnapshot.EMPTY,
     val settings: AppSettings = AppSettings(),
     val consensus: ConsensusForecast = ConsensusForecast.EMPTY,
@@ -53,6 +58,7 @@ data class WeatherState(
 class WeatherStateHolder @Inject constructor(
     repository: WeatherRepository,
     settingsRepository: SettingsRepository,
+    private val catalogue: PlaceCatalogue,
     blender: ConsensusBlender,
     private val clock: Clock,
     @ApplicationScope scope: CoroutineScope,
@@ -64,11 +70,29 @@ class WeatherStateHolder @Inject constructor(
 
     private val settings = settingsRepository.settings
 
-    /** Re-subscribes to the repository only when the bulletin language changes, not on every settings edit. */
-    private val snapshots = settings
-        .map { it.bulletinLanguage(Locale.getDefault().toLanguageTag()) }
+    /**
+     * The chosen place, or the default where the stored code names nothing the catalogue knows —
+     * an app with no place at all has nothing to show, and a code can outlive a municipal merger.
+     */
+    private val place: Flow<Place> = settings
+        .map { it.placeIstat }
         .distinctUntilChanged()
-        .flatMapLatest { language -> repository.snapshot(language) }
+        .map { istat ->
+            catalogue.byIstat(istat) ?: checkNotNull(catalogue.byIstat(SouthTyrol.DEFAULT_ISTAT)) {
+                "the catalogue is missing its own default place"
+            }
+        }
+
+    /**
+     * Re-subscribes to the repository when the place or the bulletin language changes, and on
+     * nothing else: flipping the animations switch must not re-blend seven models.
+     */
+    private val snapshots = combine(
+        place,
+        settings.map { it.bulletinLanguage(Locale.getDefault().toLanguageTag()) },
+    ) { p, language -> p to language }
+        .distinctUntilChanged()
+        .flatMapLatest { (p, language) -> repository.snapshot(p, language).map { p to it } }
 
     /**
      * The blend depends on the forecasts and nothing else, so it sits on its own upstream. Folding it
@@ -78,12 +102,12 @@ class WeatherStateHolder @Inject constructor(
     private val blended = snapshots
         // forecastsForBlend, not forecasts: a model run that has gone stale stays visible per source
         // with its age beside it, but is kept out of the number the app leads with.
-        .map { it to blender.blend(it.forecastsForBlend) }
+        .map { (place, snapshot) -> Triple(place, snapshot, blender.blend(snapshot.forecastsForBlend)) }
         .flowOn(Dispatchers.Default)
 
     val weather: StateFlow<WeatherState> =
-        combine(blended, settings, minuteTick) { (snapshot, consensus), settings, _ ->
-            WeatherState(snapshot, settings, consensus, clock.instant())
+        combine(blended, settings, minuteTick) { (place, snapshot, consensus), settings, _ ->
+            WeatherState(place, snapshot, settings, consensus, clock.instant())
         }.flowOn(Dispatchers.Default).stateIn(scope, SharingStarted.WhileSubscribed(5_000), initial)
 
     /**
@@ -94,7 +118,7 @@ class WeatherStateHolder @Inject constructor(
 
     /** The home screen's state, built once and shared with the sky behind every tab. */
     val home: StateFlow<HomeUiState> =
-        weather.map { HomeStateBuilder.build(it.snapshot, it.settings, it.consensus, it.now) }
+        weather.map { HomeStateBuilder.build(it.place, it.snapshot, it.settings, it.consensus, it.now) }
             .flowOn(Dispatchers.Default)
             .stateIn(scope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 }

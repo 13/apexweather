@@ -2,7 +2,6 @@ package it.apexweather.data.remote
 
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.DailyAggregator
-import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.WmoCodes
 import it.apexweather.domain.model.Condition
@@ -21,8 +20,8 @@ import java.time.LocalDate
 interface OpenMeteoApi {
     @GET("v1/forecast")
     suspend fun forecast(
-        @Query("latitude") latitude: Double = DorfTirol.LAT,
-        @Query("longitude") longitude: Double = DorfTirol.LON,
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double,
         @Query("timezone") timezone: String = SouthTyrol.ZONE.id,
         @Query("forecast_days") forecastDays: Int = OpenMeteoMapper.FORECAST_DAYS,
         @Query("models") models: String = OpenMeteoMapper.MODELS.values.joinToString(","),
@@ -40,9 +39,9 @@ interface OpenMeteoApi {
      */
     @GET("v1/forecast")
     suspend fun stationForecast(
-        @Query("latitude") latitude: Double = DorfTirol.STATION_LAT,
-        @Query("longitude") longitude: Double = DorfTirol.STATION_LON,
-        @Query("elevation") elevation: Int = DorfTirol.STATION_ALTITUDE_M,
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double,
+        @Query("elevation") elevation: Int,
         @Query("timezone") timezone: String = SouthTyrol.ZONE.id,
         @Query("past_days") pastDays: Int = 1,
         @Query("forecast_days") forecastDays: Int = 1,
