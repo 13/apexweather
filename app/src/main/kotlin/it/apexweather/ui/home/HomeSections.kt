@@ -86,16 +86,24 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
                 tint = Color.White.copy(alpha = 0.75f), modifier = Modifier.size(18.dp),
             )
         }
-        Text(
-            text = state.heroTempC?.let { Format.temp(it, formats) } ?: "–",
-            style = MaterialTheme.typography.displayLarge,
-            color = Color.White,
-            modifier = Modifier.testTag("hero_temp"),
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(painterResource(state.heroCondition.iconRes(state.phase)), contentDescription = null, tint = Color.fromArgb(state.palette.accent), modifier = Modifier.size(30.dp))
-            Text(state.heroCondition.label(), style = MaterialTheme.typography.headlineMedium, color = Color.White)
+        // The number and the picture are the two halves of one answer, so they share a line. The
+        // icon carries no content description: the word for the condition is directly underneath,
+        // and describing the icon as well would have a screen reader say the weather twice.
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = state.heroTempC?.let { Format.temp(it, formats) } ?: "–",
+                style = MaterialTheme.typography.displayLarge,
+                color = Color.White,
+                modifier = Modifier.testTag("hero_temp"),
+            )
+            Icon(
+                painterResource(state.heroCondition.iconRes(state.phase)),
+                contentDescription = null,
+                tint = Color.fromArgb(state.palette.accent),
+                modifier = Modifier.size(56.dp).testTag("hero_condition_icon"),
+            )
         }
+        Text(state.heroCondition.label(), style = MaterialTheme.typography.headlineMedium, color = Color.White)
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             state.heroFeelsLikeC?.let { Text(stringResource(R.string.feels_like, Format.temp(it, formats)), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f)) }

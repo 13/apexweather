@@ -87,6 +87,20 @@ class HomeScreenTest {
         rule.onNodeWithTag("agreement_badge").assertIsDisplayed()
     }
 
+    /**
+     * The icon shares the temperature's line rather than sitting a line below it: the degrees and the
+     * picture are the two halves of one answer. Geometry, not wording — CI's emulator is en-US.
+     */
+    @Test
+    fun heroConditionIconSitsBesideTheTemperature() {
+        rule.setContent { ApexTheme { HomeContent(state, onRefresh = {}, onOpenBulletin = {}) } }
+        val temp = rule.onNodeWithTag("hero_temp").fetchSemanticsNode().boundsInRoot
+        val icon = rule.onNodeWithTag("hero_condition_icon").fetchSemanticsNode().boundsInRoot
+        assertTrue("icon should start right of the number: icon=$icon temp=$temp", icon.left >= temp.right)
+        assertTrue("icon should sit on the number's line: icon=$icon temp=$temp",
+            icon.center.y > temp.top && icon.center.y < temp.bottom)
+    }
+
     @Test
     fun hourlyStripScrollsAndOpensDetailSheet() {
         rule.setContent { ApexTheme { HomeContent(state, onRefresh = {}, onOpenBulletin = {}) } }
