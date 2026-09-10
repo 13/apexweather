@@ -40,6 +40,9 @@ echo "== installing the release build on $SERIAL"
 
 echo "== launching"
 "${ADB[@]}" shell am start -W -n "$PKG/.MainActivity" >/dev/null
+# Captured now, while the app is certainly up: every check below that reads the log has to be able
+# to tell this app's output from the rest of the device's.
+PID=$("${ADB[@]}" shell pidof "$PKG" | tr -d '\r' | awk '{print $1}')
 # Long enough for the launch refresh to reach all five upstreams and come back through every mapper.
 sleep 20
 
@@ -86,6 +89,14 @@ if ! "${ADB[@]}" shell pidof "$PKG" >/dev/null; then
 fi
 
 "${ADB[@]}" logcat -d > "$OUT/logcat.txt" 2>/dev/null || true
+# Only this app's own lines. The full log is full of other processes' problems — a CI emulator's
+# Settings app throws ClassNotFoundException on its own slice controllers at boot — and a smoke test
+# that greps all of it reports someone else's trouble as ours.
+if [ -n "$PID" ]; then
+    "${ADB[@]}" logcat -d --pid="$PID" > "$OUT/logcat-app.txt" 2>/dev/null || true
+else
+    : > "$OUT/logcat-app.txt"
+fi
 
 CRASHES=$(grep -E "FATAL EXCEPTION|AndroidRuntime: Process: $PKG" "$OUT/logcat.txt" || true)
 if [ -n "$CRASHES" ]; then
@@ -95,8 +106,9 @@ if [ -n "$CRASHES" ]; then
 fi
 
 # ClassNotFound and NoSuchMethod are how a missing keep rule reports itself, and this app catches
-# enough of its own exceptions that one can be logged without taking the process down.
-MISSING=$(grep -E "ClassNotFoundException|NoSuchMethodError|NoSuchFieldError|SerializationException" "$OUT/logcat.txt" || true)
+# enough of its own exceptions that one can be logged without taking the process down. Scoped to the
+# app's own pid, for the reason above.
+MISSING=$(grep -E "ClassNotFoundException|NoSuchMethodError|NoSuchFieldError|SerializationException" "$OUT/logcat-app.txt" || true)
 if [ -n "$MISSING" ]; then
     echo "FAIL: something R8 removed or renamed was looked up at runtime"
     echo "$MISSING" | head -40
