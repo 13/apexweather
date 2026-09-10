@@ -2,6 +2,7 @@ package it.apexweather.ui.map
 
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,9 +22,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -42,6 +45,9 @@ import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.GlassCard
 import it.apexweather.ui.common.LocalFormats
 import org.osmdroid.config.Configuration
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -65,7 +71,12 @@ fun MapContent(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int) -> Un
     Box(Modifier.fillMaxSize().testTag("map_screen")) {
         RadarMap(state, Modifier.fillMaxSize())
         Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp),
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                // Heavy rain is drawn in yellow and red, and white text on it is unreadable. The
+                // attribution is not decoration — both upstreams require it — so it gets a ground
+                // of its own rather than relying on whatever the radar happens to paint.
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC0B1020))))
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (state.radarUnavailable) {
@@ -81,7 +92,7 @@ fun MapContent(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int) -> Un
             // terms each ask for their credit to be visible where the map is, not behind a toggle.
             Text(
                 stringResource(R.string.map_attribution),
-                style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f),
                 modifier = Modifier.testTag("map_attribution"),
             )
         }
@@ -129,6 +140,9 @@ private fun RadarMap(state: MapUiState, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // The frame's provider, so a pan or a zoom can fetch that frame's own zoom-7 tiles again.
+    val radarProvider = remember { mutableStateOf<MapTileProviderBasic?>(null) }
+
     val mapView = remember {
         // A unique user agent is what the OpenStreetMap tile policy asks for first; the okhttp
         // default is named there as one that gets blocked. The cache goes in the app's own cache
@@ -160,6 +174,19 @@ private fun RadarMap(state: MapUiState, modifier: Modifier = Modifier) {
                     },
                 ),
             )
+            addMapListener(object : MapListener {
+                // A pan or a zoom brings different ground into view, and its zoom-7 tiles have to be
+                // fetched before the rain over it can be drawn.
+                override fun onScroll(event: ScrollEvent?): Boolean {
+                    radarProvider.value?.fetchRadarParents(this@apply)
+                    return false
+                }
+
+                override fun onZoom(event: ZoomEvent?): Boolean {
+                    radarProvider.value?.fetchRadarParents(this@apply)
+                    return false
+                }
+            })
             minZoomLevel = MIN_ZOOM
             // Past this the z7 radar is upscaled past the point of meaning anything.
             maxZoomLevel = MAX_ZOOM
@@ -194,6 +221,9 @@ private fun RadarMap(state: MapUiState, modifier: Modifier = Modifier) {
                         Marker(map).apply {
                             position = point
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            // osmdroid pops an empty speech bubble on a tap otherwise; the place
+                            // name is already on the home screen and there is nothing to say here.
+                            infoWindow = null
                         },
                     )
                 }
@@ -202,11 +232,20 @@ private fun RadarMap(state: MapUiState, modifier: Modifier = Modifier) {
             // and overlays left behind would stack every frame on top of the last.
             map.overlays.filterIsInstance<TilesOverlay>().forEach { map.overlays.remove(it) }
             state.frame?.let { frame ->
+                val provider = MapTileProviderBasic(map.context, RadarTileSource(frame)).apply {
+                    // A standalone provider has a handler of its own, and nothing tells the map when
+                    // one of its tiles arrives. Without this the radar appears only after the reader
+                    // happens to pan, because a pan is what forces the redraw.
+                    setTileRequestCompleteHandler(map.tileRequestCompleteHandler)
+                }
                 map.overlays.add(
                     0,
-                    TilesOverlay(MapTileProviderBasic(map.context, RadarTileSource(frame)), map.context)
+                    TilesOverlay(provider, map.context)
                         .apply { loadingBackgroundColor = android.graphics.Color.TRANSPARENT },
                 )
+                // Without this the map draws no rain at all above zoom 7; see fetchRadarParents.
+                provider.fetchRadarParents(map)
+                radarProvider.value = provider
             }
             map.invalidate()
         },
@@ -215,4 +254,4 @@ private fun RadarMap(state: MapUiState, modifier: Modifier = Modifier) {
 
 private const val MIN_ZOOM = 6.0
 private const val MAX_ZOOM = 11.0
-private const val START_ZOOM = 8.5
+private const val START_ZOOM = 9.5

@@ -110,7 +110,10 @@ fun ApexApp() {
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                NavigationBar(containerColor = Color(0x59000000), tonalElevation = 0.dp) {
+                // Nearly opaque, so it carries white labels over anything behind it. It used to be
+                // 0x59, which was fine over the sky gradient and unreadable the moment the map put
+                // yellow and red radar underneath it.
+                NavigationBar(containerColor = Color(0xE6000000), tonalElevation = 0.dp) {
                     val items = listOf(
                         NavItem(HomeRoute, "home", R.string.nav_home, Icons.Rounded.Home),
                         // Second in the bar: after today's weather, where the rain is now is
