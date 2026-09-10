@@ -15,9 +15,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,9 +55,32 @@ import java.time.Instant
  * painted in MeteoAlarm's own colour for the level rather than in the sky palette, because that
  * colour is the one piece of the warning a reader already knows how to read.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WarningSection(warnings: List<Warning>, now: Instant, onClick: () -> Unit) {
+fun WarningSection(warnings: List<Warning>, now: Instant, onDismiss: (Warning) -> Unit, onClick: () -> Unit) {
     val top = warnings.firstOrNull() ?: return
+    // Keyed on the warning so the swipe state does not survive into whichever warning takes its
+    // place — without the key, dismissing one leaves the next already swiped away.
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            val going = value != SwipeToDismissBoxValue.Settled
+            if (going) onDismiss(top)
+            going
+        },
+    )
+    androidx.compose.runtime.key(top.identifier) {
+        SwipeToDismissBox(
+            state = dismissState,
+            backgroundContent = {},
+            modifier = Modifier.padding(horizontal = 16.dp),
+        ) {
+            WarningCard(top, warnings.size, now, onClick)
+        }
+    }
+}
+
+@Composable
+private fun WarningCard(top: Warning, total: Int, now: Instant, onClick: () -> Unit) {
     val level = top.level.color
     val typeLabel = top.type.label()
     val levelLabel = top.level.label()
@@ -58,10 +88,10 @@ fun WarningSection(warnings: List<Warning>, now: Instant, onClick: () -> Unit) {
     // The card merges its children, so this one string is everything a screen reader will hear —
     // including that there are more warnings behind it, which is otherwise only visible.
     val spoken = stringResource(R.string.warn_desc, typeLabel, levelLabel, window) +
-        if (warnings.size > 1) ", " + pluralStringResource(R.plurals.warn_more, warnings.size - 1, warnings.size - 1) else ""
+        if (total > 1) ", " + pluralStringResource(R.plurals.warn_more, total - 1, total - 1) else ""
 
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+        Modifier.fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
             .background(level.copy(alpha = 0.20f))
             .border(BorderStroke(1.dp, level.copy(alpha = 0.55f)), MaterialTheme.shapes.medium)
@@ -89,10 +119,10 @@ fun WarningSection(warnings: List<Warning>, now: Instant, onClick: () -> Unit) {
             stringResource(R.string.warn_area, top.areaDesc),
             style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.65f),
         )
-        if (warnings.size > 1) {
+        if (total > 1) {
             Spacer(Modifier.height(6.dp))
             Text(
-                pluralStringResource(R.plurals.warn_more, warnings.size - 1, warnings.size - 1),
+                pluralStringResource(R.plurals.warn_more, total - 1, total - 1),
                 style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.8f),
                 modifier = Modifier.testTag("warning_more"),
             )
@@ -102,7 +132,13 @@ fun WarningSection(warnings: List<Warning>, now: Instant, onClick: () -> Unit) {
 
 /** Every warning in force, for the sheet the card opens. */
 @Composable
-fun WarningDetail(warnings: List<Warning>, now: Instant) {
+fun WarningDetail(
+    warnings: List<Warning>,
+    now: Instant,
+    isDismissed: (Warning) -> Boolean = { false },
+    onDismiss: (Warning) -> Unit = {},
+    onRestore: (Warning) -> Unit = {},
+) {
     // ModalBottomSheet scrolls nothing by itself, and a bad day in the mountains can put four or
     // five warnings in force at once; without this the last of them would simply be unreachable.
     Column(
@@ -115,22 +151,46 @@ fun WarningDetail(warnings: List<Warning>, now: Instant) {
         )
         Spacer(Modifier.height(12.dp))
         warnings.forEachIndexed { i, w ->
+            // A dismissed warning is dimmed, not removed: waving it away should stop it shouting on
+            // the home screen, not put it beyond reach of the reader who wants to look again.
+            val dismissed = isDismissed(w)
+            val fade = if (dismissed) 0.45f else 1f
             Row(
                 Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag("warning_row_$i"),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Filled.Warning, contentDescription = null, tint = w.level.color, modifier = Modifier.size(20.dp))
-                Column {
+                Icon(
+                    Icons.Filled.Warning, contentDescription = null,
+                    tint = w.level.color.copy(alpha = fade), modifier = Modifier.size(20.dp),
+                )
+                Column(Modifier.weight(1f)) {
                     Text(
                         stringResource(R.string.warn_headline, w.type.label(), w.level.label()),
-                        style = MaterialTheme.typography.bodyLarge, color = Color.White,
+                        style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = fade),
                     )
                     Text(
                         warningWindow(w, now),
-                        style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f * fade),
                     )
                     // The feed's own English wording, kept verbatim so the reader can see the source's words.
-                    Text(w.headline, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.55f))
+                    Text(w.headline, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.55f * fade))
+                    if (dismissed) {
+                        Text(
+                            stringResource(R.string.warn_dismissed),
+                            style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f),
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = { if (dismissed) onRestore(w) else onDismiss(w) },
+                    modifier = Modifier.testTag(if (dismissed) "warning_restore_$i" else "warning_dismiss_$i"),
+                ) {
+                    Icon(
+                        if (dismissed) Icons.Filled.Visibility else Icons.Filled.Close,
+                        contentDescription = stringResource(if (dismissed) R.string.warn_restore else R.string.warn_dismiss),
+                        tint = Color.White.copy(alpha = 0.8f),
+                    )
                 }
             }
         }

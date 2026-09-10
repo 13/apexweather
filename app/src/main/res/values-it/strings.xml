@@ -209,4 +209,9 @@
     <string name="district_5">Alta Valle Isarco</string>
     <string name="district_6">Val Pusteria</string>
     <string name="district_7">Ladinia – Dolomiti</string>
+
+    <!-- Mettere da parte un'allerta: sparisce dalla schermata, resta nell'elenco. -->
+    <string name="warn_dismiss">Nascondi allerta</string>
+    <string name="warn_restore">Mostra di nuovo</string>
+    <string name="warn_dismissed">Nascosta</string>
 </resources>

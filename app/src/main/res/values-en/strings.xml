@@ -204,4 +204,9 @@
     <string name="district_5">Wipptal</string>
     <string name="district_6">Pustertal</string>
     <string name="district_7">Ladinia – Dolomites</string>
+
+    <!-- Waving a warning away. It stops shouting on the home screen; the sheet still lists it. -->
+    <string name="warn_dismiss">Dismiss warning</string>
+    <string name="warn_restore">Show again</string>
+    <string name="warn_dismissed">Dismissed</string>
 </resources>
