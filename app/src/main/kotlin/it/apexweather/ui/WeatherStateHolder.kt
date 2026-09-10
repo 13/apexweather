@@ -105,7 +105,7 @@ class WeatherStateHolder @Inject constructor(
     private val blended = snapshots
         // forecastsForBlend, not forecasts: a model run that has gone stale stays visible per source
         // with its age beside it, but is kept out of the number the app leads with.
-        .map { (place, snapshot) -> Triple(place, snapshot, blender.blend(snapshot.forecastsForBlend, snapshot.modelBias, clock.instant())) }
+        .map { (place, snapshot) -> Triple(place, snapshot, blender.blend(snapshot.forecastsForBlend, snapshot.modelBias, clock.instant(), snapshot.ensemble)) }
         .flowOn(Dispatchers.Default)
 
     val weather: StateFlow<WeatherState> =

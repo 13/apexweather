@@ -143,7 +143,8 @@ object HomeStateBuilder {
             heroAdjustmentC = adjustment?.takeIf { heroFromStation != null },
             heroFeelsLikeC = current?.feelsLikeC,
             heroCondition = heroCondition,
-            bandHalfWidth = current?.let { (it.tempMaxC - it.tempMinC) / 2.0 },
+            // The ensemble's own spread where it reaches this hour, the models' disagreement otherwise.
+            bandHalfWidth = current?.let { it.ensembleHalfWidthC ?: (it.tempMaxC - it.tempMinC) / 2.0 },
             currentHour = current,
             observation = obs?.takeIf { heroFromStation != null },
             station = snapshot.observation,

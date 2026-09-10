@@ -64,6 +64,16 @@ data class StationReferenceEntity(
     val lastErrorAtMs: Long?,
 )
 
+/** ICON-D2's ensemble spread for this place: how uncertain the forecast is, hour by hour. */
+@Entity(tableName = "ensemble")
+data class EnsembleEntity(
+    @PrimaryKey val place: String,
+    val json: String?,
+    val fetchedAtMs: Long?,
+    val lastError: String?,
+    val lastErrorAtMs: Long?,
+)
+
 /**
  * One hour of ground truth: what the station read, and what each model said it would read.
  *
@@ -110,6 +120,10 @@ interface WeatherDao {
     @Query("SELECT * FROM warnings WHERE id = 0") suspend fun warningsOnce(): WarningsEntity?
     @Upsert suspend fun upsertWarnings(entity: WarningsEntity)
 
+    @Query("SELECT * FROM ensemble WHERE place = :place") fun ensemble(place: String): Flow<EnsembleEntity?>
+    @Query("SELECT * FROM ensemble WHERE place = :place") suspend fun ensembleOnce(place: String): EnsembleEntity?
+    @Upsert suspend fun upsertEnsemble(entity: EnsembleEntity)
+
     @Query("SELECT * FROM station_history WHERE place = :place AND hourEpoch >= :since ORDER BY hourEpoch")
     fun stationHistory(place: String, since: Long): Flow<List<StationHistoryEntity>>
     @Upsert suspend fun upsertStationHistory(entity: StationHistoryEntity)
@@ -131,6 +145,7 @@ interface WeatherDao {
         evictStationReferences(keepPlaces)
         evictMeta(keepPlaces)
         evictStationHistory(keepPlaces)
+        evictEnsembles(keepPlaces)
         evictBulletins(keepDistricts)
     }
 
@@ -139,19 +154,21 @@ interface WeatherDao {
     @Query("DELETE FROM station_reference WHERE place NOT IN (:keep)") suspend fun evictStationReferences(keep: List<String>)
     @Query("DELETE FROM refresh_meta WHERE place NOT IN (:keep)") suspend fun evictMeta(keep: List<String>)
     @Query("DELETE FROM station_history WHERE place NOT IN (:keep)") suspend fun evictStationHistory(keep: List<String>)
+    @Query("DELETE FROM ensemble WHERE place NOT IN (:keep)") suspend fun evictEnsembles(keep: List<String>)
     @Query("DELETE FROM bulletin WHERE district NOT IN (:keep)") suspend fun evictBulletins(keep: List<Int>)
 }
 
 @Database(
     entities = [
         SourceForecastEntity::class, BulletinEntity::class, ObservationEntity::class,
-        WarningsEntity::class, StationReferenceEntity::class, StationHistoryEntity::class,
+        WarningsEntity::class, StationReferenceEntity::class, StationHistoryEntity::class, EnsembleEntity::class,
         RefreshMetaEntity::class,
     ],
     // 2: the warnings table. 3: the station reference. 4: every row keyed by the place it belongs
     // to, and the bulletin by its district. Every row here is a cache of something fetchable, so a
     // schema change drops the database rather than migrating it; the next refresh fills it again.
-    version = 5,
+    // 6: the ensemble spread.
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

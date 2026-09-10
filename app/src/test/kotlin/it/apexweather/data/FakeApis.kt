@@ -1,6 +1,8 @@
 package it.apexweather.data
 
 import it.apexweather.Fixtures
+import it.apexweather.data.remote.EnsembleApi
+import it.apexweather.data.remote.EnsembleResponse
 import it.apexweather.data.remote.GeoSphereApi
 import it.apexweather.data.remote.GeoSphereResponse
 import it.apexweather.data.remote.KmosResponse
@@ -92,6 +94,15 @@ internal class FakeMeteoAlarm(var fail: Boolean = false) : MeteoAlarmApi {
     override suspend fun italy(): ResponseBody {
         if (fail) throw IOException("meteoalarm down")
         return Fixtures.read("meteoalarm_italy.xml").toResponseBody("application/atom+xml".toMediaType())
+    }
+}
+
+internal class FakeEnsemble(var fail: Boolean = false) : EnsembleApi {
+    override suspend fun forecast(
+        latitude: Double, longitude: Double, timezone: String, forecastDays: Int, models: String, hourly: String,
+    ): EnsembleResponse {
+        if (fail) throw IOException("ensemble down")
+        return Fixtures.json.decodeFromString(EnsembleResponse.serializer(), Fixtures.read("openmeteo_ensemble.json"))
     }
 }
 

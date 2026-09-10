@@ -184,6 +184,8 @@ data class WeatherSnapshot(
     val stationReference: it.apexweather.data.remote.StationReference?,
     /** How wrong each model has lately been at the station; empty until enough hours have accumulated. */
     val modelBias: Map<Source, Double>,
+    /** How far ICON-D2's ensemble members spread, which is uncertainty rather than disagreement. */
+    val ensemble: it.apexweather.data.remote.EnsembleSpread?,
     val status: Map<Source, SourceStatus>,
     val bulletinStatus: SourceStatus?,
     val observationStatus: SourceStatus?,
@@ -208,7 +210,12 @@ data class WeatherSnapshot(
     val forecastsForBlend: Map<Source, SourceForecast>
         get() = forecasts.filterKeys { status[it] is SourceStatus.Ok }.takeIf { it.isNotEmpty() } ?: forecasts
     companion object {
-        val EMPTY = WeatherSnapshot(emptyMap(), null, null, emptyList(), null, emptyMap(), emptyMap(), null, null, null, null, false)
+        val EMPTY = WeatherSnapshot(
+            forecasts = emptyMap(), bulletin = null, observation = null, warnings = emptyList(),
+            stationReference = null, modelBias = emptyMap(), ensemble = null, status = emptyMap(),
+            bulletinStatus = null, observationStatus = null, warningStatus = null,
+            lastSuccessfulRefresh = null, lastRefreshFailed = false,
+        )
     }
 }
 
@@ -226,6 +233,11 @@ data class ConsensusHour(
     val gustKmh: Double?,
     /** Median 0 °C isotherm across the models that publish one, in metres. */
     val freezingLevelM: Double?,
+    /**
+     * Half the ensemble's tenth-to-ninetieth percentile range, where one reaches this hour. This is
+     * uncertainty measured rather than inferred, and the badge prefers it to the model spread.
+     */
+    val ensembleHalfWidthC: Double? = null,
     val condition: Condition,
     val agreement: Float,
     val sourceCount: Int,

@@ -328,4 +328,42 @@ class ConsensusBlenderTest {
         )
         assertEquals(blender.blend(f).hourly.single().tempC, blender.blend(f, emptyMap(), T0).hourly.single().tempC, 0.0)
     }
+
+    private fun ensemble(halfWidth: Double, hours: Int = 24) = it.apexweather.data.remote.EnsembleSpread(
+        fetchedAt = T0, memberCount = 20,
+        halfWidthByEpochSecond = (0 until hours).associate { hour(it).epochSecond to halfWidth },
+    )
+
+    /**
+     * The models disagreeing by six degrees and an ensemble that is confident are different claims,
+     * and the badge should report the second where it exists.
+     */
+    @Test
+    fun `the ensemble's own spread is preferred to the models' disagreement`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 8.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 14.0))),
+        )
+        val without = blender.blend(f).hourly.single()
+        val with = blender.blend(f, emptyMap(), T0, ensemble(halfWidth = 0.5)).hourly.single()
+
+        assertNull(without.ensembleHalfWidthC)
+        assertEquals(0.5, with.ensembleHalfWidthC!!, 0.0)
+        // Six degrees apart, so the model spread reads as total disagreement; the ensemble does not.
+        assertTrue("agreement was ${without.agreement}", without.agreement < 0.1f)
+        assertTrue("agreement was ${with.agreement}", with.agreement > 0.7f)
+    }
+
+    /** An hour the ensemble does not reach falls back to the models, rather than to certainty. */
+    @Test
+    fun `beyond the ensemble's range the model spread is used again`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 48).map { point(it, 8.0) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 48).map { point(it, 14.0) }),
+        )
+        val hourly = blender.blend(f, emptyMap(), T0, ensemble(halfWidth = 0.5, hours = 24)).hourly
+        assertEquals(0.5, hourly.first { it.time == hour(5) }.ensembleHalfWidthC!!, 0.0)
+        assertNull(hourly.first { it.time == hour(40) }.ensembleHalfWidthC)
+        assertTrue(hourly.first { it.time == hour(40) }.agreement < 0.1f)
+    }
 }

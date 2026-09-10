@@ -59,12 +59,13 @@ class WeatherRepositoryTest {
     private val siag = FakeSiag()
     private val odh = FakeOdh()
     private val meteoAlarm = FakeMeteoAlarm()
+    private val ensemble = FakeEnsemble()
     private val clock = MutableClock(Instant.parse("2026-09-08T14:00:00Z"))
     private lateinit var repo: WeatherRepository
 
     @Before fun setUp() {
         db = AppDatabase.inMemory(ApplicationProvider.getApplicationContext())
-        repo = WeatherRepository(db.weatherDao(), openMeteo, geoSphere, siag, odh, meteoAlarm, Fixtures.json, clock)
+        repo = WeatherRepository(db.weatherDao(), openMeteo, geoSphere, siag, odh, meteoAlarm, ensemble, Fixtures.json, clock)
     }
 
     @After fun tearDown() = db.close()
@@ -108,7 +109,7 @@ class WeatherRepositoryTest {
     fun `all sources failing marks the refresh failed but keeps data`() = runTest {
         repo.refresh(DORF_TIROL, "de")
         val firstRefresh = clock.now
-        openMeteo.fail = true; geoSphere.fail = true; siag.fail = true; odh.fail = true; meteoAlarm.fail = true
+        openMeteo.fail = true; geoSphere.fail = true; siag.fail = true; odh.fail = true; meteoAlarm.fail = true; ensemble.fail = true
         clock.now = clock.now.plus(Duration.ofMinutes(30))
         val result = repo.refresh(DORF_TIROL, "de")
         assertTrue(result.succeeded.isEmpty())
@@ -125,7 +126,7 @@ class WeatherRepositoryTest {
     fun `a store failure is isolated and the refresh still records its meta`() = runTest {
         val failing = WeatherRepository(
             FailingStoreDao(db.weatherDao(), Source.GEOSPHERE_AROME.name),
-            openMeteo, geoSphere, siag, odh, meteoAlarm, Fixtures.json, clock,
+            openMeteo, geoSphere, siag, odh, meteoAlarm, ensemble, Fixtures.json, clock,
         )
         val result = failing.refresh(DORF_TIROL, "de")
         assertEquals("store: disk full", result.failed["GEOSPHERE_AROME"])

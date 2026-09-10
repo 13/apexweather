@@ -5,10 +5,14 @@ import it.apexweather.data.local.BulletinEntity
 import it.apexweather.data.local.ObservationEntity
 import it.apexweather.data.local.RefreshMetaEntity
 import it.apexweather.data.local.SourceForecastEntity
+import it.apexweather.data.local.EnsembleEntity
 import it.apexweather.data.local.StationHistoryEntity
 import it.apexweather.data.local.StationReferenceEntity
 import it.apexweather.data.local.WarningsEntity
 import it.apexweather.data.local.WeatherDao
+import it.apexweather.data.remote.EnsembleApi
+import it.apexweather.data.remote.EnsembleMapper
+import it.apexweather.data.remote.EnsembleSpread
 import it.apexweather.data.remote.GeoSphereApi
 import it.apexweather.data.remote.GeoSphereMapper
 import it.apexweather.data.remote.MeteoAlarmApi
@@ -65,6 +69,7 @@ class WeatherRepository @Inject constructor(
     private val siag: SiagApi,
     private val odh: OdhApi,
     private val meteoAlarm: MeteoAlarmApi,
+    private val ensembleApi: EnsembleApi,
     private val json: Json,
     private val clock: Clock,
 ) {
@@ -73,17 +78,19 @@ class WeatherRepository @Inject constructor(
         val warnings: WarningsEntity?,
         val reference: StationReferenceEntity?,
         val history: List<StationHistoryEntity>,
+        val ensemble: EnsembleEntity?,
     )
 
     fun snapshot(place: Place, language: String): Flow<WeatherSnapshot> {
         val historySince = clock.instant().minus(BiasCorrector.WINDOW).epochSecond
         val sidecars = combine(
-            dao.warnings(), dao.stationReference(place.istat), dao.stationHistory(place.istat, historySince), ::Sidecars,
+            dao.warnings(), dao.stationReference(place.istat),
+            dao.stationHistory(place.istat, historySince), dao.ensemble(place.istat), ::Sidecars,
         )
         return combine(
             dao.forecasts(place.istat), dao.bulletin(place.district, language),
             dao.observation(place.istat), sidecars, dao.meta(place.istat),
-        ) { rows, bulletinRow, obsRow, (warningRow, referenceRow, historyRows), meta ->
+        ) { rows, bulletinRow, obsRow, (warningRow, referenceRow, historyRows, ensembleRow), meta ->
             val now = clock.instant()
             val forecasts = mutableMapOf<Source, SourceForecast>()
             val status = mutableMapOf<Source, SourceStatus>()
@@ -124,6 +131,7 @@ class WeatherRepository @Inject constructor(
                 stationReference = reference,
                 // How wrong each model has lately been here; empty until enough hours have accumulated.
                 modelBias = BiasCorrector.biases(samples, now),
+                ensemble = ensembleRow?.json?.let { decode("ensemble", EnsembleSpread.serializer(), it) },
                 status = status,
                 bulletinStatus = bulletinRow?.let {
                     statusOf(bulletin != null, bulletin?.issuedAt, it.fetchedAtMs, it.lastError, it.lastErrorAtMs, Duration.ofHours(24), now)
@@ -273,6 +281,16 @@ class WeatherRepository @Inject constructor(
                     }
                 }
             }
+            val en = async {
+                isolate("ENSEMBLE") {
+                    val sp = attempt("ENSEMBLE") { EnsembleMapper.map(ensembleApi.forecast(place.lat, place.lon), now) }
+                    val prev = dao.ensembleOnce(place.istat)
+                    dao.upsertEnsemble(
+                        if (sp != null) EnsembleEntity(place.istat, json.encodeToString(EnsembleSpread.serializer(), sp), now.toEpochMilli(), null, null)
+                        else EnsembleEntity(place.istat, prev?.json, prev?.fetchedAtMs, failed["ENSEMBLE"], now.toEpochMilli())
+                    )
+                }
+            }
             val wa = async {
                 isolate("METEOALARM") {
                     val w = attempt("METEOALARM") { MeteoAlarmMapper.map(meteoAlarm.italy().string(), now) }
@@ -283,7 +301,7 @@ class WeatherRepository @Inject constructor(
                     )
                 }
             }
-            om.await(); gs.await(); km.await(); bl.await(); ob.await(); wa.await(); sr.await()
+            om.await(); gs.await(); km.await(); bl.await(); ob.await(); wa.await(); sr.await(); en.await()
         }
 
         recordStationHour(place, now)
