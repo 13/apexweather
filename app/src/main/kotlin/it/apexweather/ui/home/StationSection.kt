@@ -58,7 +58,7 @@ fun StationSection(
         station.gustKmh?.let { add(R.string.station_gust to Format.wind(it, windUnit, formats)) }
         station.humidityPct?.let { add(R.string.station_humidity to stringResource(R.string.unit_percent, it)) }
         station.pressureHpa?.let { add(R.string.station_pressure to stringResource(R.string.unit_hpa, Format.hPa(it, formats))) }
-        station.precipMm?.let { add(R.string.station_precip to Format.mm(it, formats)) }
+        station.precipTodayMm?.let { add(R.string.station_precip to Format.mm(it, formats)) }
     }
     if (rows.isEmpty()) return
 

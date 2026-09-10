@@ -27,7 +27,7 @@ class StationDownscaleTest {
 
     private fun observation(at: Instant, temp: Double?) = StationObservation(
         stationName = "Meran", time = at, tempC = temp, humidityPct = null, windKmh = null,
-        windDir = null, gustKmh = null, precipMm = null, pressureHpa = null,
+        windDir = null, gustKmh = null, precipTodayMm = null, pressureHpa = null,
     )
 
     private fun reference(offsetFromVillage: Double, fetchedAt: Instant = hour(0)) = StationReference(

@@ -165,7 +165,14 @@ data class StationObservation(
     val windKmh: Double?,
     val windDir: String?,
     val gustKmh: Double?,
-    val precipMm: Double?,
+    /**
+     * Precipitation since midnight, not a rate and not "raining now".
+     *
+     * Checked against the live network on 2026-09-10: all 57 stations reported a non-zero figure
+     * between 8 and 27.6 mm at the same timestamp, which is a daily accumulation and not an hourly
+     * one. The name says so because reading it as "it is raining" is the obvious mistake.
+     */
+    val precipTodayMm: Double?,
     val pressureHpa: Double?,
 )
 

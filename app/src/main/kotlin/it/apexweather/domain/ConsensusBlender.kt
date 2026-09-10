@@ -152,8 +152,38 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             return if (n % 2 == 1) s[n / 2] else (s[n / 2 - 1] + s[n / 2]) / 2.0
         }
 
-        /** Majority vote; ties resolved toward the more severe condition. */
-        fun voteCondition(conditions: List<Condition>): Condition =
+        /**
+         * How many of the models have to put water in the sky before the hour is called wet.
+         *
+         * A third, because a plurality vote over categories loses precipitation. Dry weather has
+         * three labels to split between — clear, mostly clear, cloudy — and rain has six, so a
+         * genuinely rainy hour can be outvoted by models that merely disagree about how grey it is.
+         * Seen on 2026-09-10: four models said cloudy, one partly cloudy, two drizzle and one rain,
+         * and the app reported "Bedeckt" while it was raining, two lines above its own "Niederschlag
+         * ab 13:15".
+         *
+         * The threshold is a judgement, and it is deliberately asymmetric in the same direction as
+         * the gust and the precipitation probability: being told it is overcast while getting wet is
+         * a worse error than being told it drizzles under a grey sky.
+         */
+        private const val WET_SHARE_DENOMINATOR = 3
+
+        /**
+         * Majority vote; ties resolved toward the more severe condition.
+         *
+         * With one exception: precipitation is voted on among the models that forecast it, once
+         * enough of them do. See [WET_SHARE_DENOMINATOR].
+         */
+        fun voteCondition(conditions: List<Condition>): Condition {
+            if (conditions.isEmpty()) return Condition.CLOUDY
+            val wet = conditions.filter { it.isPrecipitation }
+            // The mildest wet answer the models actually gave, not the worst: a third of them
+            // saying so is reason to call it drizzle, not reason to promise heavy rain.
+            val pool = if (wet.isNotEmpty() && wet.size * WET_SHARE_DENOMINATOR >= conditions.size) wet else conditions
+            return plurality(pool)
+        }
+
+        private fun plurality(conditions: List<Condition>): Condition =
             conditions.groupingBy { it }.eachCount().entries
                 .sortedWith(compareByDescending<Map.Entry<Condition, Int>> { it.value }.thenByDescending { it.key })
                 .first().key

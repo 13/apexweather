@@ -366,4 +366,45 @@ class ConsensusBlenderTest {
         assertNull(hourly.first { it.time == hour(40) }.ensembleHalfWidthC)
         assertTrue(hourly.first { it.time == hour(40) }.agreement < 0.1f)
     }
+
+    /**
+     * Taken from the phone on 2026-09-10 at 13:13 local, while it was raining in Dorf Tirol: four
+     * models said cloudy, one partly cloudy, two drizzle and one rain, so a plurality vote reported
+     * "Bedeckt" — two lines above the app's own "Niederschlag ab 13:15".
+     *
+     * Being told it is overcast while getting wet is a worse error than being told it drizzles
+     * under a grey sky, which is the same asymmetry this blender already applies to gusts and to
+     * precipitation probability.
+     */
+    @Test
+    fun `precipitation is not voted away by a plurality of dry models`() {
+        val wet = listOf(
+            Condition.CLOUDY, Condition.CLOUDY, Condition.CLOUDY, Condition.CLOUDY,
+            Condition.PARTLY_CLOUDY, Condition.DRIZZLE, Condition.DRIZZLE, Condition.RAIN,
+        )
+        val voted = ConsensusBlender.voteCondition(wet)
+        assertTrue("the app reported $voted while it was raining", voted.isPrecipitation)
+        // The mildest of the wet ones, not the worst: three of eight is a reason to say it is
+        // drizzling, not a reason to promise heavy rain.
+        assertEquals(Condition.DRIZZLE, voted)
+    }
+
+    /** One model out of ten is an outlier, not a forecast of rain. */
+    @Test
+    fun `a lone wet model does not turn a dry hour wet`() {
+        val mostlyDry = List(9) { Condition.CLOUDY } + Condition.RAIN
+        assertEquals(Condition.CLOUDY, ConsensusBlender.voteCondition(mostlyDry))
+    }
+
+    @Test
+    fun `a clear majority of wet models still decides on its own`() {
+        val soaked = listOf(Condition.RAIN, Condition.RAIN, Condition.RAIN, Condition.CLOUDY)
+        assertEquals(Condition.RAIN, ConsensusBlender.voteCondition(soaked))
+    }
+
+    @Test
+    fun `an entirely dry hour stays dry`() {
+        assertEquals(Condition.CLOUDY, ConsensusBlender.voteCondition(List(8) { Condition.CLOUDY }))
+        assertEquals(Condition.CLEAR, ConsensusBlender.voteCondition(List(4) { Condition.CLEAR }))
+    }
 }

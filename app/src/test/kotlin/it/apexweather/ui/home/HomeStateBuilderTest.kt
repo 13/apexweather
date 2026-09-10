@@ -45,7 +45,7 @@ class HomeStateBuilderTest {
 
     private fun observation(temp: Double) = StationObservation(
         "Meran", hour(3), tempC = temp, humidityPct = 40, windKmh = 5.0, windDir = "W",
-        gustKmh = null, precipMm = 0.0, pressureHpa = 1010.0,
+        gustKmh = null, precipTodayMm = 0.0, pressureHpa = 1010.0,
     )
 
     /** The models' view from down at the station, warmer than the village by [warmerBy]. */
@@ -170,7 +170,7 @@ class HomeStateBuilderTest {
     fun `the station card keeps a reading the hero has already let go`() {
         val old = it.apexweather.domain.model.StationObservation(
             stationName = "Meran", time = hour(0), tempC = 18.0, humidityPct = 60, windKmh = 5.0,
-            windDir = "NO", gustKmh = 12.0, precipMm = 0.0, pressureHpa = 1013.0,
+            windDir = "NO", gustKmh = 12.0, precipTodayMm = 0.0, pressureHpa = 1013.0,
         )
         val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(observation = old), AppSettings(), consensus,
             now = hour(0).plusSeconds(4 * 3600),
