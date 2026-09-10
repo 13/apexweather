@@ -30,7 +30,7 @@
     <string name="agreement_desc">Accordo tra modelli %1$d %%</string>
     <string name="open_hour_details">Apri dettagli ora</string>
     <string name="per_source">PER FONTE</string>
-    <string name="attribution">Dati: Servizio Meteo Alto Adige · GeoSphere Austria (CC BY 4.0) · MeteoSwiss, DWD, ARPAE, ECMWF via Open-Meteo</string>
+    <string name="attribution">Dati: Servizio Meteo Alto Adige · GeoSphere Austria (CC BY 4.0) · MeteoSwiss, DWD, ARPAE, ECMWF via Open-Meteo · Icone: Meteocons (MIT)</string>
     <string name="compare_title">Confronto fonti</string>
     <string name="compare_table">VALORI GIORNALIERI PER FONTE (MIN / MAX, PRECIPITAZIONI)</string>
     <string name="compare_status">STATO FONTI</string>
