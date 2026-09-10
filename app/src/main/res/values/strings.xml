@@ -27,7 +27,15 @@
     <string name="empty_title">Noch keine Daten</string>
     <string name="empty_body">Apex Weather braucht einmal Internet, um die Vorhersagen für %1$s zu laden.</string>
     <string name="retry">Erneut versuchen</string>
-    <string name="hour_summary">%1$s (%2$s bis %3$s) · %4$s · %5$d %% · Wind %6$s</string>
+    <string name="stat_temp">Temperatur</string>
+    <string name="stat_feels">Gefühlt</string>
+    <string name="stat_precip">Niederschlag</string>
+    <string name="stat_wind">Wind</string>
+    <string name="stat_gust">Böen %1$s</string>
+    <string name="stat_chance">%1$d %%</string>
+    <string name="col_model">Modell</string>
+    <string name="col_temp">Temp</string>
+    <string name="col_precip">mm</string>
     <string name="agreement_desc">Modellübereinstimmung %1$d %%</string>
     <string name="open_hour_details">Stundendetails öffnen</string>
     <string name="per_source">PRO QUELLE</string>

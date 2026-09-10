@@ -35,9 +35,17 @@ class HomeScreenTest {
     private val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
 
     private val t0: Instant = Instant.parse("2026-09-08T10:00:00Z")
-    private fun fc(source: Source, offset: Double) = SourceForecast(
+    private fun fc(source: Source, offset: Double, gustKmh: Double? = 21.0) = SourceForecast(
         source, t0, t0,
-        hourly = (0 until 168).map { HourlyPoint(t0.plusSeconds(it * 3600L), 15.0 + offset + it % 8, precipMm = if (it % 5 == 0) 1.0 else 0.0, windKmh = 6.0, condition = Condition.PARTLY_CLOUDY) },
+        hourly = (0 until 168).map {
+            HourlyPoint(
+                t0.plusSeconds(it * 3600L), 15.0 + offset + it % 8,
+                feelsLikeC = 13.0 + offset + it % 8,
+                precipMm = if (it % 5 == 0) 1.0 else 0.0,
+                windKmh = 6.0, gustKmh = gustKmh, freezingLevelM = 3100.0,
+                condition = Condition.PARTLY_CLOUDY,
+            )
+        },
         daily = emptyList(),
     )
     private val dorfTirol = it.apexweather.domain.Place(
@@ -47,6 +55,21 @@ class HomeScreenTest {
     )
     private val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = mapOf(Source.ICON_CH1 to fc(Source.ICON_CH1, 0.0), Source.ICON_D2 to fc(Source.ICON_D2, 2.0)))
     private val state = HomeStateBuilder.build(dorfTirol, snapshot, AppSettings(), ConsensusBlender().blend(snapshot.forecasts), t0.plusSeconds(60))
+
+    /** No model publishing a gust is the case where the tile has to be gone, not drawn empty. */
+    private val noGustSnapshot = WeatherSnapshot.EMPTY.copy(
+        forecasts = mapOf(Source.ICON_CH1 to fc(Source.ICON_CH1, 0.0, gustKmh = null)),
+    )
+    private val noGustState = HomeStateBuilder.build(
+        dorfTirol, noGustSnapshot, AppSettings(),
+        ConsensusBlender().blend(noGustSnapshot.forecasts), t0.plusSeconds(60),
+    )
+
+    /** Opens the sheet on the first hour of the strip. */
+    private fun openHourSheet() {
+        rule.onNodeWithTag("hour_column_0").performScrollTo().performClick()
+        rule.onNodeWithTag("hour_detail_sheet").assertIsDisplayed()
+    }
 
     /**
      * The station card is a reference, not a headline, and it used to interrupt the forecast between
@@ -109,6 +132,40 @@ class HomeScreenTest {
         rule.onNodeWithTag("hour_column_0").assertIsNotDisplayed()
         rule.onNodeWithTag("hour_column_0").performScrollTo().performClick()
         rule.onNodeWithTag("hour_detail_sheet").assertIsDisplayed()
+    }
+
+    @Test
+    fun hourSheetShowsItsStatsAndItsAgreement() {
+        rule.setContent { ApexTheme { HomeContent(state, onRefresh = {}, onOpenBulletin = {}) } }
+        openHourSheet()
+        rule.onNodeWithTag("hour_stat_temp").assertIsDisplayed()
+        rule.onNodeWithTag("hour_stat_precip").assertIsDisplayed()
+        rule.onNodeWithTag("hour_stat_gust").assertIsDisplayed()
+        rule.onNodeWithTag("hour_agreement_badge").assertIsDisplayed()
+        rule.onNodeWithTag("hour_source_header").assertIsDisplayed()
+    }
+
+    /** A quantity nobody publishes is left out rather than drawn as a dash. */
+    @Test
+    fun hourSheetLeavesOutTheGustNobodyPublishes() {
+        rule.setContent { ApexTheme { HomeContent(noGustState, onRefresh = {}, onOpenBulletin = {}) } }
+        openHourSheet()
+        rule.onNodeWithTag("hour_stat_wind").assertIsDisplayed()
+        rule.onAllNodesWithTag("hour_stat_gust").fetchSemanticsNodes().let {
+            assertEquals("no model publishes a gust, so there is no gust line", 0, it.size)
+        }
+    }
+
+    /**
+     * The content scrolls, so the sheet needs a cross: once the reader has scrolled, dragging the
+     * sheet down scrolls the content back instead of dismissing it.
+     */
+    @Test
+    fun hourSheetClosesFromItsCross() {
+        rule.setContent { ApexTheme { HomeContent(state, onRefresh = {}, onOpenBulletin = {}) } }
+        openHourSheet()
+        rule.onNodeWithTag("hour_detail_close").performClick()
+        rule.waitUntil(2_000) { rule.onAllNodesWithTag("hour_detail_sheet").fetchSemanticsNodes().isEmpty() }
     }
 
     /** A day late in the week is the interesting one: its hours are outside the 48-hour strip. */
