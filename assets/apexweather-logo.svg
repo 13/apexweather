@@ -1,9 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="512" height="512">
-  <!-- Apex Weather: the Apex Maps A-sharp glyph, recoloured as a sunlit peak
-       over its cool blue reflection, on night sky instead of warm paper. -->
-  <rect width="108" height="108" rx="24" fill="#0B1020"/>
-  <g transform="translate(27 27.81) scale(0.27)">
-    <path d="M10.02,176L100,151.9L189.98,176L100,100.5Z" fill="#9CC9FF"/>
-    <path d="M28.08,142.58L100,82.22L171.92,142.58L100,18Z" fill="#FFD166"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="10.02 6.00 179.96 170.00">
+  <path d="M65.56,118.96A52.00,52.00 0 1,1 134.44,118.96L100.00,90.06Z" fill="#FFD166"/>
+  <g stroke="#FFD166" stroke-width="9" stroke-linecap="round">
+    <line x1="37.00" y1="80.00" x2="26.00" y2="80.00"/>
+    <line x1="55.45" y1="35.45" x2="47.67" y2="27.67"/>
+    <line x1="100.00" y1="17.00" x2="100.00" y2="6.00"/>
+    <line x1="144.55" y1="35.45" x2="152.33" y2="27.67"/>
+    <line x1="163.00" y1="80.00" x2="174.00" y2="80.00"/>
   </g>
+  <path d="M10.02,176L100,151.9L189.98,176L100,100.5Z" fill="#9CC9FF"/>
 </svg>

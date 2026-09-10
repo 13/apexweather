@@ -1,15 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Themed-icon (monochrome) layer: the launcher tints every opaque
-     pixel, so the plain A-sharp silhouette works as-is. -->
+<!-- Themed-icon (monochrome) layer: the launcher tints every opaque pixel, so this is the same sun
+     and ridge with the colour taken out. The gap between them survives as background showing
+     through, which is the only thing keeping the two shapes apart here. The rays earn their place
+     for the same reason - without them a disc behind a chevron reads as head and shoulders. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
 
     <group android:scaleX="0.27" android:scaleY="0.27"
         android:translateX="27" android:translateY="27.81">
-        <path android:fillColor="#FF000000"
-            android:pathData="M10.02,176L100,151.9L189.98,176L100,100.5Z" />
-        <path android:fillColor="#FF000000"
-            android:pathData="M28.08,142.58L100,82.22L171.92,142.58L100,18Z" />
+        <path android:fillColor="#FF000000" android:pathData="M65.56,118.96A52.00,52.00 0 1,1 134.44,118.96L100.00,90.06Z" />
+        <path android:pathData="M37.00,80.00L26.00,80.00"
+            android:strokeColor="#FF000000" android:strokeWidth="9" android:strokeLineCap="round" />
+        <path android:pathData="M55.45,35.45L47.67,27.67"
+            android:strokeColor="#FF000000" android:strokeWidth="9" android:strokeLineCap="round" />
+        <path android:pathData="M100.00,17.00L100.00,6.00"
+            android:strokeColor="#FF000000" android:strokeWidth="9" android:strokeLineCap="round" />
+        <path android:pathData="M144.55,35.45L152.33,27.67"
+            android:strokeColor="#FF000000" android:strokeWidth="9" android:strokeLineCap="round" />
+        <path android:pathData="M163.00,80.00L174.00,80.00"
+            android:strokeColor="#FF000000" android:strokeWidth="9" android:strokeLineCap="round" />
+        <path android:fillColor="#FF000000" android:pathData="M10.02,176L100,151.9L189.98,176L100,100.5Z" />
     </group>
 </vector>

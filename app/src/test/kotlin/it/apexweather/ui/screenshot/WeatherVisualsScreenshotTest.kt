@@ -6,6 +6,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.draw.clip
+import it.apexweather.ui.common.Format
+import it.apexweather.ui.common.Formats
+import it.apexweather.ui.common.LocalFormats
+import it.apexweather.ui.home.PrecipScale
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
@@ -68,6 +77,66 @@ class WeatherVisualsScreenshotTest {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * The bar row across the cases that used to be indistinguishable: a certain drizzle, a likely
+     * downpour, an unlikely shower and a dry hour all drew the same two-pixel sliver.
+     */
+    @Test
+    fun `the precipitation bars`() {
+        val cases = listOf(
+            Triple(0.0, 0, Condition.CLEAR),
+            Triple(0.0, 20, Condition.CLOUDY),
+            Triple(0.3, 100, Condition.DRIZZLE),
+            Triple(1.4, 64, Condition.RAIN),
+            Triple(6.2, 90, Condition.HEAVY_RAIN),
+            Triple(2.0, 80, Condition.SNOW),
+            Triple(0.8, 55, Condition.SLEET),
+        )
+        captureRoboImage("src/test/screenshots/precip_bars.png") {
+            CompositionLocalProvider(LocalFormats provides Formats(java.util.Locale.GERMANY, true)) {
+                Row(
+                    Modifier.background(Color(0xFF14213A)).padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    cases.forEach { (mm, prob, condition) ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("$prob%", color = Color.White, fontSize = 9.sp)
+                            PrecipBarPreview(mm, prob, condition)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * `PrecipBar` is private to HomeSections, and it should stay that way — this repeats the six
+     * lines of drawing rather than widening its visibility for a test. `PrecipScale` is the part
+     * that has to agree, and it does, because both sides read it.
+     */
+    @Composable
+    private fun PrecipBarPreview(mm: Double, prob: Int, condition: Condition) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                Modifier.width(18.dp).height(26.dp).clip(RoundedCornerShape(4.dp)).background(PrecipScale.TRACK),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                if (PrecipScale.isDrawn(prob)) {
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .height((26.dp * PrecipScale.fillFraction(prob)).coerceAtLeast(2.dp))
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(PrecipScale.fillColor(mm, condition)),
+                    )
+                }
+            }
+            Text(
+                if (PrecipScale.hasAmount(mm)) Format.mm(mm, LocalFormats.current) else "",
+                color = Color(0xFFB9D2F5), fontSize = 10.sp,
+            )
         }
     }
 

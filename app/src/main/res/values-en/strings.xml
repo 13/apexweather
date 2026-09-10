@@ -17,6 +17,7 @@
     <string name="now_from_station">Now: station %1$s, %2$s</string>
     <string name="updated_at">Updated %1$s</string>
     <string name="section_hourly">NEXT 48 HOURS</string>
+    <string name="precip_legend">Bar: probability · Number: mm</string>
     <string name="section_bulletin">SOUTH TYROL WEATHER SERVICE</string>
     <string name="now">Now</string>
     <string name="today">Today</string>
@@ -29,7 +30,7 @@
     <string name="agreement_desc">Model agreement %1$d %%</string>
     <string name="open_hour_details">Open hour details</string>
     <string name="per_source">PER SOURCE</string>
-    <string name="attribution">Data: Landeswetterdienst Südtirol · GeoSphere Austria (CC BY 4.0) · MeteoSwiss, DWD, ARPAE, ECMWF via Open-Meteo</string>
+    <string name="attribution">Data: Landeswetterdienst Südtirol · GeoSphere Austria (CC BY 4.0) · MeteoSwiss, DWD, ARPAE, ECMWF via Open-Meteo · Icons: Meteocons (MIT)</string>
     <string name="compare_title">Source comparison</string>
     <string name="compare_table">DAILY VALUES PER SOURCE (MIN / MAX, PRECIPITATION)</string>
     <string name="compare_status">SOURCE STATUS</string>
@@ -49,6 +50,11 @@
     <string name="nav_home">Today</string>
     <string name="nav_compare">Compare</string>
     <string name="nav_bulletin">Bulletin</string>
+    <string name="nav_map">Map</string>
+    <string name="map_attribution">© OpenStreetMap contributors · Weather data by RainViewer</string>
+    <string name="map_radar_unavailable">Radar images unavailable</string>
+    <string name="map_play">Play</string>
+    <string name="map_pause">Pause</string>
     <string name="settings">Settings</string>
     <string name="setting_language">LANGUAGE</string>
     <string name="lang_system">System</string>
@@ -71,7 +77,7 @@
     <string name="about_build">Version %1$s (%2$d) · %3$s</string>
     <string name="about_commit">Commit %1$s · %2$s</string>
     <string name="day_source_desc">%1$s: %2$s to %3$s, %4$s</string>
-    <string name="hour_column_desc">%1$s: %2$s, %3$s, %4$d %% chance of precipitation</string>
+    <string name="hour_column_desc">%1$s: %2$s, %3$s, %4$d %% chance of precipitation, %5$s</string>
     <plurals name="now_from_consensus">
         <item quantity="one">Consensus of %1$d model</item>
         <item quantity="other">Consensus of %1$d models</item>

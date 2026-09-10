@@ -7,7 +7,10 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import it.apexweather.data.AppSettings
@@ -19,6 +22,7 @@ import it.apexweather.domain.model.SourceForecast
 import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.ui.theme.ApexTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
@@ -42,6 +46,38 @@ class HomeScreenTest {
     )
     private val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = mapOf(Source.ICON_CH1 to fc(Source.ICON_CH1, 0.0), Source.ICON_D2 to fc(Source.ICON_D2, 2.0)))
     private val state = HomeStateBuilder.build(dorfTirol, snapshot, AppSettings(), ConsensusBlender().blend(snapshot.forecasts), t0.plusSeconds(60))
+
+    /**
+     * The station card is a reference, not a headline, and it used to interrupt the forecast between
+     * the 48-hour strip and the day list. A section list is exactly the kind of thing that gets
+     * reshuffled by accident, so the order is asserted rather than assumed.
+     */
+    @Test
+    fun theStationCardSitsBelowTheDayList() {
+        rule.setContent { ApexTheme { HomeContent(withStation, onRefresh = {}, onOpenBulletin = {}) } }
+        // Comparing the two cards' coordinates would not work: this is a LazyColumn, and whichever
+        // of them is off screen is not in the semantics tree to be measured at all. How far the
+        // list had to travel to reach each is the thing that actually says which comes first.
+        val list = rule.onNodeWithTag("home_list")
+        list.performScrollToNode(hasTestTag("daily_list"))
+        val toDayList = scrollOffset()
+        list.performScrollToNode(hasTestTag("station_card"))
+        val toStation = scrollOffset()
+        assertTrue("the station card is above the day list", toStation > toDayList)
+    }
+
+    /** How far down the home list is scrolled, in pixels from the top. */
+    private fun scrollOffset(): Float =
+        rule.onNodeWithTag("home_list").fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange].value()
+
+    /** The station card draws nothing without an observation; the class's other fixtures are forecasts. */
+    private val withStation = state.copy(
+        station = it.apexweather.domain.model.StationObservation(
+            stationName = "Meran", time = t0, tempC = 18.4, humidityPct = 62, windKmh = 7.0,
+            windDir = "NO", gustKmh = 19.0, precipTodayMm = 1.2, pressureHpa = 1012.0,
+        ),
+    )
 
     @Test
     fun heroShowsConsensusTemperature() {
@@ -142,7 +178,10 @@ class HomeScreenTest {
             ),
         )
         rule.setContent { ApexTheme { HomeContent(observed, onRefresh = {}, onOpenBulletin = {}) } }
-        rule.onNodeWithTag("station_card").performScrollTo().assertIsDisplayed()
+        // The card is last in the list now, so it has to be scrolled to through the LazyColumn
+        // rather than with performScrollTo, which only reaches a node already composed.
+        rule.onNodeWithTag("home_list").performScrollToNode(hasTestTag("station_card"))
+        rule.onNodeWithTag("station_card").assertIsDisplayed()
         rule.onNodeWithTag("station_measured_at").assertExists()
     }
 

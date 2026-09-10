@@ -24,10 +24,10 @@ class WeatherIconsTest {
         assertEquals(Condition.entries.size, Condition.entries.map { it.labelRes() }.toSet().size)
     }
 
-    /** A clear night must not be drawn as a sunny day. */
+    /** A clear night must not be drawn as a sunny day, and neither must a foggy or stormy one. */
     @Test
     fun `the sky conditions differ between day and night`() {
-        listOf(Condition.CLEAR, Condition.MOSTLY_CLEAR, Condition.PARTLY_CLOUDY).forEach {
+        DAY_AND_NIGHT.forEach {
             assertNotEquals("$it looks the same by night as by day", it.iconRes(SunPhase.DAY), it.iconRes(SunPhase.NIGHT))
         }
     }
@@ -35,8 +35,20 @@ class WeatherIconsTest {
     /** Below the clouds there is no sun to draw, so those icons must not change with the hour. */
     @Test
     fun `weather below the cloud looks the same whatever the hour`() {
-        val unaffected = Condition.entries - setOf(Condition.CLEAR, Condition.MOSTLY_CLEAR, Condition.PARTLY_CLOUDY)
-        unaffected.forEach { assertEquals(it.iconRes(SunPhase.DAY), it.iconRes(SunPhase.NIGHT)) }
+        (Condition.entries - DAY_AND_NIGHT).forEach {
+            assertEquals(it.iconRes(SunPhase.DAY), it.iconRes(SunPhase.NIGHT))
+        }
+    }
+
+    private companion object {
+        /**
+         * Every condition whose drawing contains the sun or the moon. Fog and the thunderstorm
+         * joined when the set became Meteocons: both of those icons have a sun in them by day.
+         */
+        val DAY_AND_NIGHT = setOf(
+            Condition.CLEAR, Condition.MOSTLY_CLEAR, Condition.PARTLY_CLOUDY,
+            Condition.FOG, Condition.THUNDERSTORM,
+        )
     }
 
     /** Day is what a caller gets without asking, which is what the daily rows rely on. */

@@ -47,6 +47,7 @@ import it.apexweather.R
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.SunPhase
 import it.apexweather.domain.model.Bulletin
+import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.ConsensusDay
 import it.apexweather.domain.model.ConsensusHour
 import it.apexweather.domain.model.StationObservation
@@ -160,6 +161,14 @@ fun HourlySection(hours: List<ConsensusHour>, phaseAt: (Instant) -> SunPhase, ac
     if (hours.isEmpty()) return
     GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text(stringResource(R.string.section_hourly), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+        // Without this the bar is a shape with no stated meaning, which is how it came to be read
+        // as the amount when it is the chance.
+        Text(
+            stringResource(R.string.precip_legend),
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = Color.White.copy(alpha = 0.5f),
+            modifier = Modifier.testTag("precip_legend"),
+        )
         Spacer(Modifier.height(8.dp))
         HourStrip(hours, phaseAt, accent, tagPrefix = "hour_column", onHourClick = onHourClick, modifier = Modifier.testTag("hourly_strip"))
     }
@@ -194,6 +203,7 @@ fun HourStrip(
                 val spoken = stringResource(
                     R.string.hour_column_desc, Format.hour(h.time, SouthTyrol.ZONE, formats),
                     h.condition.label(), Format.temp(h.tempC, formats), h.precipProb,
+                    Format.mm(h.precipMm, formats),
                 )
                 val behaviour = if (onHourClick == null) Modifier.semantics(mergeDescendants = true) { contentDescription = spoken }
                 else Modifier.clickable(onClickLabel = openLabel) { onHourClick(h.time) }
@@ -211,23 +221,47 @@ fun HourStrip(
                     Spacer(Modifier.height(6.dp))
                     Text(Format.temp(h.tempC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
-                    PrecipBar(h.precipMm, h.precipProb)
+                    PrecipBar(h.precipMm, h.precipProb, h.condition)
                 }
             }
         }
     }
 }
 
+/**
+ * Height is the probability, colour is the amount, and the number underneath is the amount in
+ * millimetres. See [PrecipScale] for why they are split that way.
+ */
 @Composable
-private fun PrecipBar(mm: Double, prob: Int) {
-    val heightFraction = (mm / 5.0).coerceIn(0.0, 1.0).toFloat()
+private fun PrecipBar(mm: Double, prob: Int, condition: Condition) {
+    val formats = LocalFormats.current
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.width(18.dp).height(22.dp), contentAlignment = Alignment.BottomCenter) {
-            Box(Modifier.width(18.dp).height((22 * heightFraction).dp.coerceAtLeast(if (mm > 0.05) 2.dp else 0.dp)).clip(RoundedCornerShape(3.dp)).background(Color(0xFF8FB3E8)))
+        Box(
+            Modifier.width(18.dp).height(PrecipTrackHeight)
+                .clip(RoundedCornerShape(4.dp))
+                .background(PrecipScale.TRACK),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            if (PrecipScale.isDrawn(prob)) {
+                Box(
+                    Modifier.fillMaxWidth()
+                        // The floor is what keeps a real chance from rounding away to nothing.
+                        .height((PrecipTrackHeight * PrecipScale.fillFraction(prob)).coerceAtLeast(2.dp))
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(PrecipScale.fillColor(mm, condition)),
+                )
+            }
         }
-        Text(if (prob > 0) "$prob%" else "", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = Color(0xFFB9D2F5))
+        Text(
+            if (PrecipScale.hasAmount(mm)) Format.mm(mm, formats) else "",
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = Color(0xFFB9D2F5),
+        )
     }
 }
+
+/** The track every hour's bar is drawn inside, so a small chance reads as small, not as absent. */
+private val PrecipTrackHeight = 26.dp
 
 /** Consensus temperature line with translucent min/max band. */
 @Composable

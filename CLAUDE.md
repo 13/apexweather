@@ -127,6 +127,30 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   result so an offline hour still behaves. Three channels, all off until switched on.
 - ViewModels blend on `Dispatchers.Default` (`flowOn` before `stateIn`), so the consensus never runs on the main thread.
 - Background refresh: `work/RefreshWorker` (Hilt worker, hourly, network constraint) → repository → `ApexWidget().updateAll`. `RefreshScheduler.refreshNow` is the one-shot version, used by the settings sheet and the widget's refresh button.
+- `ui/map/` is the radar tab and is self-contained the way `update/` and `notify/` are. Frames come
+  from RainViewer's public API — no key, thirteen frames of the last two hours — through
+  `RadarRepository`, which holds them in memory for ten minutes and writes nothing to Room: the tiles
+  are not cached across runs either, so a stored frame list would name pictures that can no longer be
+  fetched. `nowcast` has been empty every time it was checked and is ignored.
+  **RainViewer's radar stops at zoom 7.** Zoom 8 returns a PNG reading "Zoom Level Not Supported"
+  rather than a 404, so `RadarTileSource` declares the ceiling and the map's own zoom is clamped to
+  6-11. Drawing a z7 tile at z9 is osmdroid's *approximater*, and it only works if the z7 tile is
+  already cached — so `fetchRadarParents` asks for those tiles explicitly on every pan and zoom.
+  **Do not replace it with a protected-tile computer:** `MapTileCache.garbageCollection()` returns
+  before running the computers unless the memory cache is over capacity, which a dozen radar tiles
+  never manage, so osmdroid's own `MapTileAreaZoomComputer(-1)` never fires either. Two more
+  non-obvious requirements: the provider must be given `map.tileRequestCompleteHandler`, or tiles
+  arrive and nothing redraws until the reader pans; and the tile source must **not** carry
+  `FLAG_NO_PREVENTIVE`, which osmdroid's own OSM source sets to honour the OSM policy and which
+  `MapTilePreCache` checks before fetching anything.
+  The basemap is osmdroid over the standard OpenStreetMap tiles, which the OSM tile policy allows for
+  live app use given a unique User-Agent, honoured cache headers and **no pre-emptive fetching** — so
+  there is no download-for-offline here and there must not be one. Both credits in `map_attribution`
+  are required, by OSM and by RainViewer respectively, and the bottom of the map carries a scrim so
+  they stay readable over heavy rain. GeoSphere's `nowcast-v1-15min-1km` is the better forecast for
+  this province — 1 km, 15 minutes, three hours ahead, covering all of South Tyrol — and is not used
+  because a South Tyrol bounding box costs 4.6 MB of ungzipped GeoJSON against 198 kB of NetCDF; see
+  `docs/superpowers/specs/2026-09-10-icons-bars-and-radar-design.md`.
 - `update/` is the in-app updater and is deliberately self-contained: it reads GitHub releases,
   verifies the download against the asset's sha256 and hands the APK to `PackageInstaller`. Nothing
   in the weather code imports it — the settings sheet takes it as a slot. Removing the feature means
@@ -149,8 +173,19 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   purpose, copied from Apex Maps) so a debug build updates a sideloaded release build in place. A real key
   overrides it through the `APEX_KEYSTORE_*` env vars or `keystore/keystore.properties`. Do not ship the
   debug-signed APK to a store.
-- The launcher icon is the Apex Maps A-sharp glyph at the same scale and translate as that app's icon, so
-  the two sit at identical optical size; only the palette differs. Source copy: `assets/apexmaps-A-sharp-source.svg`.
+- The launcher icon is a sun setting behind the *lower* chevron of the Apex Maps A-sharp glyph. The
+  chevron keeps that glyph's geometry, scale and translate; the upper chevron is gone, because an
+  arrow says nothing about weather. What is left of the family resemblance is the ridge and the
+  palette. Design and what it cost: `docs/superpowers/specs/2026-09-10-sun-launcher-icon-design.md`.
+  The sun is centred on the apex and its lower edge is the disc with the ridge's silhouette, offset
+  outward by 8 units, cut away — that offset is the gap, and the gap is what makes the peak read as
+  standing in front. Cut against the two rays *down from the apex*, never against the infinite lines
+  through the ridge's edges: those carry on upward and slice the disc into a bowtie. The sun's rays
+  are not decoration either — without them the disc and the chevron read as head and shoulders once
+  Android flattens them for a themed icon — and only the five upper ones are drawn, because a
+  downward ray runs into the ridge. `ic_notification.xml` deliberately keeps the old A-sharp
+  silhouette: at 24 dp the rays turn to mush. Source of the original glyph:
+  `assets/apexmaps-A-sharp-source.svg`.
 
 ## Conventions
 
@@ -170,11 +205,22 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
 - Warnings can be waved away: swipe the card or use the cross in the sheet. Dismissals are keyed by
   identifier **and** level, so an upgrade cannot inherit the silence of the milder warning, and are
   pruned to what is in force after each refresh.
-- Weather icons are hand-drawn vectors in `res/drawable/ic_wx_*.xml`, mapped once in
-  `ui/common/WeatherIcons.kt` and used by both the app and the widget. Every condition has its own
-  drawing and `WeatherIconsTest` asserts it; do not reintroduce a second table. What the vectors
-  actually paint is pinned by the Roborazzi goldens in `app/src/test/screenshots/`, because an edited
-  path keeps its resource id and every mapping test keeps passing.
+- Weather icons are Meteocons' monochrome style, generated from the SVGs committed in
+  `tools/meteocons/` by `tools/svg2vector.py`, mapped once in `ui/common/WeatherIcons.kt` and used by
+  both the app and the widget. Regenerate deliberately and look at the icons before committing.
+  That converter is narrow on purpose and raises rather than guessing: **Android has no mask**, and
+  the only reason the monochrome style converts at all is that each of its masks is a full-canvas
+  rectangle with the cloud subtracted under `evenodd`, which is exactly a `<clip-path>`. The colour
+  styles carry gradients inside those masks and cannot be converted. Meteocons **2.0 was rejected**
+  for having no heavy-rain and no heavy-snow icon; 3.0's `extreme-*` tier is what made the swap
+  possible. Every condition has its own drawing and `WeatherIconsTest` asserts it; do not
+  reintroduce a second table. What the vectors actually paint is pinned by the Roborazzi goldens in
+  `app/src/test/screenshots/`, because an edited path keeps its resource id and every mapping test
+  keeps passing. `LICENSE-meteocons` ships the MIT notice.
+- The 48-hour strip's precipitation bar is **probability by height, amount by colour, millimetres in
+  the caption** — the rules are in `ui/home/PrecipScale.kt` and tested there. It used to be
+  millimetres on a fixed 0-5 mm scale, so an hour certain to bring 0,4 mm drew under two pixels of
+  bar beneath a caption reading 100 %. The card carries a legend saying which is which.
 - Warnings are written and coloured in `ui/common/WarningVisuals.kt`. The feed's own wording is
   English only, so it is never shown as a label; type and level are translated like everything else,
   and each has a `labelRes()` form as well as a composable one because the widget renders outside a

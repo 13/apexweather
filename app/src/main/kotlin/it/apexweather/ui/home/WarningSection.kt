@@ -27,6 +27,8 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,16 +61,21 @@ import java.time.Instant
 @Composable
 fun WarningSection(warnings: List<Warning>, now: Instant, onDismiss: (Warning) -> Unit, onClick: () -> Unit) {
     val top = warnings.firstOrNull() ?: return
-    // Keyed on the warning so the swipe state does not survive into whichever warning takes its
-    // place — without the key, dismissing one leaves the next already swiped away.
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            val going = value != SwipeToDismissBoxValue.Settled
-            if (going) onDismiss(top)
-            going
-        },
-    )
-    androidx.compose.runtime.key(top.identifier) {
+    // Keyed on the warning, and the state is created *inside* the key. Remembered outside it, the
+    // state — and the lambda it holds — survived into whichever warning took the card next: it
+    // stayed at a dismissed value it could not move to again, and the lambda went on reporting the
+    // first warning for ever. On the phone that looked like "the first swipe works and no other
+    // one does".
+    key(top.identifier) {
+        val dismissState = rememberSwipeToDismissBoxState()
+
+        // Dismissal happens here rather than in confirmValueChange, which is a predicate Compose
+        // calls several times while a gesture settles — a side effect there dismissed the same
+        // warning four times over. currentValue changes once, when the card has come to rest.
+        LaunchedEffect(dismissState.currentValue) {
+            if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) onDismiss(top)
+        }
+
         SwipeToDismissBox(
             state = dismissState,
             backgroundContent = {},

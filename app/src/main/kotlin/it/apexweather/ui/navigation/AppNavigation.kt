@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Map
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.StackedLineChart
 import androidx.compose.material3.Icon
@@ -52,6 +53,7 @@ import it.apexweather.ui.bulletin.BulletinScreen
 import it.apexweather.ui.compare.CompareScreen
 import it.apexweather.ui.home.HomeScreen
 import it.apexweather.ui.home.HomeViewModel
+import it.apexweather.ui.map.MapScreen
 import it.apexweather.ui.place.PlacePickerScreen
 import it.apexweather.ui.settings.SettingsSheet
 import it.apexweather.update.UpdateSection
@@ -84,6 +86,7 @@ internal fun NavHostController.openTopLevel(route: Any) {
 @Serializable object PlacePickerRoute
 
 @Serializable object HomeRoute
+@Serializable object MapRoute
 @Serializable object CompareRoute
 @Serializable object BulletinRoute
 
@@ -107,9 +110,15 @@ fun ApexApp() {
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                NavigationBar(containerColor = Color(0x59000000), tonalElevation = 0.dp) {
+                // Nearly opaque, so it carries white labels over anything behind it. It used to be
+                // 0x59, which was fine over the sky gradient and unreadable the moment the map put
+                // yellow and red radar underneath it.
+                NavigationBar(containerColor = Color(0xE6000000), tonalElevation = 0.dp) {
                     val items = listOf(
                         NavItem(HomeRoute, "home", R.string.nav_home, Icons.Rounded.Home),
+                        // Second in the bar: after today's weather, where the rain is now is
+                        // the next thing a reader reaches for.
+                        NavItem(MapRoute, "map", R.string.nav_map, Icons.Rounded.Map),
                         NavItem(CompareRoute, "compare", R.string.nav_compare, Icons.Rounded.StackedLineChart),
                         NavItem(BulletinRoute, "bulletin", R.string.nav_bulletin, Icons.Rounded.Article),
                     )
@@ -136,6 +145,7 @@ fun ApexApp() {
                     )
                 }
                 composable<PlacePickerRoute> { PlacePickerScreen(onBack = { nav.popBackStack() }) }
+                composable<MapRoute> { MapScreen() }
                 composable<CompareRoute> { CompareScreen() }
                 composable<BulletinRoute> { BulletinScreen() }
             }
