@@ -43,21 +43,20 @@ class SkyBackgroundTest {
     }
 
     /**
-     * With the switch off the sky still changes colour — it simply arrives at once. Two frames after
-     * the palette changes, far short of the 1.5 s crossfade, the new colour has to be on screen.
-     * This is also the one test in the file that may let the rule idle: with motion off there is no
-     * frame loop asking for another frame forever.
+     * With the switch off there is no particle frame loop and no crossfade `tween` — both gates
+     * `motion` guards — so this is the one test in the file that leaves `autoAdvance` at its default
+     * `true` and lets the rule go idle: a running frame loop would hang it, and a `tween` spec would
+     * leave the old colour on screen for a frame `waitForIdle()` does not wait through. The palette
+     * change has to arrive between one idle point and the next, not over a crossfade.
      */
     @Test
     fun paletteArrivesAtOnceWhenAnimationsAreOff() {
         val day = SkyPaletteSelector.select(Condition.CLEAR, SunPhase.DAY, 0.0)
         val night = SkyPaletteSelector.select(Condition.CLEAR, SunPhase.NIGHT, 0.0)
         val current = mutableStateOf(day)
-        rule.mainClock.autoAdvance = false
         rule.setContent { ApexTheme { SkyBackground(palette = current.value, animationsEnabled = false) } }
-        rule.mainClock.advanceTimeBy(64)
         rule.runOnIdle { current.value = night }
-        rule.mainClock.advanceTimeBy(32)
+        rule.waitForIdle()
         val pixel = rule.onNodeWithTag("sky").captureToImage().toPixelMap()[2, 1]
         assertNear(Color.fromArgb(night.top), pixel)
     }
