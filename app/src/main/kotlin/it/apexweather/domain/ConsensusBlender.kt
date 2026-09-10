@@ -8,6 +8,7 @@ import it.apexweather.domain.model.ConsensusMinute
 import it.apexweather.domain.model.HourlyPoint
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceForecast
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -15,7 +16,17 @@ import kotlin.math.roundToInt
 
 class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
 
-    fun blend(forecasts: Map<Source, SourceForecast>): ConsensusForecast {
+    /**
+     * [bias] is how warm each model has lately run at the nearest station, from [BiasCorrector]. It
+     * is subtracted from that model's temperatures before they are compared with anyone else's, and
+     * fades with lead time — a model's habit today says a lot about this afternoon and little about
+     * Thursday. An empty map is the normal state until enough hours have accumulated.
+     */
+    fun blend(
+        forecasts: Map<Source, SourceForecast>,
+        bias: Map<Source, Double> = emptyMap(),
+        now: Instant? = null,
+    ): ConsensusForecast {
         if (forecasts.isEmpty()) return ConsensusForecast.EMPTY
 
         // time → (source → point), times truncated to the hour
@@ -27,11 +38,20 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             }
         }
 
+        val from = now ?: byTime.firstKey()
         val hourly = byTime.mapNotNull { (time, bySource) ->
             val regional = bySource.filterKeys { it.regional }
             val contributing = if (regional.size >= 2) regional else bySource
             if (contributing.isEmpty()) return@mapNotNull null
-            blendHour(time, contributing)
+            val lead = Duration.between(from, time).toHours().coerceAtLeast(0)
+            val corrected = contributing.mapValues { (source, point) ->
+                val correction = BiasCorrector.correctionAt(bias[source], lead)
+                if (correction == 0.0) point else point.copy(
+                    tempC = point.tempC - correction,
+                    feelsLikeC = point.feelsLikeC?.minus(correction),
+                )
+            }
+            blendHour(time, corrected)
         }
 
         val sunTimes = forecasts.values.flatMap { it.daily }

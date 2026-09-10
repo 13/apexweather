@@ -182,6 +182,8 @@ data class WeatherSnapshot(
     val warnings: List<Warning>,
     /** The models' temperature at the weather station, for carrying its reading up to the village. */
     val stationReference: it.apexweather.data.remote.StationReference?,
+    /** How wrong each model has lately been at the station; empty until enough hours have accumulated. */
+    val modelBias: Map<Source, Double>,
     val status: Map<Source, SourceStatus>,
     val bulletinStatus: SourceStatus?,
     val observationStatus: SourceStatus?,
@@ -206,7 +208,7 @@ data class WeatherSnapshot(
     val forecastsForBlend: Map<Source, SourceForecast>
         get() = forecasts.filterKeys { status[it] is SourceStatus.Ok }.takeIf { it.isNotEmpty() } ?: forecasts
     companion object {
-        val EMPTY = WeatherSnapshot(emptyMap(), null, null, emptyList(), null, emptyMap(), null, null, null, null, false)
+        val EMPTY = WeatherSnapshot(emptyMap(), null, null, emptyList(), null, emptyMap(), emptyMap(), null, null, null, null, false)
     }
 }
 

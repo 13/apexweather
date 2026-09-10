@@ -247,4 +247,32 @@ class WeatherRepositoryTest {
         repo.evictAllBut(emptyList(), emptyList())
         assertTrue(repo.snapshot(DORF_TIROL, "de").first().forecasts.isNotEmpty())
     }
+
+    /**
+     * The one thing this app keeps that nobody publishes: what a model said about an hour that has
+     * since happened. Without it there is no ground truth to measure a model against.
+     */
+    @Test
+    fun `a refresh writes down what the station read and what the models said it would`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        val history = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first()
+        assertEquals(1, history.size)
+        assertTrue(history.single().modelsJson.contains("ICON"))
+        assertTrue(history.single().observedC in -40.0..45.0)
+    }
+
+    /** Once per hour, however many times the app refreshes inside it. */
+    @Test
+    fun `refreshing twice in the same hour records that hour once`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        repo.refresh(DORF_TIROL, "de")
+        assertEquals(1, db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first().size)
+    }
+
+    /** A place with no station has nothing to measure a model against, and records nothing. */
+    @Test
+    fun `a place without a station records no history`() = runTest {
+        repo.refresh(STERZING, "de")
+        assertTrue(db.weatherDao().stationHistory(STERZING.istat, 0L).first().isEmpty())
+    }
 }

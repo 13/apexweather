@@ -5,6 +5,7 @@ import it.apexweather.data.local.BulletinEntity
 import it.apexweather.data.local.ObservationEntity
 import it.apexweather.data.local.RefreshMetaEntity
 import it.apexweather.data.local.SourceForecastEntity
+import it.apexweather.data.local.StationHistoryEntity
 import it.apexweather.data.local.StationReferenceEntity
 import it.apexweather.data.local.WarningsEntity
 import it.apexweather.data.local.WeatherDao
@@ -26,7 +27,9 @@ import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.StationObservation
 import it.apexweather.domain.model.Warning
 import it.apexweather.domain.model.WeatherSnapshot
+import it.apexweather.domain.BiasCorrector
 import it.apexweather.domain.Place
+import it.apexweather.domain.StationSample
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -37,11 +40,14 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.Collections
 import kotlin.coroutines.cancellation.CancellationException
 import javax.inject.Inject
@@ -63,14 +69,21 @@ class WeatherRepository @Inject constructor(
     private val clock: Clock,
 ) {
     /** [combine] is typed only up to five flows, so the two single-row caches arrive as one. */
-    private data class Sidecars(val warnings: WarningsEntity?, val reference: StationReferenceEntity?)
+    private data class Sidecars(
+        val warnings: WarningsEntity?,
+        val reference: StationReferenceEntity?,
+        val history: List<StationHistoryEntity>,
+    )
 
     fun snapshot(place: Place, language: String): Flow<WeatherSnapshot> {
-        val sidecars = combine(dao.warnings(), dao.stationReference(place.istat), ::Sidecars)
+        val historySince = clock.instant().minus(BiasCorrector.WINDOW).epochSecond
+        val sidecars = combine(
+            dao.warnings(), dao.stationReference(place.istat), dao.stationHistory(place.istat, historySince), ::Sidecars,
+        )
         return combine(
             dao.forecasts(place.istat), dao.bulletin(place.district, language),
             dao.observation(place.istat), sidecars, dao.meta(place.istat),
-        ) { rows, bulletinRow, obsRow, (warningRow, referenceRow), meta ->
+        ) { rows, bulletinRow, obsRow, (warningRow, referenceRow, historyRows), meta ->
             val now = clock.instant()
             val forecasts = mutableMapOf<Source, SourceForecast>()
             val status = mutableMapOf<Source, SourceStatus>()
@@ -93,12 +106,24 @@ class WeatherRepository @Inject constructor(
             // than at fetch time: one that expired since is gone from the app the minute it expires.
             val warnings = warningRow?.json?.let { decode("warnings", WARNINGS, it) }
             val reference = referenceRow?.json?.let { decode("station reference", StationReference.serializer(), it) }
+            val samples = historyRows.mapNotNull { row ->
+                val models = decode("station history", MODEL_TEMPS, row.modelsJson) ?: return@mapNotNull null
+                StationSample(
+                    time = Instant.ofEpochSecond(row.hourEpoch),
+                    observedC = row.observedC,
+                    modelC = models.mapNotNull { (name, temp) ->
+                        runCatching { Source.valueOf(name) }.getOrNull()?.let { it to temp }
+                    }.toMap(),
+                )
+            }
             WeatherSnapshot(
                 forecasts = forecasts,
                 bulletin = bulletin,
                 observation = observation,
                 warnings = warnings.orEmpty().filter { it.isActiveAt(now) },
                 stationReference = reference,
+                // How wrong each model has lately been here; empty until enough hours have accumulated.
+                modelBias = BiasCorrector.biases(samples, now),
                 status = status,
                 bulletinStatus = bulletinRow?.let {
                     statusOf(bulletin != null, bulletin?.issuedAt, it.fetchedAtMs, it.lastError, it.lastErrorAtMs, Duration.ofHours(24), now)
@@ -261,6 +286,8 @@ class WeatherRepository @Inject constructor(
             om.await(); gs.await(); km.await(); bl.await(); ob.await(); wa.await(); sr.await()
         }
 
+        recordStationHour(place, now)
+
         val result = RefreshResult(succeeded.toList(), LinkedHashMap(failed))
         dao.upsertMeta(
             RefreshMetaEntity(
@@ -271,6 +298,39 @@ class WeatherRepository @Inject constructor(
             )
         )
         result
+    }
+
+    /**
+     * Writes down what the station read this hour and what each model said it would read.
+     *
+     * Read back from the cache rather than threaded out of the fetches, because that is the version
+     * that survived storage and because a refresh where one of the two failed simply has nothing to
+     * record. Keyed by the observation's own hour, so an hour is written once however many times the
+     * app refreshes inside it.
+     *
+     * This is the only thing the app keeps that nobody publishes: what a model said about an hour
+     * that has since happened.
+     */
+    private suspend fun recordStationHour(place: Place, now: Instant) {
+        val observation = dao.observationOnce(place.istat)?.json
+            ?.let { decode("observation", StationObservation.serializer(), it) } ?: return
+        val observed = observation.tempC ?: return
+        val reference = dao.stationReferenceOnce(place.istat)?.json
+            ?.let { decode("station reference", StationReference.serializer(), it) } ?: return
+
+        val hour = observation.time.truncatedTo(ChronoUnit.HOURS)
+        val models = reference.at(hour).mapKeys { it.key.name }
+        if (models.isEmpty()) return
+
+        dao.upsertStationHistory(
+            StationHistoryEntity(
+                place = place.istat,
+                hourEpoch = hour.epochSecond,
+                observedC = observed,
+                modelsJson = json.encodeToString(MODEL_TEMPS, models),
+            ),
+        )
+        dao.pruneStationHistory(now.minus(BiasCorrector.WINDOW).epochSecond)
     }
 
     /**
@@ -317,6 +377,8 @@ class WeatherRepository @Inject constructor(
         private const val RETRY_DELAY_MS = 3_000L
 
         private val WARNINGS: KSerializer<List<Warning>> = ListSerializer(Warning.serializer())
+        private val MODEL_TEMPS: KSerializer<Map<String, Double>> =
+            MapSerializer(String.serializer(), Double.serializer())
 
         /** MeteoAlarm publishes a few times a day; six hours without one means we are behind. */
         private val WARNINGS_STALE_AFTER: Duration = Duration.ofHours(6)

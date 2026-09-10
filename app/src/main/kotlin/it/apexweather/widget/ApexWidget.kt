@@ -77,7 +77,7 @@ class ApexWidget : GlanceAppWidget() {
         val place = ep.places().byIstat(settings.placeIstat)
             ?: checkNotNull(ep.places().byIstat(SouthTyrol.DEFAULT_ISTAT))
         val snapshot = ep.repository().snapshot(place, settings.bulletinLanguage(Locale.getDefault().toLanguageTag())).first()
-        val home = HomeStateBuilder.build(place, snapshot, settings, ep.blender().blend(snapshot.forecastsForBlend), ep.clock().instant())
+        val home = HomeStateBuilder.build(place, snapshot, settings, ep.blender().blend(snapshot.forecastsForBlend, snapshot.modelBias, ep.clock().instant()), ep.clock().instant())
         // The widget renders outside the composition, so it resolves the reader's language and
         // clock preference from its own context.
         val formats = Formats(

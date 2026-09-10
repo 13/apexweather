@@ -33,7 +33,10 @@ class StationDownscaleTest {
     private fun reference(offsetFromVillage: Double, fetchedAt: Instant = hour(0)) = StationReference(
         fetchedAt = fetchedAt,
         elevationM = 330.0,
-        tempByEpochSecond = consensus.hourly.associate { it.time.epochSecond to it.tempC + offsetFromVillage },
+        bySource = mapOf(
+            Source.ICON_CH1.name to consensus.hourly.associate { it.time.epochSecond to it.tempC + offsetFromVillage },
+            Source.ICON_D2.name to consensus.hourly.associate { it.time.epochSecond to it.tempC + offsetFromVillage },
+        ),
     )
 
     @Test

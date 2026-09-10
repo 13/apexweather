@@ -89,7 +89,7 @@ class RefreshWorker @AssistedInject constructor(
         if (!appSettings.anyNotification || !notifier.canPost()) return
         val snapshot = repository.snapshot(place, language).first()
         val now = clock.instant()
-        val home = HomeStateBuilder.build(place, snapshot, appSettings, blender.blend(snapshot.forecastsForBlend), now)
+        val home = HomeStateBuilder.build(place, snapshot, appSettings, blender.blend(snapshot.forecastsForBlend, snapshot.modelBias, now), now)
         val memory = notifyStore.read()
         // The worker renders outside a composition, so it resolves the reader's language and clock
         // preference from its own context, exactly as the widget does.

@@ -175,32 +175,43 @@ object OpenMeteoMapper {
 }
 
 /**
- * The models' temperature at the weather station, hour by hour.
+ * The models' temperature at the weather station, hour by hour, kept per model.
  *
- * Only the median across the models is kept: this series is never shown, it exists solely as the
- * "what would the models say down at the station" half of a difference, and a median is the same
- * statistic the consensus at the village uses, so the two are comparable.
+ * Per model rather than collapsed to a median, because this series has two jobs. Carrying the
+ * station's reading up to the village needs only the median — that is a difference between two
+ * points. Measuring how wrong each model has lately been at a place it can actually be checked
+ * against needs each model on its own, and that is what pays for the extra rows.
  */
 @kotlinx.serialization.Serializable
 data class StationReference(
     @kotlinx.serialization.Serializable(with = it.apexweather.domain.model.InstantSerializer::class)
     val fetchedAt: Instant,
     val elevationM: Double,
-    /** Epoch seconds → median model temperature, because a map key has to be a string in JSON anyway. */
-    val tempByEpochSecond: Map<Long, Double>,
+    /** Source name → epoch second → temperature. Names, because a JSON map key is a string anyway. */
+    val bySource: Map<String, Map<Long, Double>> = emptyMap(),
 ) {
-    fun tempAt(t: Instant): Double? = tempByEpochSecond[t.truncatedTo(java.time.temporal.ChronoUnit.HOURS).epochSecond]
+    /** Every model's value for that hour, keyed by source. */
+    fun at(t: Instant): Map<Source, Double> {
+        val second = t.truncatedTo(java.time.temporal.ChronoUnit.HOURS).epochSecond
+        return bySource.mapNotNull { (name, series) ->
+            val source = runCatching { Source.valueOf(name) }.getOrNull() ?: return@mapNotNull null
+            series[second]?.let { source to it }
+        }.toMap()
+    }
+
+    /** The median across the models, which is the statistic the village consensus uses too. */
+    fun tempAt(t: Instant): Double? = at(t).values.takeIf { it.isNotEmpty() }?.let { ConsensusBlender.median(it.toList()) }
 }
 
 object OpenMeteoStationMapper {
     fun map(resp: OpenMeteoStationResponse, fetchedAt: Instant): StationReference {
         val times = resp.hourly.strings("time").map { parseLocal(it!!, SouthTyrol.ZONE) }
-        val series = OpenMeteoMapper.MODELS.values.map { key -> resp.hourly.doubles("temperature_2m_$key") }
-        val byHour = times.indices.mapNotNull { i ->
-            // A model that does not reach this hour contributes nothing rather than a zero.
-            val values = series.mapNotNull { it.getOrNull(i) }
-            if (values.isEmpty()) null else times[i].epochSecond to ConsensusBlender.median(values)
+        val bySource = OpenMeteoMapper.MODELS.mapNotNull { (source, key) ->
+            val values = resp.hourly.doubles("temperature_2m_$key")
+            // A model that does not reach these hours contributes nothing rather than a zero.
+            val series = times.indices.mapNotNull { i -> values.getOrNull(i)?.let { times[i].epochSecond to it } }.toMap()
+            if (series.isEmpty()) null else source.name to series
         }.toMap()
-        return StationReference(fetchedAt = fetchedAt, elevationM = resp.elevation, tempByEpochSecond = byHour)
+        return StationReference(fetchedAt = fetchedAt, elevationM = resp.elevation, bySource = bySource)
     }
 }

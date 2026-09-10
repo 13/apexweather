@@ -289,4 +289,43 @@ class ConsensusBlenderTest {
         val f = mapOf(Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.0, 0.0)))
         assertNull(blender.blend(f).precipitationStartsAt(T0))
     }
+
+    /**
+     * The point of measuring a model's habit: a run that has been two degrees warm at the station
+     * all week has those two degrees taken off before it is compared with anyone else.
+     */
+    @Test
+    fun `a model's measured bias is taken off before it votes`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 14.0))),
+            Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 10.0))),
+        )
+        val uncorrected = blender.blend(f).hourly.single().tempC
+        val corrected = blender.blend(f, mapOf(Source.ICON_D2 to 4.0), now = T0).hourly.single().tempC
+        assertEquals(10.0, uncorrected, 0.0)
+        // ICON-D2 comes back to 10 too, so the band closes rather than the median moving.
+        assertEquals(10.0, corrected, 0.0)
+        assertEquals(10.0, blender.blend(f, mapOf(Source.ICON_D2 to 4.0), now = T0).hourly.single().tempMaxC, 0.0)
+    }
+
+    /** Far enough ahead the habit says nothing, and the forecast is left as the model wrote it. */
+    @Test
+    fun `the correction has faded by the far end of the day`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 24).map { point(it, 10.0) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 24).map { point(it, 14.0) }),
+        )
+        val hourly = blender.blend(f, mapOf(Source.ICON_D2 to 4.0), now = T0).hourly
+        assertEquals(12.0, hourly.first { it.time == hour(20) }.tempC, 0.0)
+    }
+
+    @Test
+    fun `an empty bias map changes nothing`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 14.0))),
+        )
+        assertEquals(blender.blend(f).hourly.single().tempC, blender.blend(f, emptyMap(), T0).hourly.single().tempC, 0.0)
+    }
 }

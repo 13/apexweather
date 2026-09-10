@@ -119,9 +119,24 @@ class OpenMeteoMapperTest {
         )
         val reference = OpenMeteoStationMapper.map(resp, Instant.parse("2026-09-09T12:00:00Z"))
         assertEquals(330.0, reference.elevationM, 0.0)
-        assertTrue(reference.tempByEpochSecond.isNotEmpty())
+        assertTrue(reference.bySource.isNotEmpty())
         // A September valley floor: outside this the units or the parse are wrong.
-        assertTrue(reference.tempByEpochSecond.values.all { it in -20.0..45.0 })
+        assertTrue(reference.bySource.values.flatMap { it.values }.all { it in -20.0..45.0 })
+    }
+
+    /**
+     * Kept per model, not collapsed to a median: measuring how wrong each one has lately been needs
+     * each one on its own, and that is what pays for the extra rows.
+     */
+    @Test
+    fun `the station reference keeps the models apart`() {
+        val reference = OpenMeteoStationMapper.map(
+            Fixtures.json.decodeFromString(OpenMeteoStationResponse.serializer(), Fixtures.read("openmeteo_station.json")),
+            Instant.parse("2026-09-10T12:00:00Z"),
+        )
+        assertTrue("only ${reference.bySource.size} models", reference.bySource.size >= 4)
+        val anHour = reference.bySource.values.first().keys.first()
+        assertTrue(reference.at(Instant.ofEpochSecond(anHour)).size >= 4)
     }
 
     /** The village sits about 290 m above the station, and the models know it. */
