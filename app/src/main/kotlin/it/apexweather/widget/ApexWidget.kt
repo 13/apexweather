@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.ColorFilter
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
@@ -112,7 +113,10 @@ private fun WidgetContent(state: WidgetState, background: Bitmap) {
         Image(ImageProvider(background), contentDescription = null, contentScale = ContentScale.FillBounds, modifier = GlanceModifier.fillMaxSize())
         Column(GlanceModifier.fillMaxSize().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(ImageProvider(state.iconRes), contentDescription = null, modifier = GlanceModifier.size(28.dp))
+                // The weather drawables are black and are tinted by whoever draws them; the app does
+                // it through Icon's tint. Glance's Image does not tint on its own, so without this
+                // the widget draws a black icon on a near-black card and it disappears.
+                Image(ImageProvider(state.iconRes), contentDescription = null, colorFilter = ColorFilter.tint(white), modifier = GlanceModifier.size(28.dp))
                 Spacer(GlanceModifier.width(8.dp))
                 Text(state.tempText, style = TextStyle(color = white, fontSize = 30.sp, fontWeight = FontWeight.Medium))
                 Spacer(GlanceModifier.width(10.dp))
@@ -153,7 +157,7 @@ private fun WidgetContent(state: WidgetState, background: Bitmap) {
                     state.hours.forEach { h ->
                         Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(h.label, style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.75f)), fontSize = 11.sp))
-                            Image(ImageProvider(h.iconRes), contentDescription = null, modifier = GlanceModifier.size(18.dp))
+                            Image(ImageProvider(h.iconRes), contentDescription = null, colorFilter = ColorFilter.tint(white), modifier = GlanceModifier.size(18.dp))
                             Text(h.tempText, style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium))
                         }
                     }
