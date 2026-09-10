@@ -97,7 +97,7 @@ fun HomeContent(
                 item { HeroSection(state, onOpenPlaces = onOpenPlaces) }
                 item {
                     AnimatedVisibility(appeared, enter = fadeIn(tween(500)) + slideInVertically(tween(500)) { it / 4 }) {
-                        HourlySection(state.upcomingHours, state::phaseAt, accent) { selectedHour = it }
+                        HourlySection(state.upcomingHours, state::phaseAt) { selectedHour = it }
                     }
                 }
                 item {
@@ -151,7 +151,7 @@ fun HomeContent(
             containerColor = MaterialTheme.colorScheme.surface,
             modifier = Modifier.testTag("day_detail_sheet"),
         ) {
-            DayDetail(day, state)
+            DayDetail(day, state, onClose = { selectedDay = null })
         }
     }
 }

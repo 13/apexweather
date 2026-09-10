@@ -113,6 +113,14 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             else -> (1.0 - (spread / 6.0).coerceIn(0.0, 1.0)).toFloat()
         }
 
+        // The **mean**, where every other quantity here takes the median, and the one place that
+        // difference is not an oversight. Precipitation is zero-inflated: the moment half the models
+        // say dry the median is 0.0 and every wet model is discarded, however much rain they
+        // forecast. That is what put a rain cloud over a blank amount at 19:00 on 2026-09-10 —
+        // three of six models wet, at 0,1, 0,2 and 0,5 mm, and a median of 0,05. The mean of those
+        // six is 0,13 mm, which is what the hour actually amounts to.
+        val precip = values.map { it.precipMm }.average()
+
         val probs = values.mapNotNull { it.precipProb }
         val precipProb = if (probs.isNotEmpty()) probs.max()
         else (100.0 * values.count { it.precipMm > 0.1 } / values.size).roundToInt()
@@ -128,7 +136,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             tempMinC = tMin,
             tempMaxC = tMax,
             feelsLikeC = feels.takeIf { it.isNotEmpty() }?.let(::median),
-            precipMm = median(values.map { it.precipMm }),
+            precipMm = precip,
             precipProb = precipProb,
             windKmh = winds.takeIf { it.isNotEmpty() }?.let(::median),
             // Deliberately the maximum rather than the median every other quantity uses: a gust is a
@@ -138,7 +146,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             gustKmh = gusts.maxOrNull(),
             freezingLevelM = freezing.takeIf { it.isNotEmpty() }?.let(::median),
             ensembleHalfWidthC = ensembleHalfWidth,
-            condition = voteCondition(values.map { it.condition }),
+            condition = voteCondition(values.map { it.condition }, precip),
             agreement = agreement,
             sourceCount = values.size,
             perSource = points,
@@ -169,14 +177,27 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         private const val WET_SHARE_DENOMINATOR = 3
 
         /**
+         * Below this an hour has no precipitation to speak of. The same tenth of a millimetre the
+         * upstream mappers use to decide whether anything is falling at all, and the same one the
+         * strip uses to decide whether to print an amount.
+         */
+        private const val WET_MIN_MM = 0.1
+
+        /**
          * Majority vote; ties resolved toward the more severe condition.
          *
-         * With one exception: precipitation is voted on among the models that forecast it, once
-         * enough of them do. See [WET_SHARE_DENOMINATOR].
+         * Two exceptions. Precipitation is voted on among the models that forecast it, once enough
+         * of them do — see [WET_SHARE_DENOMINATOR]. And an hour that amounts to less than
+         * [WET_MIN_MM] is not called wet whatever the labels say, because the icon would then be
+         * promising rain over a blank amount: on 2026-09-10 the strip drew a rain cloud above an
+         * empty bar and no millimetres at all, and the hour sheet read "19:00 · Regen · 0,0 mm".
+         * The reader is told the chance separately, and that is where an unlikely shower belongs.
          */
-        fun voteCondition(conditions: List<Condition>): Condition {
+        fun voteCondition(conditions: List<Condition>, precipMm: Double): Condition {
             if (conditions.isEmpty()) return Condition.CLOUDY
             val wet = conditions.filter { it.isPrecipitation }
+            val dry = conditions.filterNot { it.isPrecipitation }
+            if (precipMm < WET_MIN_MM && dry.isNotEmpty()) return plurality(dry)
             // The mildest wet answer the models actually gave, not the worst: a third of them
             // saying so is reason to call it drizzle, not reason to promise heavy rain.
             val pool = if (wet.isNotEmpty() && wet.size * WET_SHARE_DENOMINATOR >= conditions.size) wet else conditions

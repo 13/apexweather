@@ -18,6 +18,7 @@
     <string name="updated_at">Aktualisiert %1$s</string>
     <string name="section_hourly">NÄCHSTE 48 STUNDEN</string>
     <string name="precip_legend">Niederschlag in mm · darunter die Wahrscheinlichkeit</string>
+    <string name="close">Schließen</string>
     <string name="section_bulletin">LANDESWETTERDIENST</string>
     <string name="now">Jetzt</string>
     <string name="today">Heute</string>
@@ -51,6 +52,7 @@
     <string name="nav_compare">Vergleich</string>
     <string name="nav_bulletin">Bericht</string>
     <string name="nav_map">Karte</string>
+    <string name="nav_settings">Mehr</string>
     <string name="map_attribution">© OpenStreetMap-Mitwirkende · Wetterdaten von RainViewer</string>
     <string name="map_radar_unavailable">Radarbilder nicht erreichbar</string>
     <string name="map_play">Abspielen</string>

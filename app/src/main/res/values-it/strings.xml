@@ -18,6 +18,7 @@
     <string name="updated_at">Aggiornato %1$s</string>
     <string name="section_hourly">PROSSIME 48 ORE</string>
     <string name="precip_legend">Precipitazioni in mm · sotto la probabilità</string>
+    <string name="close">Chiudi</string>
     <string name="section_bulletin">SERVIZIO METEO PROVINCIALE</string>
     <string name="now">Ora</string>
     <string name="today">Oggi</string>
@@ -51,6 +52,7 @@
     <string name="nav_compare">Confronto</string>
     <string name="nav_bulletin">Bollettino</string>
     <string name="nav_map">Mappa</string>
+    <string name="nav_settings">Altro</string>
     <string name="map_attribution">© Contributori OpenStreetMap · Dati meteo di RainViewer</string>
     <string name="map_radar_unavailable">Immagini radar non raggiungibili</string>
     <string name="map_play">Riproduci</string>

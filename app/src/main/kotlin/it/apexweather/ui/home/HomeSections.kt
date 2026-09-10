@@ -157,7 +157,7 @@ fun AgreementBadge(halfWidth: Double, agreement: Float, sourceCount: Int = 0, sh
 private val HourColumnWidth = 58.dp
 
 @Composable
-fun HourlySection(hours: List<ConsensusHour>, phaseAt: (Instant) -> SunPhase, accent: Color, onHourClick: (Instant) -> Unit) {
+fun HourlySection(hours: List<ConsensusHour>, phaseAt: (Instant) -> SunPhase, onHourClick: (Instant) -> Unit) {
     if (hours.isEmpty()) return
     GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text(stringResource(R.string.section_hourly), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
@@ -170,7 +170,7 @@ fun HourlySection(hours: List<ConsensusHour>, phaseAt: (Instant) -> SunPhase, ac
             modifier = Modifier.testTag("precip_legend"),
         )
         Spacer(Modifier.height(8.dp))
-        HourStrip(hours, phaseAt, accent, tagPrefix = "hour_column", onHourClick = onHourClick, modifier = Modifier.testTag("hourly_strip"))
+        HourStrip(hours, phaseAt, tagPrefix = "hour_column", onHourClick = onHourClick, modifier = Modifier.testTag("hourly_strip"))
     }
 }
 
@@ -184,7 +184,6 @@ fun HourlySection(hours: List<ConsensusHour>, phaseAt: (Instant) -> SunPhase, ac
 fun HourStrip(
     hours: List<ConsensusHour>,
     phaseAt: (Instant) -> SunPhase,
-    accent: Color,
     tagPrefix: String,
     modifier: Modifier = Modifier,
     onHourClick: ((Instant) -> Unit)? = null,
@@ -194,7 +193,6 @@ fun HourStrip(
     val scroll = rememberScrollState()
     val formats = LocalFormats.current
     Column(modifier.horizontalScroll(scroll)) {
-        TemperatureCurve(hours, accent, Modifier.width(HourColumnWidth * hours.size).height(90.dp))
         val openLabel = stringResource(R.string.open_hour_details)
         Row {
             hours.forEachIndexed { i, h ->
@@ -269,37 +267,6 @@ private fun PrecipBar(mm: Double, prob: Int, condition: Condition) {
 
 /** The track every hour's bar is drawn inside, so a small amount reads as small, not as absent. */
 private val PrecipTrackHeight = 30.dp
-
-/** Consensus temperature line with translucent min/max band. */
-@Composable
-fun TemperatureCurve(hours: List<ConsensusHour>, accent: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier) {
-        if (hours.size < 2) return@Canvas
-        val minT = hours.minOf { it.tempMinC } - 1
-        val maxT = hours.maxOf { it.tempMaxC } + 1
-        val colW = size.width / hours.size
-        fun x(i: Int) = colW * i + colW / 2
-        fun y(t: Double) = (size.height - 10f) - ((t - minT) / (maxT - minT)).toFloat() * (size.height - 20f)
-
-        val band = Path().apply {
-            moveTo(x(0), y(hours[0].tempMaxC))
-            hours.forEachIndexed { i, h -> lineTo(x(i), y(h.tempMaxC)) }
-            for (i in hours.indices.reversed()) lineTo(x(i), y(hours[i].tempMinC))
-            close()
-        }
-        drawPath(band, Brush.verticalGradient(listOf(accent.copy(alpha = 0.30f), accent.copy(alpha = 0.05f))))
-
-        val line = Path().apply {
-            moveTo(x(0), y(hours[0].tempC))
-            for (i in 1 until hours.size) {
-                val x0 = x(i - 1); val y0 = y(hours[i - 1].tempC); val x1 = x(i); val y1 = y(hours[i].tempC)
-                cubicTo(x0 + colW / 2, y0, x1 - colW / 2, y1, x1, y1)
-            }
-        }
-        drawPath(line, Color.White, style = Stroke(width = 3f))
-        drawCircle(accent, radius = 5f, center = Offset(x(0), y(hours[0].tempC)))
-    }
-}
 
 @Composable
 fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate) -> Unit) {

@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertContentDescriptionContains
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.hasTestTag
@@ -104,6 +105,21 @@ class HomeScreenTest {
         rule.onNodeWithTag("day_detail_sheet").assertIsDisplayed()
         rule.onNodeWithTag("day_hour_strip").assertIsDisplayed()
         rule.onNodeWithTag("day_hour_column_0").assertIsDisplayed()
+    }
+
+    /**
+     * The day sheet's content scrolls and the sheet skips its half state, so once the reader has
+     * scrolled, dragging down scrolls the content back instead of dismissing. The cross is the one
+     * way out that works from any scroll position.
+     */
+    @Test
+    fun theCrossClosesTheDaySheet() {
+        rule.setContent { ApexTheme { HomeContent(state, onRefresh = {}, onOpenBulletin = {}) } }
+        rule.onNodeWithTag("home_list").performScrollToNode(hasTestTag("day_row_4"))
+        rule.onNodeWithTag("day_row_4").performClick()
+        rule.onNodeWithTag("day_detail_sheet").assertIsDisplayed()
+        rule.onNodeWithTag("day_detail_close").performClick()
+        rule.waitUntil(2_000) { rule.onAllNodesWithTag("day_detail_sheet").fetchSemanticsNodes().isEmpty() }
     }
 
     @Test

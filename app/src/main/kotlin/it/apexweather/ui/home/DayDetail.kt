@@ -2,6 +2,8 @@ package it.apexweather.ui.home
 
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +45,7 @@ import it.apexweather.ui.theme.fromArgb
  * than as invented agreement.
  */
 @Composable
-fun DayDetail(day: ConsensusDay, state: HomeUiState) {
+fun DayDetail(day: ConsensusDay, state: HomeUiState, onClose: () -> Unit = {}) {
     val locale = LocalConfiguration.current.locales[0]
     val formats = LocalFormats.current
     val accent = Color.fromArgb(state.palette.accent)
@@ -55,10 +58,20 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState) {
         Modifier.verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp).padding(bottom = 32.dp),
     ) {
-        Text(
-            Format.weekdayFull(day.date, formats) + ", " + Format.dayMonth(day.date, formats),
-            style = MaterialTheme.typography.headlineMedium, color = Color.White,
-        )
+        // The cross is not decoration. This content scrolls, and the sheet skips its half state, so
+        // once the reader has scrolled down, dragging the sheet down scrolls the content back up
+        // instead of dismissing — and at the top it bounces rather than closing. The warning sheet
+        // has carried a cross for the same reason; this one was the odd sheet out.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                Format.weekdayFull(day.date, formats) + ", " + Format.dayMonth(day.date, formats),
+                style = MaterialTheme.typography.headlineMedium, color = Color.White,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onClose, modifier = Modifier.testTag("day_detail_close")) {
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), tint = Color.White.copy(alpha = 0.8f))
+            }
+        }
         Spacer(Modifier.height(8.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -101,7 +114,6 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState) {
             HourStrip(
                 hours = hours,
                 phaseAt = state::phaseAt,
-                accent = accent,
                 tagPrefix = "day_hour_column",
                 labelFirstAsNow = false,
                 modifier = Modifier.testTag("day_hour_strip"),
