@@ -287,7 +287,10 @@ In `app/src/main/kotlin/it/apexweather/ui/home/HomeSections.kt`, replace the who
 
 ```kotlin
 @Composable
-private fun PrecipBar(mm: Double, prob: Int, prob: Int) { /* the old millimetre version */ }
+private fun PrecipBar(mm: Double, prob: Int) {
+    val heightFraction = (mm / 5.0).coerceIn(0.0, 1.0).toFloat()
+    // ... the rest of the old millimetre version
+}
 ```
 
 with:
