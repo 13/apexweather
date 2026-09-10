@@ -93,4 +93,21 @@ class FormatTest {
         assertTrue(Format.hourOfDay(7, twelveHour).contains("7"))
         assertNotEquals("07:00", Format.hourOfDay(7, twelveHour))
     }
+
+    /**
+     * A table column carries its unit in the header, so the cells have to be able to drop it — and
+     * the unit-carrying forms have to come out of the same code, or the two drift apart.
+     */
+    @Test fun `values without their unit`() {
+        assertEquals("0,3", Format.mmValue(0.3, german))
+        assertEquals("0", Format.mmValue(0.04, german))
+        assertEquals("12", Format.mmValue(12.4, german))
+        assertEquals("0.3", Format.mmValue(0.3, english))
+        assertEquals("12", Format.windValue(12.3, WindUnit.KMH, german))
+        assertEquals("3,4", Format.windValue(12.3, WindUnit.MS, german))
+        // unchanged, and now assembled from the values above
+        assertEquals("0,3 mm", Format.mm(0.3, german))
+        assertEquals("12 km/h", Format.wind(12.3, WindUnit.KMH, german))
+        assertEquals("3,4 m/s", Format.wind(12.3, WindUnit.MS, german))
+    }
 }
