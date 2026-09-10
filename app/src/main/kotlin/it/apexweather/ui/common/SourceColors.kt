@@ -11,7 +11,10 @@ object SourceColors {
         Source.ICON_CH2 -> Color(0xFF3FBF8F)
         Source.ICON_2I -> Color(0xFF4FC3F7)
         Source.ICON_D2 -> Color(0xFFFFD166)
+        Source.KNMI_HARMONIE -> Color(0xFF80CBC4)
+        Source.DMI_HARMONIE -> Color(0xFFC5E1A5)
         Source.ECMWF -> Color(0xFFB39DDB)
+        Source.ECMWF_AIFS -> Color(0xFFCE93D8)
     }
     val consensus: Color = Color.White
 }

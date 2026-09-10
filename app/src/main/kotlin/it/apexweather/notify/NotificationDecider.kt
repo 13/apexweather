@@ -30,7 +30,8 @@ sealed interface WeatherNotification {
         val precipMm: Double,
     ) : WeatherNotification
 
-    data class RainStarting(val hour: ConsensusHour) : WeatherNotification
+    /** [startsAt] is the quarter-hour the rain begins where a model publishes one, else the hour. */
+    data class RainStarting(val hour: ConsensusHour, val startsAt: Instant) : WeatherNotification
 
     data class Severe(val warning: Warning) : WeatherNotification
 }
@@ -110,7 +111,10 @@ object NotificationDecider {
             h.time.isAfter(now) && !h.time.isAfter(limit) && h.precipProb >= RAIN_MIN_PROB && h.precipMm >= RAIN_MIN_MM
         } ?: return null
         if (memory.lastRainOnset == onset.time) return null
-        return WeatherNotification.RainStarting(onset)
+        // The hourly series can only say "some time in the 15:00 hour". Where the regional models
+        // published a quarter-hourly one, it says 15:15, and that is what the reader is told.
+        val precise = state.minutelyStart?.takeIf { !it.isBefore(now) && !it.isAfter(limit) } ?: onset.time
+        return WeatherNotification.RainStarting(onset, precise)
     }
 
     /** The memory to store after [posted] went out, given what was remembered before. */

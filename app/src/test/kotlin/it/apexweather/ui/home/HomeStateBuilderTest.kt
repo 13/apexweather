@@ -53,7 +53,10 @@ class HomeStateBuilderTest {
         it.apexweather.data.remote.StationReference(
             fetchedAt = fetchedAt,
             elevationM = 330.0,
-            tempByEpochSecond = consensus.hourly.associate { it.time.epochSecond to it.tempC + warmerBy },
+            bySource = mapOf(
+                Source.ICON_CH1.name to consensus.hourly.associate { it.time.epochSecond to it.tempC + warmerBy },
+                Source.ICON_D2.name to consensus.hourly.associate { it.time.epochSecond to it.tempC + warmerBy },
+            ),
         )
 
     /**

@@ -1,6 +1,8 @@
 package it.apexweather.data
 
 import it.apexweather.Fixtures
+import it.apexweather.data.remote.EnsembleApi
+import it.apexweather.data.remote.EnsembleResponse
 import it.apexweather.data.remote.GeoSphereApi
 import it.apexweather.data.remote.GeoSphereResponse
 import it.apexweather.data.remote.KmosResponse
@@ -34,11 +36,17 @@ internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
     /** Fails this many times and then succeeds, for testing the retry. */
     var failuresBeforeSuccess: Int = 0
 
-    open override suspend fun forecast(latitude: Double, longitude: Double, timezone: String, forecastDays: Int, models: String, hourly: String, daily: String): OpenMeteoResponse {
+    open override suspend fun forecast(
+        latitude: Double, longitude: Double, timezone: String, forecastDays: Int,
+        models: String, hourly: String, daily: String, minutely: String, minutelySteps: Int,
+    ): OpenMeteoResponse {
         forecastCalls++
         if (failuresBeforeSuccess >= forecastCalls) throw IOException("connection reset")
         if (fail) throw IOException("open-meteo down")
-        return Fixtures.json.decodeFromString(OpenMeteoResponse.serializer(), Fixtures.read("openmeteo.json"))
+        // The recording of the request the app actually makes today: fourteen days, eight models,
+        // the freezing level asked for. `openmeteo.json` is kept for OpenMeteoMapperTest alone,
+        // where its job is to be a response that predates two of those changes.
+        return Fixtures.json.decodeFromString(OpenMeteoResponse.serializer(), Fixtures.read("openmeteo_14d.json"))
     }
 
     override suspend fun stationForecast(
@@ -86,6 +94,15 @@ internal class FakeMeteoAlarm(var fail: Boolean = false) : MeteoAlarmApi {
     override suspend fun italy(): ResponseBody {
         if (fail) throw IOException("meteoalarm down")
         return Fixtures.read("meteoalarm_italy.xml").toResponseBody("application/atom+xml".toMediaType())
+    }
+}
+
+internal class FakeEnsemble(var fail: Boolean = false) : EnsembleApi {
+    override suspend fun forecast(
+        latitude: Double, longitude: Double, timezone: String, forecastDays: Int, models: String, hourly: String,
+    ): EnsembleResponse {
+        if (fail) throw IOException("ensemble down")
+        return Fixtures.json.decodeFromString(EnsembleResponse.serializer(), Fixtures.read("openmeteo_ensemble.json"))
     }
 }
 

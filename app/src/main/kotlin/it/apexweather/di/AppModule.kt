@@ -9,6 +9,7 @@ import dagger.hilt.components.SingletonComponent
 import it.apexweather.BuildConfig
 import it.apexweather.data.local.AppDatabase
 import it.apexweather.data.local.WeatherDao
+import it.apexweather.data.remote.EnsembleApi
 import it.apexweather.data.remote.GeoSphereApi
 import it.apexweather.data.remote.MeteoAlarmApi
 import it.apexweather.data.remote.OdhApi
@@ -63,6 +64,7 @@ object AppModule {
     @Provides @Singleton fun odh(c: OkHttpClient, j: Json): OdhApi = retrofit(OdhApi.BASE_URL, c, j).create(OdhApi::class.java)
     // Returns the Atom feed as a raw body: Retrofit hands ResponseBody back without a converter,
     // and MeteoAlarmMapper does the XML parsing.
+    @Provides @Singleton fun ensemble(c: OkHttpClient, j: Json): EnsembleApi = retrofit(EnsembleApi.BASE_URL, c, j).create(EnsembleApi::class.java)
     @Provides @Singleton fun meteoAlarm(c: OkHttpClient, j: Json): MeteoAlarmApi = retrofit(MeteoAlarmApi.BASE_URL, c, j).create(MeteoAlarmApi::class.java)
 
     @Provides @Singleton fun database(@ApplicationContext ctx: Context): AppDatabase = AppDatabase.build(ctx)

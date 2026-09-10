@@ -56,12 +56,26 @@ import java.time.LocalDate
 @Composable
 fun HomeScreen(onOpenBulletin: () -> Unit, onOpenPlaces: () -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    HomeContent(state = state, onRefresh = viewModel::refresh, onOpenBulletin = onOpenBulletin, onOpenPlaces = onOpenPlaces)
+    HomeContent(
+        state = state,
+        onRefresh = viewModel::refresh,
+        onOpenBulletin = onOpenBulletin,
+        onOpenPlaces = onOpenPlaces,
+        onDismissWarning = viewModel::dismissWarning,
+        onRestoreWarning = viewModel::restoreWarning,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () -> Unit, onOpenPlaces: () -> Unit = {}) {
+fun HomeContent(
+    state: HomeUiState,
+    onRefresh: () -> Unit,
+    onOpenBulletin: () -> Unit,
+    onOpenPlaces: () -> Unit = {},
+    onDismissWarning: (it.apexweather.domain.model.Warning) -> Unit = {},
+    onRestoreWarning: (it.apexweather.domain.model.Warning) -> Unit = {},
+) {
     var selectedHour by remember { mutableStateOf<Instant?>(null) }
     var selectedDay by remember { mutableStateOf<LocalDate?>(null) }
     var warningsOpen by remember { mutableStateOf(false) }
@@ -77,7 +91,9 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (state.offline) item { OfflineBanner(state) }
                 // Above the hero: a warning that has to be scrolled to is a warning that was missed.
-                if (state.warnings.isNotEmpty()) item { WarningSection(state.warnings, state.now) { warningsOpen = true } }
+                if (state.visibleWarnings.isNotEmpty()) {
+                    item { WarningSection(state.visibleWarnings, state.now, onDismissWarning) { warningsOpen = true } }
+                }
                 item { HeroSection(state, onOpenPlaces = onOpenPlaces) }
                 item {
                     AnimatedVisibility(appeared, enter = fadeIn(tween(500)) + slideInVertically(tween(500)) { it / 4 }) {
@@ -118,7 +134,7 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
     // Warnings expire while the sheet is open; the last one going closes it rather than leaving an empty sheet.
     if (warningsOpen && state.warnings.isNotEmpty()) {
         ModalBottomSheet(onDismissRequest = { warningsOpen = false }, containerColor = MaterialTheme.colorScheme.surface, modifier = Modifier.testTag("warning_sheet")) {
-            WarningDetail(state.warnings, state.now)
+            WarningDetail(state.warnings, state.now, state::isDismissed, onDismissWarning, onRestoreWarning)
         }
     }
 

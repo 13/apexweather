@@ -18,6 +18,7 @@ import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceForecast
 import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.ui.theme.ApexTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
@@ -149,5 +150,52 @@ class HomeScreenTest {
     fun noStationReadingMeansNoStationCard() {
         rule.setContent { ApexTheme { HomeContent(state.copy(station = null), onRefresh = {}, onOpenBulletin = {}) } }
         rule.onNodeWithTag("station_card").assertDoesNotExist()
+    }
+
+    /** A warning waved away stops shouting on the home screen. */
+    @Test
+    fun aDismissedWarningLeavesTheCard() {
+        val w = warning("a", it.apexweather.domain.model.WarningLevel.ORANGE)
+        val warned = state.copy(
+            warnings = listOf(w),
+            dismissedWarnings = setOf(it.apexweather.data.WarningDismissals.key(w)),
+        )
+        rule.setContent { ApexTheme { HomeContent(warned, onRefresh = {}, onOpenBulletin = {}) } }
+        rule.onNodeWithTag("warning_card").assertDoesNotExist()
+    }
+
+    /** But it is still in the sheet, dimmed, with a way back — dismissing is not deleting. */
+    @Test
+    fun aDismissedWarningIsStillListedAndCanBeRestored() {
+        val w = warning("a", it.apexweather.domain.model.WarningLevel.ORANGE)
+        var restored: it.apexweather.domain.model.Warning? = null
+        val warned = state.copy(
+            warnings = listOf(w, warning("b", it.apexweather.domain.model.WarningLevel.YELLOW)),
+            dismissedWarnings = setOf(it.apexweather.data.WarningDismissals.key(w)),
+        )
+        rule.setContent {
+            ApexTheme {
+                HomeContent(warned, onRefresh = {}, onOpenBulletin = {}, onRestoreWarning = { restored = it })
+            }
+        }
+        // The undismissed one still has a card; opening it shows both.
+        rule.onNodeWithTag("warning_card").performClick()
+        rule.onNodeWithTag("warning_row_0").assertIsDisplayed()
+        rule.onNodeWithTag("warning_restore_0").performScrollTo().performClick()
+        assertEquals("a", restored?.identifier)
+    }
+
+    @Test
+    fun dismissingFromTheSheetReportsTheWarning() {
+        var dismissed: it.apexweather.domain.model.Warning? = null
+        val warned = state.copy(warnings = listOf(warning("a", it.apexweather.domain.model.WarningLevel.ORANGE)))
+        rule.setContent {
+            ApexTheme {
+                HomeContent(warned, onRefresh = {}, onOpenBulletin = {}, onDismissWarning = { dismissed = it })
+            }
+        }
+        rule.onNodeWithTag("warning_card").performClick()
+        rule.onNodeWithTag("warning_dismiss_0").performScrollTo().performClick()
+        assertEquals("a", dismissed?.identifier)
     }
 }

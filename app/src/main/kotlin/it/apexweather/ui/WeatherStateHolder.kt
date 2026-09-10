@@ -3,6 +3,7 @@ package it.apexweather.ui
 import it.apexweather.data.AppSettings
 import it.apexweather.data.PlaceCatalogue
 import it.apexweather.data.SettingsRepository
+import it.apexweather.data.WarningDismissals
 import it.apexweather.data.WeatherRepository
 import it.apexweather.di.ApplicationScope
 import it.apexweather.domain.ConsensusBlender
@@ -36,6 +37,7 @@ import javax.inject.Singleton
 /** Everything the screens derive their state from, blended once. */
 data class WeatherState(
     val place: Place? = null,
+    val dismissedWarnings: Set<String> = emptySet(),
     val snapshot: WeatherSnapshot = WeatherSnapshot.EMPTY,
     val settings: AppSettings = AppSettings(),
     val consensus: ConsensusForecast = ConsensusForecast.EMPTY,
@@ -59,6 +61,7 @@ class WeatherStateHolder @Inject constructor(
     repository: WeatherRepository,
     settingsRepository: SettingsRepository,
     private val catalogue: PlaceCatalogue,
+    private val dismissals: WarningDismissals,
     blender: ConsensusBlender,
     private val clock: Clock,
     @ApplicationScope scope: CoroutineScope,
@@ -102,12 +105,12 @@ class WeatherStateHolder @Inject constructor(
     private val blended = snapshots
         // forecastsForBlend, not forecasts: a model run that has gone stale stays visible per source
         // with its age beside it, but is kept out of the number the app leads with.
-        .map { (place, snapshot) -> Triple(place, snapshot, blender.blend(snapshot.forecastsForBlend)) }
+        .map { (place, snapshot) -> Triple(place, snapshot, blender.blend(snapshot.forecastsForBlend, snapshot.modelBias, clock.instant(), snapshot.ensemble)) }
         .flowOn(Dispatchers.Default)
 
     val weather: StateFlow<WeatherState> =
-        combine(blended, settings, minuteTick) { (place, snapshot, consensus), settings, _ ->
-            WeatherState(place, snapshot, settings, consensus, clock.instant())
+        combine(blended, settings, dismissals.dismissed, minuteTick) { (place, snapshot, consensus), settings, dismissed, _ ->
+            WeatherState(place, dismissed, snapshot, settings, consensus, clock.instant())
         }.flowOn(Dispatchers.Default).stateIn(scope, SharingStarted.WhileSubscribed(5_000), initial)
 
     /**
@@ -118,7 +121,7 @@ class WeatherStateHolder @Inject constructor(
 
     /** The home screen's state, built once and shared with the sky behind every tab. */
     val home: StateFlow<HomeUiState> =
-        weather.map { HomeStateBuilder.build(it.place, it.snapshot, it.settings, it.consensus, it.now) }
+        weather.map { HomeStateBuilder.build(it.place, it.snapshot, it.settings, it.consensus, it.now, it.dismissedWarnings) }
             .flowOn(Dispatchers.Default)
             .stateIn(scope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 }

@@ -59,12 +59,13 @@ class WeatherRepositoryTest {
     private val siag = FakeSiag()
     private val odh = FakeOdh()
     private val meteoAlarm = FakeMeteoAlarm()
+    private val ensemble = FakeEnsemble()
     private val clock = MutableClock(Instant.parse("2026-09-08T14:00:00Z"))
     private lateinit var repo: WeatherRepository
 
     @Before fun setUp() {
         db = AppDatabase.inMemory(ApplicationProvider.getApplicationContext())
-        repo = WeatherRepository(db.weatherDao(), openMeteo, geoSphere, siag, odh, meteoAlarm, Fixtures.json, clock)
+        repo = WeatherRepository(db.weatherDao(), openMeteo, geoSphere, siag, odh, meteoAlarm, ensemble, Fixtures.json, clock)
     }
 
     @After fun tearDown() = db.close()
@@ -76,7 +77,7 @@ class WeatherRepositoryTest {
     }
 
     @Test
-    fun `refresh fills all seven sources, bulletin and observation`() = runTest {
+    fun `refresh fills every source, the bulletin and the observation`() = runTest {
         val result = repo.refresh(DORF_TIROL, "de")
         assertTrue(result.failed.isEmpty())
         val s = repo.snapshot(DORF_TIROL, "de").first()
@@ -108,7 +109,7 @@ class WeatherRepositoryTest {
     fun `all sources failing marks the refresh failed but keeps data`() = runTest {
         repo.refresh(DORF_TIROL, "de")
         val firstRefresh = clock.now
-        openMeteo.fail = true; geoSphere.fail = true; siag.fail = true; odh.fail = true; meteoAlarm.fail = true
+        openMeteo.fail = true; geoSphere.fail = true; siag.fail = true; odh.fail = true; meteoAlarm.fail = true; ensemble.fail = true
         clock.now = clock.now.plus(Duration.ofMinutes(30))
         val result = repo.refresh(DORF_TIROL, "de")
         assertTrue(result.succeeded.isEmpty())
@@ -125,7 +126,7 @@ class WeatherRepositoryTest {
     fun `a store failure is isolated and the refresh still records its meta`() = runTest {
         val failing = WeatherRepository(
             FailingStoreDao(db.weatherDao(), Source.GEOSPHERE_AROME.name),
-            openMeteo, geoSphere, siag, odh, meteoAlarm, Fixtures.json, clock,
+            openMeteo, geoSphere, siag, odh, meteoAlarm, ensemble, Fixtures.json, clock,
         )
         val result = failing.refresh(DORF_TIROL, "de")
         assertEquals("store: disk full", result.failed["GEOSPHERE_AROME"])
@@ -246,5 +247,33 @@ class WeatherRepositoryTest {
         repo.refresh(DORF_TIROL, "de")
         repo.evictAllBut(emptyList(), emptyList())
         assertTrue(repo.snapshot(DORF_TIROL, "de").first().forecasts.isNotEmpty())
+    }
+
+    /**
+     * The one thing this app keeps that nobody publishes: what a model said about an hour that has
+     * since happened. Without it there is no ground truth to measure a model against.
+     */
+    @Test
+    fun `a refresh writes down what the station read and what the models said it would`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        val history = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first()
+        assertEquals(1, history.size)
+        assertTrue(history.single().modelsJson.contains("ICON"))
+        assertTrue(history.single().observedC in -40.0..45.0)
+    }
+
+    /** Once per hour, however many times the app refreshes inside it. */
+    @Test
+    fun `refreshing twice in the same hour records that hour once`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        repo.refresh(DORF_TIROL, "de")
+        assertEquals(1, db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first().size)
+    }
+
+    /** A place with no station has nothing to measure a model against, and records nothing. */
+    @Test
+    fun `a place without a station records no history`() = runTest {
+        repo.refresh(STERZING, "de")
+        assertTrue(db.weatherDao().stationHistory(STERZING.istat, 0L).first().isEmpty())
     }
 }

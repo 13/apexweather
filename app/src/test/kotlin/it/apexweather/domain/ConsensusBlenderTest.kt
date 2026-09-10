@@ -235,4 +235,135 @@ class ConsensusBlenderTest {
         assertTrue(c.hourly.isEmpty())
         assertTrue(c.daily.isEmpty())
     }
+
+    private fun minutes(vararg mm: Double) = mm.mapIndexed { i, v ->
+        it.apexweather.domain.model.MinutePoint(T0.plusSeconds(i * 900L), v)
+    }
+
+    @Test
+    fun `the quarter-hourly series is the median of the models that publish one`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.0, 1.0)),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.4, 2.0)),
+            Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.2, 3.0)),
+        )
+        val minutely = blender.blend(f).minutely
+        assertEquals(3, minutely.size)
+        assertEquals(0.2, minutely[1].precipMm, 1e-9)
+        assertEquals(3, minutely[1].sourceCount)
+    }
+
+    /** A model with no quarter-hourly series simply does not vote; it must not count as a dry zero. */
+    @Test
+    fun `a model without a quarter-hourly series is left out of it`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))).copy(minutely = minutes(1.0)),
+            Source.ECMWF to forecast(Source.ECMWF, listOf(point(0, 10.0))),
+        )
+        val minutely = blender.blend(f).minutely
+        assertEquals(1, minutely.single().sourceCount)
+        assertEquals(1.0, minutely.single().precipMm, 0.0)
+    }
+
+    @Test
+    fun `the start of precipitation is found to the quarter-hour`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.0, 0.6, 1.0)),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.0, 0.8, 1.0)),
+        )
+        assertEquals(T0.plusSeconds(2 * 900L), blender.blend(f).precipitationStartsAt(T0))
+    }
+
+    /** Already raining: a start time would be a lie, and the reader can see it out of the window. */
+    @Test
+    fun `no start time is offered while it is already raining`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))).copy(minutely = minutes(1.0, 1.0, 1.0)),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0))).copy(minutely = minutes(1.0, 1.0, 1.0)),
+        )
+        assertNull(blender.blend(f).precipitationStartsAt(T0.plusSeconds(450L)))
+    }
+
+    @Test
+    fun `a dry twelve hours offers no start time`() {
+        val f = mapOf(Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.0, 0.0)))
+        assertNull(blender.blend(f).precipitationStartsAt(T0))
+    }
+
+    /**
+     * The point of measuring a model's habit: a run that has been two degrees warm at the station
+     * all week has those two degrees taken off before it is compared with anyone else.
+     */
+    @Test
+    fun `a model's measured bias is taken off before it votes`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 14.0))),
+            Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 10.0))),
+        )
+        val uncorrected = blender.blend(f).hourly.single().tempC
+        val corrected = blender.blend(f, mapOf(Source.ICON_D2 to 4.0), now = T0).hourly.single().tempC
+        assertEquals(10.0, uncorrected, 0.0)
+        // ICON-D2 comes back to 10 too, so the band closes rather than the median moving.
+        assertEquals(10.0, corrected, 0.0)
+        assertEquals(10.0, blender.blend(f, mapOf(Source.ICON_D2 to 4.0), now = T0).hourly.single().tempMaxC, 0.0)
+    }
+
+    /** Far enough ahead the habit says nothing, and the forecast is left as the model wrote it. */
+    @Test
+    fun `the correction has faded by the far end of the day`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 24).map { point(it, 10.0) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 24).map { point(it, 14.0) }),
+        )
+        val hourly = blender.blend(f, mapOf(Source.ICON_D2 to 4.0), now = T0).hourly
+        assertEquals(12.0, hourly.first { it.time == hour(20) }.tempC, 0.0)
+    }
+
+    @Test
+    fun `an empty bias map changes nothing`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 14.0))),
+        )
+        assertEquals(blender.blend(f).hourly.single().tempC, blender.blend(f, emptyMap(), T0).hourly.single().tempC, 0.0)
+    }
+
+    private fun ensemble(halfWidth: Double, hours: Int = 24) = it.apexweather.data.remote.EnsembleSpread(
+        fetchedAt = T0, memberCount = 20,
+        halfWidthByEpochSecond = (0 until hours).associate { hour(it).epochSecond to halfWidth },
+    )
+
+    /**
+     * The models disagreeing by six degrees and an ensemble that is confident are different claims,
+     * and the badge should report the second where it exists.
+     */
+    @Test
+    fun `the ensemble's own spread is preferred to the models' disagreement`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 8.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 14.0))),
+        )
+        val without = blender.blend(f).hourly.single()
+        val with = blender.blend(f, emptyMap(), T0, ensemble(halfWidth = 0.5)).hourly.single()
+
+        assertNull(without.ensembleHalfWidthC)
+        assertEquals(0.5, with.ensembleHalfWidthC!!, 0.0)
+        // Six degrees apart, so the model spread reads as total disagreement; the ensemble does not.
+        assertTrue("agreement was ${without.agreement}", without.agreement < 0.1f)
+        assertTrue("agreement was ${with.agreement}", with.agreement > 0.7f)
+    }
+
+    /** An hour the ensemble does not reach falls back to the models, rather than to certainty. */
+    @Test
+    fun `beyond the ensemble's range the model spread is used again`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 48).map { point(it, 8.0) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 48).map { point(it, 14.0) }),
+        )
+        val hourly = blender.blend(f, emptyMap(), T0, ensemble(halfWidth = 0.5, hours = 24)).hourly
+        assertEquals(0.5, hourly.first { it.time == hour(5) }.ensembleHalfWidthC!!, 0.0)
+        assertNull(hourly.first { it.time == hour(40) }.ensembleHalfWidthC)
+        assertTrue(hourly.first { it.time == hour(40) }.agreement < 0.1f)
+    }
 }

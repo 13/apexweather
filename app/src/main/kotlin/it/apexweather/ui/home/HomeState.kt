@@ -1,6 +1,7 @@
 package it.apexweather.ui.home
 
 import it.apexweather.data.AppSettings
+import it.apexweather.data.WarningDismissals
 import it.apexweather.domain.Place
 import it.apexweather.domain.SkyPalette
 import it.apexweather.domain.SkyPaletteSelector
@@ -47,8 +48,12 @@ data class HomeUiState(
      * The card carries the timestamp, so an older reading is honest rather than hidden.
      */
     val station: StationObservation? = null,
-    /** Civil-protection warnings in force for the province, worst first. */
+    /** Civil-protection warnings in force for the province, worst first — dismissed ones included. */
     val warnings: List<Warning> = emptyList(),
+    /** Keys of the warnings the reader has waved away; see [WarningDismissals.key]. */
+    val dismissedWarnings: Set<String> = emptySet(),
+    /** When precipitation next begins, to the quarter-hour, or null if it is already falling. */
+    val minutelyStart: Instant? = null,
     /**
      * How much the station's reading had to be moved to stand for the village, in degrees. Null when
      * the hero is not a station reading, or when there was nothing to correct it with — the wording
@@ -80,6 +85,15 @@ data class HomeUiState(
      * What each model says about [date]. Models whose forecast does not reach that far are absent
      * rather than filled in, so a day late in the week honestly shows fewer of them.
      */
+    /**
+     * What the card shows. The sheet still lists everything, greyed, because dismissing a warning
+     * should stop it shouting, not put it beyond reach.
+     */
+    val visibleWarnings: List<Warning>
+        get() = warnings.filterNot { WarningDismissals.key(it) in dismissedWarnings }
+
+    fun isDismissed(warning: Warning): Boolean = WarningDismissals.key(warning) in dismissedWarnings
+
     fun sourcesForDay(date: LocalDate): Map<Source, DailyPoint> =
         sourceDays.mapNotNull { (source, byDate) -> byDate[date]?.let { source to it } }
             .sortedBy { it.first.ordinal }
@@ -95,7 +109,14 @@ object HomeStateBuilder {
      */
     const val MAX_DAYS = 14
 
-    fun build(place: Place?, snapshot: WeatherSnapshot, settings: AppSettings, consensus: ConsensusForecast, now: Instant): HomeUiState {
+    fun build(
+        place: Place?,
+        snapshot: WeatherSnapshot,
+        settings: AppSettings,
+        consensus: ConsensusForecast,
+        now: Instant,
+        dismissedWarnings: Set<String> = emptySet(),
+    ): HomeUiState {
         val thisHour = now.truncatedTo(ChronoUnit.HOURS)
         val upcoming = consensus.hourly.filter { !it.time.isBefore(thisHour) }.take(48)
         val current = upcoming.firstOrNull()
@@ -122,11 +143,14 @@ object HomeStateBuilder {
             heroAdjustmentC = adjustment?.takeIf { heroFromStation != null },
             heroFeelsLikeC = current?.feelsLikeC,
             heroCondition = heroCondition,
-            bandHalfWidth = current?.let { (it.tempMaxC - it.tempMinC) / 2.0 },
+            // The ensemble's own spread where it reaches this hour, the models' disagreement otherwise.
+            bandHalfWidth = current?.let { it.ensembleHalfWidthC ?: (it.tempMaxC - it.tempMinC) / 2.0 },
             currentHour = current,
             observation = obs?.takeIf { heroFromStation != null },
             station = snapshot.observation,
             warnings = snapshot.warnings,
+            dismissedWarnings = dismissedWarnings,
+            minutelyStart = consensus.precipitationStartsAt(now),
             upcomingHours = upcoming,
             days = consensus.daily.filter { !it.date.isBefore(now.atZone(SouthTyrol.ZONE).toLocalDate()) }.take(MAX_DAYS),
             hoursByDate = consensus.hourly.groupBy { it.time.atZone(SouthTyrol.ZONE).toLocalDate() },

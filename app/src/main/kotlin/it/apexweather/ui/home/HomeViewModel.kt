@@ -8,8 +8,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.apexweather.data.PlaceCatalogue
 import it.apexweather.data.SettingsRepository
+import it.apexweather.data.WarningDismissals
 import it.apexweather.data.WeatherRepository
 import it.apexweather.domain.Place
+import it.apexweather.domain.model.Warning
 import it.apexweather.ui.WeatherStateHolder
 import it.apexweather.widget.ApexWidget
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +36,7 @@ class HomeViewModel @Inject constructor(
     private val repository: WeatherRepository,
     private val settingsRepository: SettingsRepository,
     private val catalogue: PlaceCatalogue,
+    private val dismissals: WarningDismissals,
     private val clock: Clock,
 ) : ViewModel() {
 
@@ -94,11 +97,18 @@ class HomeViewModel @Inject constructor(
             // Read after the refresh, not before: the reader may have changed place while it ran,
             // and a list worked out beforehand would evict the place they are now looking at.
             evictStalePlaces()
+            // A warning that has expired takes its dismissal with it, so the set cannot grow and a
+            // warning re-issued later is shown again rather than inheriting the old silence.
+            runCatching { dismissals.prune(holder.weather.value.snapshot.warnings) }
             runCatching { ApexWidget().updateAll(context) }
         } finally {
             refreshing.value = false
         }
     }
+
+    fun dismissWarning(warning: Warning) = viewModelScope.launch { dismissals.dismiss(warning) }
+
+    fun restoreWarning(warning: Warning) = viewModelScope.launch { dismissals.restore(warning) }
 
     private suspend fun evictStalePlaces() {
         val settings = settingsRepository.settings.first()

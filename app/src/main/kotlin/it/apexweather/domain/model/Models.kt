@@ -12,7 +12,14 @@ enum class Source(val displayName: String, val regional: Boolean) {
     ICON_CH2("MeteoSwiss ICON-CH2", true),
     ICON_2I("ARPAE ICON-2I", true),
     ICON_D2("DWD ICON-D2", true),
-    ECMWF("ECMWF IFS", false);
+    // Two independent HARMONIE-AROME runs at about 2 km. They matter because without them the
+    // regional half of the consensus is four flavours of ICON, and four models that share a core
+    // agreeing with each other is not the same thing as four models being right.
+    KNMI_HARMONIE("KNMI HARMONIE", true),
+    DMI_HARMONIE("DMI HARMONIE", true),
+    ECMWF("ECMWF IFS", false),
+    /** ECMWF's machine-learned model: the same institution, an entirely different way of forecasting. */
+    ECMWF_AIFS("ECMWF AIFS", false);
 
     /** True when [SourceStatus.Ok.issuedAt] really is the model run time. Open-Meteo does not report a
      * run time, so for those sources the timestamp is only when we fetched the data. */
@@ -22,7 +29,7 @@ enum class Source(val displayName: String, val regional: Boolean) {
      * (02:00 and 14:00 local), so its threshold is the 12 h cadence plus margin for the publication delay. */
     val staleAfterHours: Int get() = when (this) {
         SIAG_KMOS -> 16
-        ECMWF -> 12
+        ECMWF, ECMWF_AIFS -> 12
         else -> 6
     }
 }
@@ -54,6 +61,19 @@ data class HourlyPoint(
     val condition: Condition,
 )
 
+/**
+ * A quarter of an hour of precipitation.
+ *
+ * Only the regional models publish these natively. Asking a 25 km global model for a quarter-hourly
+ * series returns one, but it is interpolation wearing the clothes of resolution, so those are left
+ * out rather than allowed to vote on when the rain starts.
+ */
+@Serializable
+data class MinutePoint(
+    @Serializable(with = InstantSerializer::class) val time: Instant,
+    val precipMm: Double,
+)
+
 @Serializable
 data class DailyPoint(
     @Serializable(with = LocalDateSerializer::class) val date: LocalDate,
@@ -72,6 +92,8 @@ data class SourceForecast(
     @Serializable(with = InstantSerializer::class) val fetchedAt: Instant,
     val hourly: List<HourlyPoint>,
     val daily: List<DailyPoint>,
+    /** Quarter-hourly precipitation for the next twelve hours; empty for a model that has none. */
+    val minutely: List<MinutePoint> = emptyList(),
 )
 
 @Serializable
@@ -160,6 +182,10 @@ data class WeatherSnapshot(
     val warnings: List<Warning>,
     /** The models' temperature at the weather station, for carrying its reading up to the village. */
     val stationReference: it.apexweather.data.remote.StationReference?,
+    /** How wrong each model has lately been at the station; empty until enough hours have accumulated. */
+    val modelBias: Map<Source, Double>,
+    /** How far ICON-D2's ensemble members spread, which is uncertainty rather than disagreement. */
+    val ensemble: it.apexweather.data.remote.EnsembleSpread?,
     val status: Map<Source, SourceStatus>,
     val bulletinStatus: SourceStatus?,
     val observationStatus: SourceStatus?,
@@ -184,7 +210,12 @@ data class WeatherSnapshot(
     val forecastsForBlend: Map<Source, SourceForecast>
         get() = forecasts.filterKeys { status[it] is SourceStatus.Ok }.takeIf { it.isNotEmpty() } ?: forecasts
     companion object {
-        val EMPTY = WeatherSnapshot(emptyMap(), null, null, emptyList(), null, emptyMap(), null, null, null, null, false)
+        val EMPTY = WeatherSnapshot(
+            forecasts = emptyMap(), bulletin = null, observation = null, warnings = emptyList(),
+            stationReference = null, modelBias = emptyMap(), ensemble = null, status = emptyMap(),
+            bulletinStatus = null, observationStatus = null, warningStatus = null,
+            lastSuccessfulRefresh = null, lastRefreshFailed = false,
+        )
     }
 }
 
@@ -202,6 +233,11 @@ data class ConsensusHour(
     val gustKmh: Double?,
     /** Median 0 °C isotherm across the models that publish one, in metres. */
     val freezingLevelM: Double?,
+    /**
+     * Half the ensemble's tenth-to-ninetieth percentile range, where one reaches this hour. This is
+     * uncertainty measured rather than inferred, and the badge prefers it to the model spread.
+     */
+    val ensembleHalfWidthC: Double? = null,
     val condition: Condition,
     val agreement: Float,
     val sourceCount: Int,
@@ -223,6 +259,31 @@ data class ConsensusDay(
     val sunset: Instant?,
 )
 
-data class ConsensusForecast(val hourly: List<ConsensusHour>, val daily: List<ConsensusDay>) {
-    companion object { val EMPTY = ConsensusForecast(emptyList(), emptyList()) }
+/** Quarter-hourly precipitation, blended the same way as everything else: the median of the models. */
+data class ConsensusMinute(val time: Instant, val precipMm: Double, val sourceCount: Int)
+
+data class ConsensusForecast(
+    val hourly: List<ConsensusHour>,
+    val daily: List<ConsensusDay>,
+    val minutely: List<ConsensusMinute> = emptyList(),
+) {
+    /**
+     * When precipitation next begins, to the quarter-hour, or null if it is already falling or does
+     * not start inside the sub-hourly window. The threshold is the same one the hourly series uses
+     * for "this counts as rain".
+     */
+    fun precipitationStartsAt(now: Instant): Instant? {
+        val ahead = minutely.filter { it.time.isAfter(now) }
+        if (ahead.isEmpty()) return null
+        // Already raining: the reader can see that out of the window, and a start time would be a lie.
+        if (minutely.lastOrNull { !it.time.isAfter(now) }?.let { it.precipMm >= WET_MM } == true) return null
+        return ahead.firstOrNull { it.precipMm >= WET_MM }?.time
+    }
+
+    companion object {
+        /** Millimetres in a quarter of an hour that count as precipitation rather than damp air. */
+        const val WET_MM = 0.05
+
+        val EMPTY = ConsensusForecast(emptyList(), emptyList())
+    }
 }

@@ -4,9 +4,12 @@ import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.ConsensusDay
 import it.apexweather.domain.model.ConsensusForecast
 import it.apexweather.domain.model.ConsensusHour
+import it.apexweather.data.remote.EnsembleSpread
+import it.apexweather.domain.model.ConsensusMinute
 import it.apexweather.domain.model.HourlyPoint
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceForecast
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -14,7 +17,18 @@ import kotlin.math.roundToInt
 
 class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
 
-    fun blend(forecasts: Map<Source, SourceForecast>): ConsensusForecast {
+    /**
+     * [bias] is how warm each model has lately run at the nearest station, from [BiasCorrector]. It
+     * is subtracted from that model's temperatures before they are compared with anyone else's, and
+     * fades with lead time — a model's habit today says a lot about this afternoon and little about
+     * Thursday. An empty map is the normal state until enough hours have accumulated.
+     */
+    fun blend(
+        forecasts: Map<Source, SourceForecast>,
+        bias: Map<Source, Double> = emptyMap(),
+        now: Instant? = null,
+        ensemble: EnsembleSpread? = null,
+    ): ConsensusForecast {
         if (forecasts.isEmpty()) return ConsensusForecast.EMPTY
 
         // time → (source → point), times truncated to the hour
@@ -26,11 +40,20 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             }
         }
 
+        val from = now ?: byTime.firstKey()
         val hourly = byTime.mapNotNull { (time, bySource) ->
             val regional = bySource.filterKeys { it.regional }
             val contributing = if (regional.size >= 2) regional else bySource
             if (contributing.isEmpty()) return@mapNotNull null
-            blendHour(time, contributing)
+            val lead = Duration.between(from, time).toHours().coerceAtLeast(0)
+            val corrected = contributing.mapValues { (source, point) ->
+                val correction = BiasCorrector.correctionAt(bias[source], lead)
+                if (correction == 0.0) point else point.copy(
+                    tempC = point.tempC - correction,
+                    feelsLikeC = point.feelsLikeC?.minus(correction),
+                )
+            }
+            blendHour(time, corrected, ensemble?.halfWidthAt(time))
         }
 
         val sunTimes = forecasts.values.flatMap { it.daily }
@@ -60,16 +83,35 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
                 sunrise = d.sunrise, sunset = d.sunset,
             )
         }
-        return ConsensusForecast(hourly, daily)
+        return ConsensusForecast(hourly, daily, blendMinutely(forecasts))
     }
 
-    private fun blendHour(time: Instant, points: Map<Source, HourlyPoint>): ConsensusHour {
+    /**
+     * The quarter-hourly series, median across whichever models published one. Only the regional
+     * models do, so this is a smaller consensus than the hourly one — and an honest one, rather than
+     * a wide one padded with globals interpolating their own hourly values.
+     */
+    private fun blendMinutely(forecasts: Map<Source, SourceForecast>): List<ConsensusMinute> {
+        val byTime = sortedMapOf<Instant, MutableList<Double>>()
+        forecasts.values.forEach { f ->
+            f.minutely.forEach { p -> byTime.getOrPut(p.time) { mutableListOf() }.add(p.precipMm) }
+        }
+        return byTime.map { (time, values) -> ConsensusMinute(time, median(values), values.size) }
+    }
+
+    private fun blendHour(time: Instant, points: Map<Source, HourlyPoint>, ensembleHalfWidth: Double?): ConsensusHour {
         val values = points.values
         val temps = values.map { it.tempC }
         val tMin = temps.min()
         val tMax = temps.max()
-        val spread = tMax - tMin
-        val agreement = if (values.size == 1) 0.5f else (1.0 - (spread / 6.0).coerceIn(0.0, 1.0)).toFloat()
+        // The ensemble measures uncertainty; the spread between models only stands in for it. Where
+        // the ensemble reaches this hour it is the better number, and it is doubled to compare like
+        // with like — one is a half-width, the other a full range.
+        val spread = ensembleHalfWidth?.times(2) ?: (tMax - tMin)
+        val agreement = when {
+            ensembleHalfWidth == null && values.size == 1 -> 0.5f
+            else -> (1.0 - (spread / 6.0).coerceIn(0.0, 1.0)).toFloat()
+        }
 
         val probs = values.mapNotNull { it.precipProb }
         val precipProb = if (probs.isNotEmpty()) probs.max()
@@ -95,6 +137,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             // means here, not oversights; change them only on purpose.
             gustKmh = gusts.maxOrNull(),
             freezingLevelM = freezing.takeIf { it.isNotEmpty() }?.let(::median),
+            ensembleHalfWidthC = ensembleHalfWidth,
             condition = voteCondition(values.map { it.condition }),
             agreement = agreement,
             sourceCount = values.size,

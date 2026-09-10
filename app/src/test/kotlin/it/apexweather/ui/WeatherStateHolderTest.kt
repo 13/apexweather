@@ -3,8 +3,10 @@ package it.apexweather.ui
 import androidx.test.core.app.ApplicationProvider
 import it.apexweather.Fixtures
 import it.apexweather.data.FakeGeoSphere
+import it.apexweather.data.FakeEnsemble
 import it.apexweather.data.FakeMeteoAlarm
 import it.apexweather.data.PlaceCatalogue
+import it.apexweather.data.WarningDismissals
 import it.apexweather.domain.DORF_TIROL
 import it.apexweather.data.FakeOdh
 import it.apexweather.data.FakeOpenMeteo
@@ -57,7 +59,7 @@ class WeatherStateHolderTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         db = AppDatabase.inMemory(context)
         repository = WeatherRepository(
-            db.weatherDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(), FakeMeteoAlarm(),
+            db.weatherDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(), FakeMeteoAlarm(), FakeEnsemble(),
             Fixtures.json, MutableClock(Instant.parse("2026-09-08T14:00:00Z")),
         )
         scope = CoroutineScope(UnconfinedTestDispatcher())
@@ -68,7 +70,7 @@ class WeatherStateHolderTest {
         // data never ends.
         runBlocking { settings.setPlace(DORF_TIROL.istat) }
         holder = WeatherStateHolder(
-            repository, settings, PlaceCatalogue(context), ConsensusBlender(SouthTyrol.ZONE),
+            repository, settings, PlaceCatalogue(context), WarningDismissals(context), ConsensusBlender(SouthTyrol.ZONE),
             MutableClock(Instant.parse("2026-09-08T14:00:00Z")), scope,
         )
     }
