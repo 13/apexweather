@@ -99,7 +99,7 @@ class WeatherNotifier @Inject constructor(@ApplicationContext private val contex
         // filled shapes drawn to be seen in colour; Android flattens a small icon to a white
         // silhouette, which turns most of them into an unreadable blob.
         is WeatherNotification.Summary -> ID_SUMMARY to base(CHANNEL_SUMMARY)
-            .setContentTitle(context.getString(R.string.notif_summary_title, context.getString(n.condition.labelRes())))
+            .setContentTitle(context.getString(R.string.notif_summary_title, context.getString(n.condition.labelRes()), n.placeName))
             .setContentText(
                 context.getString(
                     R.string.notif_summary_text,

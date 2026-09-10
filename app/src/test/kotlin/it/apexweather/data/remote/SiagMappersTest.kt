@@ -1,7 +1,6 @@
 package it.apexweather.data.remote
 
 import it.apexweather.Fixtures
-import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.NearbyStation
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.SiagCodes

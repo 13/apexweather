@@ -110,6 +110,17 @@ class SettingsRepositoryTest {
         assertEquals("021115", s.recentPlaces.first())
     }
 
+    /**
+     * The place the app opened on is never written to the recent list by anything else, so the very
+     * first switch has to put it there — otherwise eviction would throw its cache away at once.
+     */
+    @Test
+    fun `the place being left enters the recent list on the first switch`() = runTest {
+        repo.setPlace(SouthTyrol.DEFAULT_ISTAT)
+        repo.setPlace("021115")
+        assertEquals(listOf("021115", SouthTyrol.DEFAULT_ISTAT), repo.settings.first().recentPlaces.take(2))
+    }
+
     /** Most recent first, each place once: going back to one moves it to the head, not a duplicate. */
     @Test
     fun `the recent list is ordered by last use and holds each place once`() = runTest {

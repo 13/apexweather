@@ -123,8 +123,12 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
      * cache has already been told to evict.
      */
     suspend fun setPlace(istat: String) = context.settingsStore.edit { prefs ->
+        val previous = prefs[Keys.placeIstat]?.takeIf { it.isNotBlank() } ?: SouthTyrol.DEFAULT_ISTAT
         prefs[Keys.placeIstat] = istat
+        // The place being left has to enter the list here, or it is not in it when eviction reads
+        // it — and the very first switch would throw away the cache of the place the app opened on.
         val current = prefs[Keys.recentPlaces].orEmpty().split(',').filter { it.isNotBlank() }
+            .ifEmpty { listOf(previous) }
         prefs[Keys.recentPlaces] = (listOf(istat) + current.filterNot { it == istat })
             .take(RECENT_PLACES)
             .joinToString(",")

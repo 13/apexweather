@@ -45,14 +45,23 @@ class RefreshWorker @AssistedInject constructor(
         // say so when they are returned to, which is what this app already does for a failed source.
         val place = catalogue.byIstat(appSettings.placeIstat)
             ?: checkNotNull(catalogue.byIstat(SouthTyrol.DEFAULT_ISTAT))
-        val keepPlaces = (listOf(place.istat) + appSettings.recentPlaces).distinct()
-        val keepDistricts = (keepPlaces.mapNotNull { catalogue.byIstat(it)?.district } + place.district).distinct()
         val result = try {
-            repository.refresh(place, language, keepPlaces, keepDistricts)
+            repository.refresh(place, language)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             null
+        }
+        try {
+            // After the refresh, from settings read then: the reader may have changed place while
+            // it ran, and a list worked out beforehand would evict the place they are now looking at.
+            val current = settings.settings.first()
+            val keep = (listOf(current.placeIstat) + current.recentPlaces).distinct()
+            repository.evictAllBut(keep, keep.mapNotNull { catalogue.byIstat(it)?.district }.distinct())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // A cache left slightly too large is not worth failing the refresh over.
         }
         try {
             ApexWidget().updateAll(applicationContext)
@@ -82,11 +91,11 @@ class RefreshWorker @AssistedInject constructor(
         val now = clock.instant()
         val home = HomeStateBuilder.build(place, snapshot, appSettings, blender.blend(snapshot.forecastsForBlend), now)
         val memory = notifyStore.read()
-        val decided = NotificationDecider.decide(home, appSettings, memory, now, SouthTyrol.ZONE)
-        val formats = Formats(
-            applicationContext.resources.configuration.locales[0],
-            android.text.format.DateFormat.is24HourFormat(applicationContext),
-        )
+        // The worker renders outside a composition, so it resolves the reader's language and clock
+        // preference from its own context, exactly as the widget does.
+        val locale = applicationContext.resources.configuration.locales[0]
+        val formats = Formats(locale, android.text.format.DateFormat.is24HourFormat(applicationContext))
+        val decided = NotificationDecider.decide(home, appSettings, memory, now, SouthTyrol.ZONE, place.name(locale))
         val posted = notifier.post(decided, formats, now)
         // Only what actually reached the reader is remembered, so a notification Android dropped is
         // tried again on the next refresh rather than silently counted as delivered.

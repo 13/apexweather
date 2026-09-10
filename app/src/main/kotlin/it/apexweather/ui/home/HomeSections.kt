@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,7 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.apexweather.R
-import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.SunPhase
 import it.apexweather.domain.model.Bulletin
@@ -62,11 +63,28 @@ import java.time.LocalDate
 import kotlin.math.roundToInt
 
 @Composable
-fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier) {
+fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces: () -> Unit = {}) {
     val locale = LocalConfiguration.current.locales[0]
     val formats = LocalFormats.current
     Column(modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.Start) {
-        Text(DorfTirol.NAME, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
+        // The place name is already the first line on the screen, so it is the button too rather
+        // than adding a second affordance to a screen whose point is the sky behind it.
+        Row(
+            Modifier.clickable(onClickLabel = stringResource(R.string.change_place), onClick = onOpenPlaces)
+                .padding(vertical = 2.dp)
+                .testTag("place_button"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                state.place?.name(locale).orEmpty(),
+                style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f),
+            )
+            Icon(
+                Icons.Filled.ExpandMore, contentDescription = null,
+                tint = Color.White.copy(alpha = 0.75f), modifier = Modifier.size(18.dp),
+            )
+        }
         Text(
             text = state.heroTempC?.let { Format.temp(it, formats) } ?: "–",
             style = MaterialTheme.typography.displayLarge,
@@ -89,7 +107,7 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier) {
         val source = state.observation?.let { obs ->
             val at = Format.timestamp(obs.time, SouthTyrol.ZONE, state.now, formats)
             state.heroAdjustmentC
-                ?.let { stringResource(R.string.now_from_station_adjusted, obs.stationName, at, Format.tempDelta(it, formats)) }
+                ?.let { stringResource(R.string.now_from_station_adjusted, obs.stationName, at, Format.tempDelta(it, formats), state.place?.name(locale).orEmpty()) }
                 ?: stringResource(R.string.now_from_station, obs.stationName, at)
         } ?: pluralStringResource(R.plurals.now_from_consensus, sourceCount, sourceCount)
         Text(source, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.65f))

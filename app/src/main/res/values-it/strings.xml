@@ -23,7 +23,7 @@
     <string name="offline_banner">Dati delle %1$s · offline</string>
     <string name="offline_banner_no_time">Nessuna connessione</string>
     <string name="empty_title">Ancora nessun dato</string>
-    <string name="empty_body">Apex Weather ha bisogno di internet una volta per caricare le previsioni per Tirolo.</string>
+    <string name="empty_body">Apex Weather ha bisogno di internet una volta per caricare le previsioni per %1$s.</string>
     <string name="retry">Riprova</string>
     <string name="hour_summary">%1$s (da %2$s a %3$s) · %4$s · %5$d %% · vento %6$s</string>
     <string name="agreement_desc">Accordo tra modelli %1$d %%</string>
@@ -176,7 +176,7 @@
     <string name="channel_rain_desc">Quando nelle prossime ore iniziano le precipitazioni</string>
     <string name="channel_warning_name">Allerte meteo</string>
     <string name="channel_warning_desc">Allerte della protezione civile per la regione</string>
-    <string name="notif_summary_title">Oggi a Tirolo: %1$s</string>
+    <string name="notif_summary_title">Oggi a %2$s: %1$s</string>
     <string name="notif_summary_text">%1$s / %2$s · %3$s</string>
     <string name="notif_rain_title">%1$s dalle %2$s</string>
     <string name="notif_rain_text">%1$d %% di probabilità · %2$s previsti</string>
@@ -190,5 +190,23 @@
     <string name="setting_notif_grant">Consenti</string>
 
     <!-- La stazione sta 270 m sotto il paese: il valore viene riportato in quota prima di mostrarlo. -->
-    <string name="now_from_station_adjusted">Ora: stazione %1$s, %2$s · riportato a Tirolo (%3$s)</string>
+    <string name="now_from_station_adjusted">Ora: stazione %1$s, %2$s · riportato a %4$s (%3$s)</string>
+
+    <!-- La scelta del comune, fra i 116 della provincia. -->
+    <string name="place_title">Scegli il comune</string>
+    <string name="place_search">Cerca comune</string>
+    <string name="place_none">Nessun comune trovato</string>
+    <string name="place_meta">%1$s · %2$s</string>
+    <string name="place_row_desc">%1$s, %2$s, distretto %3$s</string>
+    <string name="place_selected">Attualmente scelto</string>
+    <string name="change_place">Cambia comune</string>
+    <string name="setting_place">COMUNE</string>
+    <string name="back">Indietro</string>
+    <string name="district_1">Bolzano, Oltradige e Bassa Atesina</string>
+    <string name="district_2">Burgraviato</string>
+    <string name="district_3">Val Venosta</string>
+    <string name="district_4">Valle Isarco e Val Sarentino</string>
+    <string name="district_5">Alta Valle Isarco</string>
+    <string name="district_6">Val Pusteria</string>
+    <string name="district_7">Ladinia – Dolomiti</string>
 </resources>

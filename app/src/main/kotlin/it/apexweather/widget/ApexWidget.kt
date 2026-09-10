@@ -49,7 +49,6 @@ import it.apexweather.data.PlaceCatalogue
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
 import it.apexweather.domain.ConsensusBlender
-import it.apexweather.domain.DorfTirol
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.ui.common.Formats
 import it.apexweather.ui.home.HomeStateBuilder
@@ -118,7 +117,7 @@ private fun WidgetContent(state: WidgetState, background: Bitmap) {
                 Text(state.tempText, style = TextStyle(color = white, fontSize = 30.sp, fontWeight = FontWeight.Medium))
                 Spacer(GlanceModifier.width(10.dp))
                 Column {
-                    Text(DorfTirol.NAME, style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium))
+                    Text(state.placeName, style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium))
                     // The small widget has room for two lines. While the data is current those are
                     // the place and the sky; once it goes stale the age takes the second line,
                     // because a small widget showing an old reading with nothing to say so is a lie.

@@ -23,7 +23,7 @@
     <string name="offline_banner">Daten von %1$s · offline</string>
     <string name="offline_banner_no_time">Keine Verbindung</string>
     <string name="empty_title">Noch keine Daten</string>
-    <string name="empty_body">Apex Weather braucht einmal Internet, um die Vorhersagen für Dorf Tirol zu laden.</string>
+    <string name="empty_body">Apex Weather braucht einmal Internet, um die Vorhersagen für %1$s zu laden.</string>
     <string name="retry">Erneut versuchen</string>
     <string name="hour_summary">%1$s (%2$s bis %3$s) · %4$s · %5$d %% · Wind %6$s</string>
     <string name="agreement_desc">Modellübereinstimmung %1$d %%</string>
@@ -174,7 +174,7 @@
     <string name="channel_rain_desc">Wenn in den nächsten Stunden Niederschlag beginnt</string>
     <string name="channel_warning_name">Unwetterwarnungen</string>
     <string name="channel_warning_desc">Warnungen des Zivilschutzes für die Region</string>
-    <string name="notif_summary_title">Heute in Dorf Tirol: %1$s</string>
+    <string name="notif_summary_title">Heute in %2$s: %1$s</string>
     <string name="notif_summary_text">%1$s bis %2$s · %3$s</string>
     <string name="notif_rain_title">%1$s ab %2$s</string>
     <string name="notif_rain_text">%1$d %% Wahrscheinlichkeit · %2$s erwartet</string>
@@ -188,5 +188,23 @@
     <string name="setting_notif_grant">Erlauben</string>
 
     <!-- The station stands 270 m below the village, so its reading is carried up before it is quoted. -->
-    <string name="now_from_station_adjusted">Jetzt: Station %1$s, %2$s · auf Dorf Tirol umgerechnet (%3$s)</string>
+    <string name="now_from_station_adjusted">Jetzt: Station %1$s, %2$s · auf %4$s umgerechnet (%3$s)</string>
+
+    <!-- Choosing which of the province's 116 municipalities the app is about. -->
+    <string name="place_title">Ort wählen</string>
+    <string name="place_search">Gemeinde suchen</string>
+    <string name="place_none">Keine Gemeinde gefunden</string>
+    <string name="place_meta">%1$s · %2$s</string>
+    <string name="place_row_desc">%1$s, %2$s, Bezirk %3$s</string>
+    <string name="place_selected">Aktuell gewählt</string>
+    <string name="change_place">Ort wechseln</string>
+    <string name="setting_place">ORT</string>
+    <string name="back">Zurück</string>
+    <string name="district_1">Bozen, Überetsch und Unterland</string>
+    <string name="district_2">Burggrafenamt</string>
+    <string name="district_3">Vinschgau</string>
+    <string name="district_4">Eisacktal und Sarntal</string>
+    <string name="district_5">Wipptal</string>
+    <string name="district_6">Pustertal</string>
+    <string name="district_7">Ladinien – Dolomiten</string>
 </resources>

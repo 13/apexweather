@@ -133,12 +133,7 @@ class WeatherRepository @Inject constructor(
      * on the caller's — the five Open-Meteo model mappings, and seven JSON encodings of ~168 hourly
      * points each. On the main thread that is visible jank on launch and on every pull to refresh.
      */
-    suspend fun refresh(
-        place: Place,
-        language: String,
-        keepPlaces: List<String> = listOf(place.istat),
-        keepDistricts: List<Int> = listOf(place.district),
-    ): RefreshResult = withContext(Dispatchers.Default) {
+    suspend fun refresh(place: Place, language: String): RefreshResult = withContext(Dispatchers.Default) {
         val now = clock.instant()
         // The blocks below run in parallel on whatever threads the network continuations resume on,
         // so the shared bookkeeping has to be synchronised.
@@ -275,10 +270,20 @@ class WeatherRepository @Inject constructor(
                 lastAttemptFailed = result.allFailed,
             )
         )
-        // Only after a refresh that produced something: a failed one must not clear the cache it
-        // was supposed to top up.
-        if (result.succeeded.isNotEmpty()) dao.evict(keepPlaces, keepDistricts)
         result
+    }
+
+    /**
+     * Drops every place but [keepPlaces], and every bulletin but those of [keepDistricts].
+     *
+     * Deliberately not part of [refresh]. A refresh takes seconds, and the reader can change place
+     * inside those seconds; an eviction list computed before the network round-trip would then be
+     * describing the place they have just left, and would delete the cache of the one they are now
+     * looking at. Callers work this list out after the refresh returns, from settings read then.
+     */
+    suspend fun evictAllBut(keepPlaces: List<String>, keepDistricts: List<Int>) {
+        if (keepPlaces.isEmpty() || keepDistricts.isEmpty()) return
+        dao.evict(keepPlaces, keepDistricts)
     }
 
     private suspend fun previousSuccessMs(place: Place): Long? = dao.metaOnce(place.istat)?.lastSuccessMs

@@ -54,14 +54,14 @@ import java.time.Instant
 import java.time.LocalDate
 
 @Composable
-fun HomeScreen(onOpenBulletin: () -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeScreen(onOpenBulletin: () -> Unit, onOpenPlaces: () -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    HomeContent(state = state, onRefresh = viewModel::refresh, onOpenBulletin = onOpenBulletin)
+    HomeContent(state = state, onRefresh = viewModel::refresh, onOpenBulletin = onOpenBulletin, onOpenPlaces = onOpenPlaces)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () -> Unit) {
+fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () -> Unit, onOpenPlaces: () -> Unit = {}) {
     var selectedHour by remember { mutableStateOf<Instant?>(null) }
     var selectedDay by remember { mutableStateOf<LocalDate?>(null) }
     var warningsOpen by remember { mutableStateOf(false) }
@@ -73,12 +73,12 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
     PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
         when {
             state.loading -> Box(Modifier.fillMaxSize())
-            state.isEmpty -> EmptyState(onRefresh, Modifier.fillMaxSize())
+            state.isEmpty -> EmptyState(state.place?.name(LocalConfiguration.current.locales[0]).orEmpty(), onRefresh, Modifier.fillMaxSize())
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (state.offline) item { OfflineBanner(state) }
                 // Above the hero: a warning that has to be scrolled to is a warning that was missed.
                 if (state.warnings.isNotEmpty()) item { WarningSection(state.warnings, state.now) { warningsOpen = true } }
-                item { HeroSection(state) }
+                item { HeroSection(state, onOpenPlaces = onOpenPlaces) }
                 item {
                     AnimatedVisibility(appeared, enter = fadeIn(tween(500)) + slideInVertically(tween(500)) { it / 4 }) {
                         HourlySection(state.upcomingHours, state::phaseAt, accent) { selectedHour = it }
@@ -148,11 +148,11 @@ private fun OfflineBanner(state: HomeUiState) {
 }
 
 @Composable
-private fun EmptyState(onRetry: () -> Unit, modifier: Modifier) {
+private fun EmptyState(placeName: String, onRetry: () -> Unit, modifier: Modifier) {
     Column(modifier.padding(32.dp).testTag("empty_state"), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(stringResource(R.string.empty_title), style = MaterialTheme.typography.headlineMedium, color = Color.White)
         Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.empty_body), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f))
+        Text(stringResource(R.string.empty_body, placeName), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f))
         Spacer(Modifier.height(20.dp))
         Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
     }

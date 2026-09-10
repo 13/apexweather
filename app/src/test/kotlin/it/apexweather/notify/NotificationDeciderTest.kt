@@ -48,7 +48,10 @@ class NotificationDeciderTest {
         current: ConsensusHour? = consensusHour(morning, mm = 0.0, prob = 5, condition = Condition.CLOUDY),
         upcoming: List<ConsensusHour> = emptyList(),
         warnings: List<Warning> = emptyList(),
-    ) = HomeUiState(days = days, currentHour = current, upcomingHours = upcoming, warnings = warnings)
+    ) = HomeUiState(
+        place = it.apexweather.domain.DORF_TIROL,
+        days = days, currentHour = current, upcomingHours = upcoming, warnings = warnings,
+    )
 
     private val allOn = AppSettings(notifySummary = true, notifyRain = true, notifyWarnings = true)
 
@@ -56,16 +59,18 @@ class NotificationDeciderTest {
 
     @Test
     fun `the summary goes out once the chosen hour has come`() {
-        val out = NotificationDecider.decide(state(), allOn, NotifyMemory(), morning, zone)
+        val out = NotificationDecider.decide(state(), allOn, NotifyMemory(), morning, zone, "Dorf Tirol")
         val summary = out.filterIsInstance<WeatherNotification.Summary>().single()
         assertEquals(today, summary.date)
+        // The reader may have switched place since the last summary; the title has to say which.
+        assertEquals("Dorf Tirol", summary.placeName)
         assertEquals(21.0, summary.maxC, 0.001)
     }
 
     @Test
     fun `nothing before the chosen hour`() {
         val sixThirty = Instant.parse("2026-09-09T04:30:00Z")
-        val out = NotificationDecider.decide(state(), allOn, NotifyMemory(), sixThirty, zone)
+        val out = NotificationDecider.decide(state(), allOn, NotifyMemory(), sixThirty, zone, "Dorf Tirol")
         assertTrue(out.none { it is WeatherNotification.Summary })
     }
 
@@ -73,20 +78,20 @@ class NotificationDeciderTest {
     @Test
     fun `a summary hours late is not worth posting`() {
         val evening = Instant.parse("2026-09-09T16:00:00Z")
-        val out = NotificationDecider.decide(state(), allOn, NotifyMemory(), evening, zone)
+        val out = NotificationDecider.decide(state(), allOn, NotifyMemory(), evening, zone, "Dorf Tirol")
         assertTrue(out.none { it is WeatherNotification.Summary })
     }
 
     @Test
     fun `the same day is never summarised twice`() {
         val memory = NotifyMemory(lastSummaryDate = today)
-        val out = NotificationDecider.decide(state(), allOn, memory, morning, zone)
+        val out = NotificationDecider.decide(state(), allOn, memory, morning, zone, "Dorf Tirol")
         assertTrue(out.none { it is WeatherNotification.Summary })
     }
 
     @Test
     fun `the switch being off means silence`() {
-        val out = NotificationDecider.decide(state(warnings = listOf(warning("a"))), AppSettings(), NotifyMemory(), morning, zone)
+        val out = NotificationDecider.decide(state(warnings = listOf(warning("a"))), AppSettings(), NotifyMemory(), morning, zone, "Dorf Tirol")
         assertTrue(out.isEmpty())
     }
 
@@ -97,7 +102,7 @@ class NotificationDeciderTest {
         val onset = morning.plusSeconds(2 * 3600)
         val out = NotificationDecider.decide(
             state(upcoming = listOf(consensusHour(onset, mm = 1.4, prob = 70))),
-            allOn, NotifyMemory(), morning, zone,
+            allOn, NotifyMemory(), morning, zone, "Dorf Tirol",
         )
         assertEquals(onset, out.filterIsInstance<WeatherNotification.RainStarting>().single().hour.time)
     }
@@ -106,7 +111,7 @@ class NotificationDeciderTest {
     fun `rain beyond the lookahead is a forecast, not a heads-up`() {
         val out = NotificationDecider.decide(
             state(upcoming = listOf(consensusHour(morning.plusSeconds(5 * 3600), mm = 1.4, prob = 70))),
-            allOn, NotifyMemory(), morning, zone,
+            allOn, NotifyMemory(), morning, zone, "Dorf Tirol",
         )
         assertTrue(out.none { it is WeatherNotification.RainStarting })
     }
@@ -115,7 +120,7 @@ class NotificationDeciderTest {
     fun `a shower nobody is sure about stays quiet`() {
         val out = NotificationDecider.decide(
             state(upcoming = listOf(consensusHour(morning.plusSeconds(3600), mm = 1.4, prob = 20))),
-            allOn, NotifyMemory(), morning, zone,
+            allOn, NotifyMemory(), morning, zone, "Dorf Tirol",
         )
         assertTrue(out.none { it is WeatherNotification.RainStarting })
     }
@@ -128,7 +133,7 @@ class NotificationDeciderTest {
                 current = consensusHour(morning, mm = 1.0, prob = 90),
                 upcoming = listOf(consensusHour(morning.plusSeconds(3600), mm = 1.4, prob = 70)),
             ),
-            allOn, NotifyMemory(), morning, zone,
+            allOn, NotifyMemory(), morning, zone, "Dorf Tirol",
         )
         assertTrue(out.none { it is WeatherNotification.RainStarting })
     }
@@ -138,7 +143,7 @@ class NotificationDeciderTest {
         val onset = morning.plusSeconds(2 * 3600)
         val out = NotificationDecider.decide(
             state(upcoming = listOf(consensusHour(onset, mm = 1.4, prob = 70))),
-            allOn, NotifyMemory(lastRainOnset = onset), morning, zone,
+            allOn, NotifyMemory(lastRainOnset = onset), morning, zone, "Dorf Tirol",
         )
         assertTrue(out.none { it is WeatherNotification.RainStarting })
     }
@@ -149,7 +154,7 @@ class NotificationDeciderTest {
     fun `every warning not yet announced goes out`() {
         val out = NotificationDecider.decide(
             state(warnings = listOf(warning("a", WarningLevel.RED), warning("b"))),
-            allOn, NotifyMemory(notifiedWarningIds = setOf("b")), morning, zone,
+            allOn, NotifyMemory(notifiedWarningIds = setOf("b")), morning, zone, "Dorf Tirol",
         )
         val severe = out.filterIsInstance<WeatherNotification.Severe>()
         assertEquals(listOf("a"), severe.map { it.warning.identifier })
@@ -168,7 +173,7 @@ class NotificationDeciderTest {
     fun `what was posted is what is remembered`() {
         val onset = morning.plusSeconds(3600)
         val posted = listOf(
-            WeatherNotification.Summary(today, Condition.RAIN, 11.0, 21.0, 4.0),
+            WeatherNotification.Summary("Dorf Tirol", today, Condition.RAIN, 11.0, 21.0, 4.0),
             WeatherNotification.RainStarting(consensusHour(onset, mm = 1.4, prob = 70)),
         )
         val next = NotificationDecider.remember(NotifyMemory(), posted, activeWarningIds = emptySet())

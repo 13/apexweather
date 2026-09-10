@@ -201,11 +201,11 @@ class WeatherRepositoryTest {
     /** Two places, two caches. Switching must never show one place the other's forecast. */
     @Test
     fun `refreshing one place leaves another place's cache alone`() = runTest {
-        repo.refresh(DORF_TIROL, "de", keepPlaces = listOf(DORF_TIROL.istat, STERZING.istat), keepDistricts = listOf(2, 5))
+        repo.refresh(DORF_TIROL, "de")
         val dorfTirol = repo.snapshot(DORF_TIROL, "de").first().forecasts
         assertTrue(dorfTirol.isNotEmpty())
 
-        repo.refresh(STERZING, "de", keepPlaces = listOf(STERZING.istat, DORF_TIROL.istat), keepDistricts = listOf(5, 2))
+        repo.refresh(STERZING, "de")
         assertEquals(dorfTirol.keys, repo.snapshot(DORF_TIROL, "de").first().forecasts.keys)
         assertTrue(repo.snapshot(STERZING, "de").first().forecasts.isNotEmpty())
         // and the two really are different municipalities, not one row read twice
@@ -219,7 +219,7 @@ class WeatherRepositoryTest {
      */
     @Test
     fun `a place without a station stores neither an observation nor a reference`() = runTest {
-        repo.refresh(STERZING, "de", keepPlaces = listOf(STERZING.istat), keepDistricts = listOf(5))
+        repo.refresh(STERZING, "de")
         val s = repo.snapshot(STERZING, "de").first()
         assertNull(s.observation)
         assertNull(s.stationReference)
@@ -228,21 +228,23 @@ class WeatherRepositoryTest {
 
     @Test
     fun `a place the reader has left behind is evicted`() = runTest {
-        repo.refresh(STERZING, "de", keepPlaces = listOf(STERZING.istat), keepDistricts = listOf(5))
+        repo.refresh(STERZING, "de")
+        repo.refresh(DORF_TIROL, "de")
         assertTrue(repo.snapshot(STERZING, "de").first().forecasts.isNotEmpty())
 
-        repo.refresh(DORF_TIROL, "de", keepPlaces = listOf(DORF_TIROL.istat), keepDistricts = listOf(2))
+        repo.evictAllBut(listOf(DORF_TIROL.istat), listOf(DORF_TIROL.district))
         assertTrue(repo.snapshot(STERZING, "de").first().forecasts.isEmpty())
         assertTrue(repo.snapshot(DORF_TIROL, "de").first().forecasts.isNotEmpty())
     }
 
-    /** A refresh that produced nothing must not clear the cache it was supposed to top up. */
+    /**
+     * Eviction is separate from the refresh precisely so a caller that has lost track of what to
+     * keep cannot empty the cache. An empty list means "I do not know", not "keep nothing".
+     */
     @Test
-    fun `a failed refresh evicts nothing`() = runTest {
-        repo.refresh(DORF_TIROL, "de", keepPlaces = listOf(DORF_TIROL.istat), keepDistricts = listOf(2))
-        openMeteo.fail = true; geoSphere.fail = true; siag.fail = true; odh.fail = true; meteoAlarm.fail = true
-
-        repo.refresh(STERZING, "de", keepPlaces = listOf(STERZING.istat), keepDistricts = listOf(5))
+    fun `an empty keep list evicts nothing`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        repo.evictAllBut(emptyList(), emptyList())
         assertTrue(repo.snapshot(DORF_TIROL, "de").first().forecasts.isNotEmpty())
     }
 }

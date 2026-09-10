@@ -13,6 +13,8 @@ import java.time.ZoneId
 data class WidgetHour(val label: String, val tempText: String, val iconRes: Int)
 
 data class WidgetState(
+    /** The place this is about, in the reader's language. */
+    val placeName: String,
     val hasData: Boolean,
     val tempText: String,
     val conditionRes: Int,
@@ -36,6 +38,7 @@ object WidgetStateBuilder {
     fun build(home: HomeUiState, zone: ZoneId, formats: Formats): WidgetState {
         val hasData = !home.isEmpty && home.heroTempC != null
         return WidgetState(
+            placeName = home.place?.name(formats.locale).orEmpty(),
             hasData = hasData,
             tempText = home.heroTempC?.let { Format.temp(it, formats) } ?: "–",
             conditionRes = if (hasData) home.heroCondition.labelRes() else R.string.empty_title,

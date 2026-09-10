@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -51,6 +52,7 @@ import it.apexweather.ui.bulletin.BulletinScreen
 import it.apexweather.ui.compare.CompareScreen
 import it.apexweather.ui.home.HomeScreen
 import it.apexweather.ui.home.HomeViewModel
+import it.apexweather.ui.place.PlacePickerScreen
 import it.apexweather.ui.settings.SettingsSheet
 import it.apexweather.update.UpdateSection
 import it.apexweather.ui.settings.SettingsViewModel
@@ -74,6 +76,13 @@ internal fun NavHostController.openTopLevel(route: Any) {
     }
 }
 
+/**
+ * The place picker. Not a bottom-bar destination, so it is reached with a plain navigate: the
+ * one-way-in rule above exists to keep the three tabs' back stacks interchangeable, and this screen
+ * is something the reader opens and leaves again.
+ */
+@Serializable object PlacePickerRoute
+
 @Serializable object HomeRoute
 @Serializable object CompareRoute
 @Serializable object BulletinRoute
@@ -88,6 +97,7 @@ fun ApexApp() {
     val settingsVm: SettingsViewModel = hiltViewModel()
     val settings by settingsVm.settings.collectAsStateWithLifecycle()
     val homeVm: HomeViewModel = hiltViewModel()
+    val homeState by homeVm.state.collectAsStateWithLifecycle()
     var settingsOpen by remember { mutableStateOf(false) }
     val backStack by nav.currentBackStackEntryAsState()
     val dest = backStack?.destination
@@ -118,7 +128,14 @@ fun ApexApp() {
             },
         ) { padding ->
             NavHost(nav, startDestination = HomeRoute, modifier = Modifier.padding(bottom = padding.calculateBottomPadding())) {
-                composable<HomeRoute> { HomeScreen(onOpenBulletin = { nav.openTopLevel(BulletinRoute) }, viewModel = homeVm) }
+                composable<HomeRoute> {
+                    HomeScreen(
+                        onOpenBulletin = { nav.openTopLevel(BulletinRoute) },
+                        onOpenPlaces = { nav.navigate(PlacePickerRoute) },
+                        viewModel = homeVm,
+                    )
+                }
+                composable<PlacePickerRoute> { PlacePickerScreen(onBack = { nav.popBackStack() }) }
                 composable<CompareRoute> { CompareScreen() }
                 composable<BulletinRoute> { BulletinScreen() }
             }
@@ -153,6 +170,8 @@ fun ApexApp() {
             onAnimations = settingsVm::setAnimations,
             onRefresh = homeVm::refresh,
             onDismiss = { settingsOpen = false },
+            placeName = homeState.place?.name(LocalConfiguration.current.locales[0]).orEmpty(),
+            onOpenPlaces = { settingsOpen = false; nav.navigate(PlacePickerRoute) },
             notificationsAllowed = notificationsAllowed,
             onRequestNotifications = {
                 // Below API 33 there is no permission to ask for; the switch that is off lives in
