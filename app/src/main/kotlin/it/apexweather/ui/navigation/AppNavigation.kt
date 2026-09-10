@@ -122,6 +122,7 @@ fun ApexApp() {
                         NavItem(CompareRoute, "compare", R.string.nav_compare, Icons.Rounded.StackedLineChart),
                         NavItem(BulletinRoute, "bulletin", R.string.nav_bulletin, Icons.Rounded.Article),
                     )
+                    val barColors = NavigationBarItemDefaults.colors(selectedIconColor = Color.White, selectedTextColor = Color.White, indicatorColor = Color(0x33FFFFFF), unselectedIconColor = Color(0xAAFFFFFF), unselectedTextColor = Color(0xAAFFFFFF))
                     items.forEach { item ->
                         val selected = dest?.hasRoute(item.route::class) == true
                         NavigationBarItem(
@@ -129,10 +130,21 @@ fun ApexApp() {
                             onClick = { nav.openTopLevel(item.route) },
                             icon = { Icon(item.icon, null) },
                             label = { Text(stringResource(item.labelRes)) },
-                            colors = NavigationBarItemDefaults.colors(selectedIconColor = Color.White, selectedTextColor = Color.White, indicatorColor = Color(0x33FFFFFF), unselectedIconColor = Color(0xAAFFFFFF), unselectedTextColor = Color(0xAAFFFFFF)),
+                            colors = barColors,
                             modifier = Modifier.testTag("nav_${item.tag}"),
                         )
                     }
+                    // Settings is an action, not a destination — it opens a sheet and nothing is ever
+                    // "on" it — so it is never selected. It sits here rather than floating over the
+                    // top-right corner, where it covered the first warning card.
+                    NavigationBarItem(
+                        selected = false,
+                        onClick = { settingsOpen = true },
+                        icon = { Icon(Icons.Rounded.Settings, null) },
+                        label = { Text(stringResource(R.string.nav_settings)) },
+                        colors = barColors,
+                        modifier = Modifier.testTag("settings_button"),
+                    )
                 }
             },
         ) { padding ->
@@ -149,9 +161,6 @@ fun ApexApp() {
                 composable<CompareRoute> { CompareScreen() }
                 composable<BulletinRoute> { BulletinScreen() }
             }
-        }
-        IconButton(onClick = { settingsOpen = true }, modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp).testTag("settings_button")) {
-            Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.settings), tint = Color.White.copy(alpha = 0.85f))
         }
     }
 

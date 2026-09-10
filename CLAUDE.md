@@ -227,6 +227,18 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   and scaling to the largest hour on screen makes a height mean different rain on different days and
   magnifies a dry day's 0,2 mm into a downpour. Past 10 mm the bar is simply full and the number
   underneath says the rest. The card carries a legend.
+- **The hourly precipitation amount is the mean; every other quantity is the median.** That is the
+  one place the difference is deliberate. Precipitation is zero-inflated, so the moment half the
+  models say dry the median is 0.0 and every wet model is discarded however much rain it forecasts —
+  which is what drew a rain cloud over a blank amount and an hour sheet reading "19:00 · Regen ·
+  0,0 mm". `voteCondition` also refuses to call an hour wet below 0.1 mm, whatever the labels say:
+  the chance is shown separately, and that is where an unlikely shower belongs. The quarter-hourly
+  series still uses the median, because it answers *when* rather than *how much*.
+- Every bottom sheet whose content scrolls needs a **cross**. `ModalBottomSheet` with
+  `skipPartiallyExpanded` hands a downward drag to the inner scroll first, so once the reader has
+  scrolled, dragging the sheet down scrolls the content back instead of dismissing, and bounces at
+  the top. The warning sheet always had one; the day sheet did not, and that is what "flickers, does
+  not close" was.
 - Warnings are written and coloured in `ui/common/WarningVisuals.kt`. The feed's own wording is
   English only, so it is never shown as a label; type and level are translated like everything else,
   and each has a `labelRes()` form as well as a composable one because the widget renders outside a

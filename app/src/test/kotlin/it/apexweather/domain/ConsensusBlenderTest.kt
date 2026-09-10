@@ -77,13 +77,17 @@ class ConsensusBlenderTest {
         assertEquals(67, blender.blend(f).hourly.single().precipProb)
     }
 
+    /**
+     * The wet models carry an amount, because a model saying RAIN at 0 mm is the contradiction the
+     * blender now refuses outright — see `an hour that amounts to nothing is not called rain`.
+     */
     @Test
     fun `condition majority vote with severity tie-break`() {
         val f = mapOf(
-            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, condition = Condition.RAIN))),
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, precip = 1.0, condition = Condition.RAIN))),
             Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0, condition = Condition.CLOUDY))),
             Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 10.0, condition = Condition.CLOUDY))),
-            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(point(0, 10.0, condition = Condition.RAIN))),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(point(0, 10.0, precip = 1.0, condition = Condition.RAIN))),
         )
         assertEquals(Condition.RAIN, blender.blend(f).hourly.single().condition)
     }
@@ -382,7 +386,7 @@ class ConsensusBlenderTest {
             Condition.CLOUDY, Condition.CLOUDY, Condition.CLOUDY, Condition.CLOUDY,
             Condition.PARTLY_CLOUDY, Condition.DRIZZLE, Condition.DRIZZLE, Condition.RAIN,
         )
-        val voted = ConsensusBlender.voteCondition(wet)
+        val voted = ConsensusBlender.voteCondition(wet, precipMm = 0.4)
         assertTrue("the app reported $voted while it was raining", voted.isPrecipitation)
         // The mildest of the wet ones, not the worst: three of eight is a reason to say it is
         // drizzling, not a reason to promise heavy rain.
@@ -393,18 +397,64 @@ class ConsensusBlenderTest {
     @Test
     fun `a lone wet model does not turn a dry hour wet`() {
         val mostlyDry = List(9) { Condition.CLOUDY } + Condition.RAIN
-        assertEquals(Condition.CLOUDY, ConsensusBlender.voteCondition(mostlyDry))
+        assertEquals(Condition.CLOUDY, ConsensusBlender.voteCondition(mostlyDry, precipMm = 0.3))
     }
 
     @Test
     fun `a clear majority of wet models still decides on its own`() {
         val soaked = listOf(Condition.RAIN, Condition.RAIN, Condition.RAIN, Condition.CLOUDY)
-        assertEquals(Condition.RAIN, ConsensusBlender.voteCondition(soaked))
+        assertEquals(Condition.RAIN, ConsensusBlender.voteCondition(soaked, precipMm = 2.0))
     }
 
     @Test
     fun `an entirely dry hour stays dry`() {
-        assertEquals(Condition.CLOUDY, ConsensusBlender.voteCondition(List(8) { Condition.CLOUDY }))
-        assertEquals(Condition.CLEAR, ConsensusBlender.voteCondition(List(4) { Condition.CLEAR }))
+        assertEquals(Condition.CLOUDY, ConsensusBlender.voteCondition(List(8) { Condition.CLOUDY }, precipMm = 0.0))
+        assertEquals(Condition.CLEAR, ConsensusBlender.voteCondition(List(4) { Condition.CLEAR }, precipMm = 0.0))
+    }
+
+    /**
+     * Taken from the phone on 2026-09-10 at 18:10 local. Six models had the 19:00 hour: three dry,
+     * and 0,1, 0,2 and 0,5 mm. Half of them wet is enough to win the label, so the strip drew a rain
+     * cloud over an empty bar with no millimetres under it, and the hour sheet read
+     * "19:00 · Regen · 0,0 mm".
+     */
+    @Test
+    fun `an hour that amounts to nothing is not called rain`() {
+        val half = listOf(
+            Condition.CLOUDY, Condition.CLOUDY, Condition.CLOUDY,
+            Condition.DRIZZLE, Condition.DRIZZLE, Condition.RAIN,
+        )
+        assertEquals(Condition.CLOUDY, ConsensusBlender.voteCondition(half, precipMm = 0.04))
+        // ...and the same labels with something actually falling still read as rain.
+        assertTrue(ConsensusBlender.voteCondition(half, precipMm = 0.13).isPrecipitation)
+    }
+
+    /** Models that all agree on a trace and nothing else to fall back on keep their own answer. */
+    @Test
+    fun `with no dry model to fall back on the wet labels stand`() {
+        val allWet = List(4) { Condition.DRIZZLE }
+        assertEquals(Condition.DRIZZLE, ConsensusBlender.voteCondition(allWet, precipMm = 0.02))
+    }
+
+    /**
+     * The amount is the **mean**, where every other quantity is the median. Precipitation is
+     * zero-inflated: half the models saying dry collapses the median to zero and throws away every
+     * wet one, however much rain they forecast.
+     */
+    @Test
+    fun `the hourly amount keeps the wet models when half of them are dry`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 15.0, precip = 0.0, condition = Condition.CLOUDY))),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(point(0, 15.0, precip = 0.0, condition = Condition.CLOUDY))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 15.0, precip = 0.0, condition = Condition.CLOUDY))),
+            Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 15.0, precip = 0.1, condition = Condition.DRIZZLE))),
+            Source.KNMI_HARMONIE to forecast(Source.KNMI_HARMONIE, listOf(point(0, 15.0, precip = 0.2, condition = Condition.DRIZZLE))),
+            Source.DMI_HARMONIE to forecast(Source.DMI_HARMONIE, listOf(point(0, 15.0, precip = 0.5, condition = Condition.RAIN))),
+        )
+        val h = blender.blend(f).hourly.single()
+        // The median of these six is 0,05 — which prints as "0,0 mm", and is what put a rain cloud
+        // over a blank amount. The mean is what the hour actually comes to.
+        assertEquals(0.1333, h.precipMm, 1e-3)
+        assertTrue("an hour with rain in it should say so", h.condition.isPrecipitation)
     }
 }

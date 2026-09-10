@@ -18,6 +18,7 @@
     <string name="updated_at">Updated %1$s</string>
     <string name="section_hourly">NEXT 48 HOURS</string>
     <string name="precip_legend">Precipitation in mm · probability below</string>
+    <string name="close">Close</string>
     <string name="section_bulletin">SOUTH TYROL WEATHER SERVICE</string>
     <string name="now">Now</string>
     <string name="today">Today</string>
@@ -51,6 +52,7 @@
     <string name="nav_compare">Compare</string>
     <string name="nav_bulletin">Bulletin</string>
     <string name="nav_map">Map</string>
+    <string name="nav_settings">More</string>
     <string name="map_attribution">© OpenStreetMap contributors · Weather data by RainViewer</string>
     <string name="map_radar_unavailable">Radar images unavailable</string>
     <string name="map_play">Play</string>
