@@ -37,6 +37,15 @@ data class GeoSphereResponse(
 @Serializable data class GeoSphereParam(val unit: String? = null, val data: List<Double?>)
 
 object GeoSphereMapper {
+
+    /**
+     * Relative humidity at which the air is taken to be saturated. Not 100: a model rarely reaches
+     * it exactly, and 97 % under a covered sky is already cloud at ground level.
+     */
+    private const val FOG_RH_PCT = 97.0
+
+    /** Fog is cloud on the ground, so the sky above has to be covered too. */
+    private const val FOG_CLOUD_FRACTION = 0.9
     const val PARAMS = "t2m,rr_acc,snow_acc,rh2m,u10m,v10m,ugust,vgust,tcc,sp,cape"
 
     fun map(resp: GeoSphereResponse, fetchedAt: Instant): SourceForecast {
@@ -71,7 +80,7 @@ object GeoSphereMapper {
                 windDirDeg = dir,
                 cloudPct = (cloud * 100).roundToInt().coerceIn(0, 100),
                 humidityPct = rh.getOrNull(i)?.roundToInt()?.coerceIn(0, 100),
-                condition = condition(precip, snow, cloud, temp, cape.getOrNull(i) ?: 0.0),
+                condition = condition(precip, snow, cloud, temp, cape.getOrNull(i) ?: 0.0, rh.getOrNull(i)),
             )
         }
         return SourceForecast(
@@ -109,7 +118,19 @@ object GeoSphereMapper {
         return speedKmh to dirFrom.roundToInt() % 360
     }
 
-    fun condition(precipMm: Double, snowMm: Double, tcc: Double, tempC: Double, cape: Double): Condition {
+    /**
+     * AROME publishes no weather code, so the condition is derived. [rh2m] is the newest input and
+     * the reason is fog: this mapper could not return [Condition.FOG] at all, which left one of the
+     * app's ten sources structurally unable to vote for it. AROME has no visibility parameter — the
+     * dataset offers nineteen and none of them is one — so saturation under a covered sky stands in.
+     */
+    fun condition(precipMm: Double, snowMm: Double, tcc: Double, tempC: Double, cape: Double, rh2m: Double? = null): Condition {
+        // Saturated air under a covered sky and nothing falling out of it. Ordered before the
+        // precipitation branch would be wrong: rain saturates the air too, and rain is the more
+        // useful thing to be told.
+        if (precipMm < 0.1 && rh2m != null && rh2m >= FOG_RH_PCT && tcc >= FOG_CLOUD_FRACTION) {
+            return Condition.FOG
+        }
         if (precipMm >= 0.1) {
             val snowShare = if (precipMm > 0) snowMm / precipMm else 0.0
             val frozen = snowShare > 0.5 || tempC < 0.5

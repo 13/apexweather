@@ -44,7 +44,11 @@ object SkyPaletteSelector {
             // and until now no golden covered it either.
             Condition.FOG -> when (phase) {
                 SunPhase.NIGHT -> p(0xFF0D1017, 0xFF1B1F26, 0xFF2C3138, 0xFFD5D8DD, 0xFF0E1116, ParticleKind.FOG, 0.8f)
-                else -> p(0xFF6B7280, 0xFF9CA3AF, 0xFFD1D5DB, 0xFFF3F4F6, 0xFF5B6270, ParticleKind.FOG, 0.8f)
+                // Darkened to sit with the other daylight palettes. The original ran to #D1D5DB at
+                // the foot of the screen, and this app writes in white: the moment fog became
+                // reachable, the labels over it were barely there. Still the greyest sky in the
+                // set, which is what makes it read as fog rather than as overcast.
+                else -> p(0xFF4E5763, 0xFF6E7885, 0xFF97A1AD, 0xFFEDEFF2, 0xFF434B56, ParticleKind.FOG, 0.8f)
             }
             Condition.DRIZZLE, Condition.RAIN -> when (phase) {
                 SunPhase.NIGHT -> p(0xFF0A0E1A, 0xFF141C2E, 0xFF20304A, 0xFF8FB3E8, 0xFF0B101C, ParticleKind.RAIN, precipDensity)

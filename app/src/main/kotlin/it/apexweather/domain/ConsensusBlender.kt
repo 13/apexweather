@@ -193,10 +193,29 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
          * empty bar and no millimetres at all, and the hour sheet read "19:00 · Regen · 0,0 mm".
          * The reader is told the chance separately, and that is where an unlikely shower belongs.
          */
-        fun voteCondition(conditions: List<Condition>, precipMm: Double): Condition {
+        /**
+         * Fog is not precipitation, so the wet-pool rule below discarded it outright: once a third
+         * of the models forecast drizzle, a model saying Talnebel had no way to be heard. In a
+         * valley where fog and drizzle are the same grey afternoon that is a real loss, and it is
+         * why the app never once showed fog.
+         *
+         * So fog is decided first, and it wins on the same third the wet pool uses — but only while
+         * the hour is light. Being told it is foggy while a downpour is arriving would be the same
+         * mistake in the other direction, so above [FOG_LOSES_ABOVE_MM] the rain leads.
+         */
+        private const val FOG_LOSES_ABOVE_MM = 0.5
+
+        fun voteCondition(conditions: List<Condition>, precipMm: Double, stationSaturated: Boolean = false): Condition {
             if (conditions.isEmpty()) return Condition.CLOUDY
             val wet = conditions.filter { it.isPrecipitation }
             val dry = conditions.filterNot { it.isPrecipitation }
+            val fog = conditions.count { it == Condition.FOG }
+            // A saturated station is ground truth against a forecast, so it lowers the bar to a
+            // single source having seen the fog. It never invents fog on its own: something has to
+            // have forecast it first. See StationFog.
+            val fogWins = fog > 0 && precipMm <= FOG_LOSES_ABOVE_MM &&
+                (stationSaturated || fog * WET_SHARE_DENOMINATOR >= conditions.size)
+            if (fogWins) return Condition.FOG
             if (precipMm < WET_MIN_MM && dry.isNotEmpty()) return plurality(dry)
             // The mildest wet answer the models actually gave, not the worst: a third of them
             // saying so is reason to call it drizzle, not reason to promise heavy rain.

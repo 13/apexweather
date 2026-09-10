@@ -7,9 +7,11 @@ import it.apexweather.domain.SkyPalette
 import it.apexweather.domain.SkyPaletteSelector
 import it.apexweather.domain.SunPhase
 import it.apexweather.domain.SunPhaseCalculator
+import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.DailyAggregator
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.StationDownscale
+import it.apexweather.domain.StationFog
 import it.apexweather.domain.model.Bulletin
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.ConsensusDay
@@ -118,8 +120,8 @@ object HomeStateBuilder {
         dismissedWarnings: Set<String> = emptySet(),
     ): HomeUiState {
         val thisHour = now.truncatedTo(ChronoUnit.HOURS)
-        val upcoming = consensus.hourly.filter { !it.time.isBefore(thisHour) }.take(48)
-        val current = upcoming.firstOrNull()
+        val upcomingRaw = consensus.hourly.filter { !it.time.isBefore(thisHour) }.take(48)
+        val rawCurrent = upcomingRaw.firstOrNull()
         val today = consensus.daily.firstOrNull { it.date == now.atZone(SouthTyrol.ZONE).toLocalDate() }
         val phase = SunPhaseCalculator.phase(now, today?.sunrise, today?.sunset, SouthTyrol.ZONE)
         val obs = snapshot.observation?.takeIf { Duration.between(it.time, now) <= OBSERVATION_MAX_AGE && it.tempC != null }
@@ -128,6 +130,24 @@ object HomeStateBuilder {
         // and is the better number. The raw reading is the last resort, never the first choice.
         val adjustment = obs?.let { StationDownscale.offsetAt(it.time, snapshot.stationReference, consensus, now) }
         val heroFromStation = obs?.tempC?.let { t -> adjustment?.let { t + it } }
+        // A saturated station is the only ground truth this app has about the sky, and it applies to
+        // this hour alone — which is why the hour is re-voted here rather than in the blender, where
+        // it would colour all forty-eight. It cannot invent fog: something has to have forecast it.
+        val current = rawCurrent?.let { h ->
+            val revoted = if (StationFog.impliesFog(snapshot.observation, now, h)) {
+                Condition.FOG
+            } else {
+                ConsensusBlender.voteCondition(
+                    h.perSource.values.map { it.condition },
+                    h.precipMm,
+                    stationSaturated = StationFog.saturated(snapshot.observation, now),
+                )
+            }
+            if (revoted == h.condition) h else h.copy(condition = revoted)
+        }
+        // The strip's first column is this same hour, so it carries the re-vote too; the hero
+        // disagreeing with the column directly beneath it is the failure mode this avoids.
+        val upcoming = if (current == null || current === rawCurrent) upcomingRaw else listOf(current) + upcomingRaw.drop(1)
         val heroCondition = current?.condition ?: Condition.PARTLY_CLOUDY
         val isEmpty = current == null && obs == null && snapshot.bulletin == null
         return HomeUiState(

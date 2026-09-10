@@ -234,6 +234,21 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   0,0 mm". `voteCondition` also refuses to call an hour wet below 0.1 mm, whatever the labels say:
   the chance is shown separately, and that is where an unlikely shower belongs. The quarter-hourly
   series still uses the median, because it answers *when* rather than *how much*.
+- **Fog is the hardest condition to get on screen here, and three separate things blocked it.**
+  `GeoSphereMapper.condition` had no FOG branch at all, so one of the ten sources could never vote
+  for it — AROME publishes no visibility (nineteen parameters, none of them one), so saturation
+  (`rh2m` >= 97 %) under a covered sky stands in. `voteCondition` discarded fog outright once a
+  third of the models forecast precipitation, because FOG is not `isPrecipitation`; fog is decided
+  first now, and loses to real rain above 0,5 mm. And `domain/StationFog.kt` uses the station's own
+  humidity: as a tiebreaker it lets a single source carry the fog, and `impliesFog` can raise fog on
+  the **current hour only** when the measured air is saturated under a covered sky with nothing much
+  falling. Every clause there is load-bearing — rain saturates the air exactly as fog does, and a
+  clear humid dawn is not fog. It can still be wrong: the station is 270 m below the village and
+  valley fog often lies below a shoulder rather than over it.
+  On 2026-09-10 it was foggy in Dorf Tirol and **not one of the ten sources said so** — eight
+  Open-Meteo models returned overcast or drizzle, the three publishing visibility said 12 to 29 km,
+  and SIAG KMOS, which has codes for Hochnebel and Talnebel, returned "Bedeckt, mäßiger Regen". The
+  station read 100 %. That is the case this exists for.
 - Every bottom sheet whose content scrolls needs a **cross**. `ModalBottomSheet` with
   `skipPartiallyExpanded` hands a downward drag to the inner scroll first, so once the reader has
   scrolled, dragging the sheet down scrolls the content back instead of dismissing, and bounces at
