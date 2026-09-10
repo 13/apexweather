@@ -216,7 +216,10 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   possible. Every condition has its own drawing and `WeatherIconsTest` asserts it; do not
   reintroduce a second table. What the vectors actually paint is pinned by the Roborazzi goldens in
   `app/src/test/screenshots/`, because an edited path keeps its resource id and every mapping test
-  keeps passing. `LICENSE-meteocons` ships the MIT notice.
+  keeps passing. `LICENSE-meteocons` ships the MIT notice. The drawables are **black** and are
+  tinted by whoever draws them — `Icon(tint = …)` in the app, and an explicit
+  `ColorFilter.tint` in `ApexWidget`, because Glance's `Image` does not tint on its own and a
+  black icon on the widget's near-black card is invisible. That shipped once, in v0.8.0.
 - The 48-hour strip's precipitation bar is **probability by height, amount by colour, millimetres in
   the caption** — the rules are in `ui/home/PrecipScale.kt` and tested there. It used to be
   millimetres on a fixed 0-5 mm scale, so an hour certain to bring 0,4 mm drew under two pixels of
