@@ -58,7 +58,25 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   cache and nothing else would fill it. The same staleness rule guards both, so returning to a place
   refreshed minutes ago still costs nothing.
 
-- `domain/` is pure Kotlin. `ConsensusBlender` turns `Map<Source, SourceForecast>` into `ConsensusForecast` (median, min/max band, ECMWF only where < 2 regional sources, majority-vote condition). `DailyAggregator` is the single place hourly → daily happens. `SkyPaletteSelector` + `SunPhaseCalculator` drive the UI colours.
+- `domain/` is pure Kotlin. `ConsensusBlender` turns `Map<Source, SourceForecast>` into
+  `ConsensusForecast` (median, min/max band, globals only where < 2 regional sources, majority-vote
+  condition). `DailyAggregator` is the single place hourly → daily happens. `SkyPaletteSelector` +
+  `SunPhaseCalculator` drive the UI colours.
+- **Ten sources.** KNMI and DMI HARMONIE-AROME were added because the regional half was otherwise
+  four flavours of ICON, and models sharing a core agree for reasons unrelated to being right;
+  ECMWF AIFS because a machine-learned model fails differently from a physics one.
+- **`BiasCorrector` is the accuracy lever.** Every hour the app writes down what the station read and
+  what each model said it would read (`station_history` — the one table that is **not** a cache;
+  nobody publishes what a model said yesterday about an hour that has since happened). Over days that
+  difference becomes each model's habit here, and it is subtracted before the blend. Three guards,
+  each because a correction on thin evidence does harm: at least six hours, never more than 3 K, and
+  faded out entirely by twelve hours of lead time.
+- **The agreement badge prefers the ensemble.** ICON-D2's twenty members measure uncertainty; the
+  spread between deterministic models only stands in for it. Where the ensemble reaches an hour its
+  tenth-to-ninetieth percentile half-width is used, and the model spread beyond that.
+- **Quarter-hourly precipitation** comes from the regional models only. A 25 km global returns a
+  `minutely_15` series when asked, but it is interpolated from its own hourly one and would be false
+  precision in the one place it is used — saying which quarter-hour the rain starts.
 - `data/remote/` has one file per upstream: Open-Meteo (5 models in one call, dynamic JSON keys read
   via `JsonObject`), GeoSphere AROME (condition derived from cloud/precip/CAPE, precipitation is a
   diff of the accumulated series), SIAG (KMOS municipality forecast, Open Data Hub bulletin, live
@@ -149,6 +167,9 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   the instrumented tests and `tools/release-smoke.sh` alike, and it has now caught both. Resolve the
   string from the resources the code itself uses, or match a spelling every language shares.
 - Source colours are in `ui/common/SourceColors.kt`; SIAG letter codes in `domain/SiagCodes.kt`.
+- Warnings can be waved away: swipe the card or use the cross in the sheet. Dismissals are keyed by
+  identifier **and** level, so an upgrade cannot inherit the silence of the milder warning, and are
+  pruned to what is in force after each refresh.
 - Weather icons are hand-drawn vectors in `res/drawable/ic_wx_*.xml`, mapped once in
   `ui/common/WeatherIcons.kt` and used by both the app and the widget. Every condition has its own
   drawing and `WeatherIconsTest` asserts it; do not reintroduce a second table. What the vectors
