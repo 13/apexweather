@@ -30,6 +30,7 @@ class TopLevelNavigationTest {
         nav = rememberNavController()
         NavHost(nav, startDestination = HomeRoute) {
             composable<HomeRoute> { Text("home", Modifier.testTag("screen_home")) }
+            composable<MapRoute> { Text("map", Modifier.testTag("screen_map")) }
             composable<CompareRoute> { Text("compare", Modifier.testTag("screen_compare")) }
             composable<BulletinRoute> { Text("bulletin", Modifier.testTag("screen_bulletin")) }
         }
@@ -50,15 +51,26 @@ class TopLevelNavigationTest {
     @Test
     fun everyTabReachesEveryOtherTab() {
         show()
-        listOf(CompareRoute, BulletinRoute, HomeRoute, BulletinRoute, CompareRoute, HomeRoute).forEach { route ->
+        listOf(CompareRoute, MapRoute, BulletinRoute, HomeRoute, MapRoute, BulletinRoute, CompareRoute, HomeRoute).forEach { route ->
             open(route)
             val tag = when (route) {
                 HomeRoute -> "screen_home"
                 CompareRoute -> "screen_compare"
+                MapRoute -> "screen_map"
                 else -> "screen_bulletin"
             }
             rule.onNodeWithTag(tag).assertIsDisplayed()
         }
+    }
+
+    /** The map is a tab like the others: leaving it must not strand the home tab. */
+    @Test
+    fun theHomeTabReturnsAfterTheMap() {
+        show()
+        open(MapRoute)
+        rule.onNodeWithTag("screen_map").assertIsDisplayed()
+        open(HomeRoute)
+        rule.onNodeWithTag("screen_home").assertIsDisplayed()
     }
 
     /** Pressing the tab you are already on must not push a second copy or land somewhere else. */
