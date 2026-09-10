@@ -190,6 +190,9 @@ dependencies {
     implementation(libs.okhttp.logging)
     // Installs the recorded baseline profile on first run; without it the profile in the APK is inert.
     implementation(libs.profileinstaller)
+    // The map tab. Same library Apex Maps uses, and the only one that draws OpenStreetMap tiles
+    // without an API key. Its cache and user agent are configured in MapScreen.
+    implementation(libs.osmdroid)
     implementation(libs.coil.compose)
     implementation(libs.coil.okhttp)
 
