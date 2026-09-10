@@ -220,10 +220,13 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   tinted by whoever draws them — `Icon(tint = …)` in the app, and an explicit
   `ColorFilter.tint` in `ApexWidget`, because Glance's `Image` does not tint on its own and a
   black icon on the widget's near-black card is invisible. That shipped once, in v0.8.0.
-- The 48-hour strip's precipitation bar is **probability by height, amount by colour, millimetres in
-  the caption** — the rules are in `ui/home/PrecipScale.kt` and tested there. It used to be
-  millimetres on a fixed 0-5 mm scale, so an hour certain to bring 0,4 mm drew under two pixels of
-  bar beneath a caption reading 100 %. The card carries a legend saying which is which.
+- The 48-hour strip's precipitation bar is **millimetres by height, then the millimetres as a
+  number, then the probability** — the rules are in `ui/home/PrecipScale.kt` and tested there. The
+  scale is **fixed and square-rooted against a 10 mm full bar**, and both other scales were tried and
+  are worse: linear against a fixed maximum is what drew 1.8 dp for an hour certain to bring 0,4 mm,
+  and scaling to the largest hour on screen makes a height mean different rain on different days and
+  magnifies a dry day's 0,2 mm into a downpour. Past 10 mm the bar is simply full and the number
+  underneath says the rest. The card carries a legend.
 - Warnings are written and coloured in `ui/common/WarningVisuals.kt`. The feed's own wording is
   English only, so it is never shown as a label; type and level are translated like everything else,
   and each has a `labelRes()` form as well as a composable one because the widget renders outside a

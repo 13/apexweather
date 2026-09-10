@@ -7,39 +7,56 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The bar used to be millimetres on a fixed 0-5 mm scale, so an hour certain to bring 0,4 mm drew
- * under two pixels of bar beneath a caption reading 100 %. Height is probability now, and these are
- * the rules that make that readable.
+ * The bar is millimetres on a fixed square-root scale. It used to be millimetres on a fixed *linear*
+ * 0-5 mm scale, which drew under two pixels for an hour certain to bring 0,4 mm.
  */
 class PrecipScaleTest {
 
     @Test
-    fun `the fill is the probability`() {
-        assertEquals(0f, PrecipScale.fillFraction(0), 1e-6f)
-        assertEquals(0.64f, PrecipScale.fillFraction(64), 1e-6f)
-        assertEquals(1f, PrecipScale.fillFraction(100), 1e-6f)
+    fun `a full bar is the top of the scale`() {
+        assertEquals(1f, PrecipScale.fillFraction(PrecipScale.FULL_SCALE_MM), 1e-6f)
     }
 
-    /** Upstreams are not trusted to stay inside 0..100; a bar taller than its track would overdraw. */
+    /** Past the cap the bar stays full; the millimetres printed under it say the rest. */
     @Test
-    fun `a probability outside the scale is clamped`() {
-        assertEquals(0f, PrecipScale.fillFraction(-5), 1e-6f)
-        assertEquals(1f, PrecipScale.fillFraction(140), 1e-6f)
+    fun `more than the scale holds is still one bar`() {
+        assertEquals(1f, PrecipScale.fillFraction(48.0), 1e-6f)
     }
 
     @Test
-    fun `a chance too small to mean anything leaves the track empty`() {
-        assertFalse(PrecipScale.isDrawn(0))
-        assertFalse(PrecipScale.isDrawn(4))
-        assertTrue(PrecipScale.isDrawn(5))
+    fun `no rain is no bar`() {
+        assertEquals(0f, PrecipScale.fillFraction(0.0), 1e-6f)
     }
 
-    /** Absence must never read as zero: below a tenth of a millimetre nothing is printed at all. */
+    /**
+     * The whole point of the square root: on a linear 0-10 mm scale these would be 2 %, 10 % and
+     * 25 % of the track, and the first two would be invisible.
+     */
+    @Test
+    fun `the bottom of the range is stretched enough to see`() {
+        assertEquals(0.141f, PrecipScale.fillFraction(0.2), 1e-3f)
+        assertEquals(0.316f, PrecipScale.fillFraction(1.0), 1e-3f)
+        assertEquals(0.500f, PrecipScale.fillFraction(2.5), 1e-3f)
+    }
+
+    /** A height always means the same rain, whatever else is on screen. */
+    @Test
+    fun `the scale does not depend on the other hours`() {
+        assertEquals(PrecipScale.fillFraction(1.0), PrecipScale.fillFraction(1.0), 0f)
+        assertTrue(PrecipScale.fillFraction(2.0) > PrecipScale.fillFraction(1.0))
+    }
+
     @Test
     fun `an amount is printed only once there is one`() {
         assertFalse(PrecipScale.hasAmount(0.0))
         assertFalse(PrecipScale.hasAmount(0.04))
         assertTrue(PrecipScale.hasAmount(0.1))
+    }
+
+    /** The smallest amount worth printing is still worth drawing. */
+    @Test
+    fun `the smallest printed amount draws a visible bar`() {
+        assertTrue(PrecipScale.fillFraction(PrecipScale.MIN_PRINTED_MM) >= 0.09f)
     }
 
     @Test
