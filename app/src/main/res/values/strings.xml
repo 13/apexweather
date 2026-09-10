@@ -87,6 +87,7 @@
     <string name="about_build">Version %1$s (%2$d) · %3$s</string>
     <string name="about_commit">Commit %1$s · %2$s</string>
     <string name="day_source_desc">%1$s: %2$s bis %3$s, %4$s</string>
+    <string name="hour_source_desc">%1$s: %2$s, %3$s, %4$s</string>
     <string name="hour_column_desc">%1$s Uhr: %2$s, %3$s, %4$d %% Niederschlagswahrscheinlichkeit, %5$s</string>
     <plurals name="now_from_consensus">
         <item quantity="one">Konsens aus %1$d Modell</item>

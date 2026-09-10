@@ -25,10 +25,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import it.apexweather.R
@@ -132,7 +135,9 @@ fun HourDetail(hour: ConsensusHour, state: HomeUiState, onClose: () -> Unit = {}
             )
         }
         stats.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+            // The longest labels ("Precipitazioni") need a gutter against a half-width column, or
+            // they run into the tile beside them.
+            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 row.forEach { StatTile(it, Modifier.weight(1f)) }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
@@ -164,7 +169,19 @@ fun HourDetail(hour: ConsensusHour, state: HomeUiState, onClose: () -> Unit = {}
             Cell(Format.windUnitLabel(unit).trim(), MaterialTheme.typography.labelSmall, Color.White.copy(alpha = 0.6f))
         }
         hour.perSource.entries.sortedBy { it.key.ordinal }.forEach { (source, p) ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            // The cells themselves are unit-free — the units live in the header row, a separate
+            // semantics node — so TalkBack would otherwise read "17,8°, 0,3, 11" with no unit
+            // anywhere. Merge the row into one node and speak the unit-carrying forms instead.
+            val spoken = stringResource(
+                R.string.hour_source_desc, source.displayName,
+                Format.tempDecimal(p.tempC, formats), Format.mm(p.precipMm, formats),
+                p.windKmh?.let { Format.wind(it, unit, formats) } ?: MISSING,
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                    .semantics(mergeDescendants = true) { contentDescription = spoken },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 // The same colour the compare chart draws this model in, so the two screens agree.
                 Box(Modifier.size(7.dp).clip(CircleShape).background(SourceColors.of(source)))
                 Spacer(Modifier.width(8.dp))
@@ -179,7 +196,9 @@ fun HourDetail(hour: ConsensusHour, state: HomeUiState, onClose: () -> Unit = {}
 
 @Composable
 private fun StatTile(stat: Stat, modifier: Modifier = Modifier) {
-    Column(modifier.testTag(stat.tag)) {
+    // Label, value and sub-line were three separate TalkBack stops for one reading. Merging them
+    // reads as one utterance; see the report for what that does to the sub-line's own tag.
+    Column(modifier.testTag(stat.tag).semantics(mergeDescendants = true) {}) {
         Text(stat.label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
         Text(stat.value, style = MaterialTheme.typography.titleLarge, color = Color.White)
         stat.sub?.let {
@@ -194,5 +213,9 @@ private fun StatTile(stat: Stat, modifier: Modifier = Modifier) {
 /** One right-aligned column of the per-source table. The widths are shared by header and rows. */
 @Composable
 private fun Cell(text: String, style: androidx.compose.ui.text.TextStyle, color: Color) {
-    Text(text, style = style, color = color, textAlign = TextAlign.End, modifier = Modifier.width(62.dp))
+    // The width was fixed in dp while the text inside is sp, so at a large font scale "17,8°"
+    // soft-wrapped mid-number. Scaling the width with the font (rather than capping maxLines, which
+    // would clip a digit) keeps the column wide enough for its own text.
+    val width = 62.dp * LocalDensity.current.fontScale
+    Text(text, style = style, color = color, textAlign = TextAlign.End, modifier = Modifier.width(width))
 }

@@ -138,11 +138,15 @@ class HomeScreenTest {
     fun hourSheetShowsItsStatsAndItsAgreement() {
         rule.setContent { ApexTheme { HomeContent(state, onRefresh = {}, onOpenBulletin = {}) } }
         openHourSheet()
+        // The sheet opens partially expanded and its content scrolls, so whether these are on
+        // screen depends on the device's own height — scroll each into view before asserting.
         rule.onNodeWithTag("hour_stat_temp").assertIsDisplayed()
         rule.onNodeWithTag("hour_stat_precip").assertIsDisplayed()
-        rule.onNodeWithTag("hour_stat_gust").assertIsDisplayed()
+        // The stat tile merges its label, value and sub-line into one TalkBack stop, which also
+        // takes the sub-line's own tag out of the default (merged) query tree — reach it unmerged.
+        rule.onNodeWithTag("hour_stat_gust", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("hour_agreement_badge").assertIsDisplayed()
-        rule.onNodeWithTag("hour_source_header").assertIsDisplayed()
+        rule.onNodeWithTag("hour_source_header").performScrollTo().assertIsDisplayed()
     }
 
     /** A quantity nobody publishes is left out rather than drawn as a dash. */

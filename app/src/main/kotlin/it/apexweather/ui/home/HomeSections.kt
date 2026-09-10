@@ -94,7 +94,11 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
                 text = state.heroTempC?.let { Format.temp(it, formats) } ?: "–",
                 style = MaterialTheme.typography.displayLarge,
                 color = Color.White,
-                modifier = Modifier.testTag("hero_temp"),
+                // Without a weight a wide reading at a large font/display scale fills the row and the
+                // 56 dp icon is measured against zero width left over — it just disappears. The number
+                // yields space before the icon does, and fill = false keeps it from stretching short
+                // readings to fill the row.
+                modifier = Modifier.weight(1f, fill = false).testTag("hero_temp"),
             )
             Icon(
                 painterResource(state.heroCondition.iconRes(state.phase)),
