@@ -263,3 +263,15 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   (locale plus the 24-hour flag). Inside a composition take it from `LocalFormats.current`; outside
   one, build it from a `Context`. Never format with `Locale.ROOT` or interpolate a number into a
   string.
+- The animations switch (`AppSettings.animations`) stops **all** sky movement: the particles and the
+  gradient's 1.5 s crossfade both hang off one `motion` flag in `SkyBackground`, together with the
+  system's reduced-motion setting. The crossfade used to run regardless — a colour change was held
+  not to be motion — and a reader who turned the switch off still watched the sky fade. With motion
+  off `SkyBackground` runs no frame loop, which is the one case where a test that renders it may let
+  the rule idle; `SkyBackgroundTest` uses that to prove the palette arrives in a single frame.
+- The hour sheet lives in `ui/home/HourDetail.kt`, beside `DayDetail.kt`. Its numbers are a two-column
+  grid of labelled tiles rather than one interpolated sentence: five quantities in a line of prose
+  could not be scanned and left no room for the gust, which `ConsensusHour` had carried unshown. A
+  tile whose value no model publishes is left out; wind alone keeps its dash, because "no model
+  publishes wind for this hour" is a fact about the hour. The per-source table's cells drop their
+  units into the column headers, which is what `Format.mmValue` and `Format.windValue` exist for.
