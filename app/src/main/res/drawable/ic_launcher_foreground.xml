@@ -1,17 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Apex Weather mark: the Apex Maps A-sharp glyph (apexmaps/assets/apexmaps-A-sharp.svg),
-     kept at the same geometry and safe-circle scale as the Apex Maps launcher icon so the
-     two sit at identical optical size. The variation is the palette: a sunlit amber peak
-     over its cool blue reflection, on night sky instead of warm paper. -->
+<!--
+  Apex Weather mark: a sun rising over the Apex Maps chevron.
+
+  The ridge is the lower chevron of the Apex Maps A-sharp glyph, unchanged, at the scale and
+  translate that glyph has always had. The upper chevron is gone; a sun stands where its peak was,
+  because the icon opens a weather app and an arrow says nothing about weather. What is left of the
+  family resemblance is the ridge and the palette — amber and cool blue on night sky.
+
+  The rays are not decoration. Without them the disc and the chevron read as head and shoulders once
+  Android flattens them to one colour for a themed icon. See ic_launcher_monochrome.xml.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
 
     <group android:scaleX="0.27" android:scaleY="0.27"
         android:translateX="27" android:translateY="27.81">
-        <path android:fillColor="#9CC9FF"
-            android:pathData="M10.02,176L100,151.9L189.98,176L100,100.5Z" />
-        <path android:fillColor="#FFD166"
-            android:pathData="M28.08,142.58L100,82.22L171.92,142.58L100,18Z" />
+        <path android:fillColor="#9CC9FF" android:pathData="M10.02,176L100,151.9L189.98,176L100,100.5Z" />
+        <path android:fillColor="#FFD166" android:pathData="M62,74a38,38 0 1,0 76,0a38,38 0 1,0 -76,0Z" />
+        <path android:pathData="M150.0,74.0L162.0,74.0"
+            android:strokeColor="#FFD166" android:strokeWidth="9" android:strokeLineCap="round" />
+        <path android:pathData="M135.36,109.36L143.84,117.84"
+            android:strokeColor="#FFD166" android:strokeWidth="9" android:strokeLineCap="round" />
+        <path android:pathData="M64.64,109.36L56.16,117.84"
+            android:strokeColor="#FFD166" android:strokeWidth="9" android:strokeLineCap="round" />
+        <path android:pathData="M50.0,74.0L38.0,74.0"
+            android:strokeColor="#FFD166" android:strokeWidth="9" android:strokeLineCap="round" />
+        <path android:pathData="M64.64,38.64L56.16,30.16"
+            android:strokeColor="#FFD166" android:strokeWidth="9" android:strokeLineCap="round" />
+        <path android:pathData="M100.0,24.0L100.0,12.0"
+            android:strokeColor="#FFD166" android:strokeWidth="9" android:strokeLineCap="round" />
+        <path android:pathData="M135.36,38.64L143.84,30.16"
+            android:strokeColor="#FFD166" android:strokeWidth="9" android:strokeLineCap="round" />
     </group>
 </vector>

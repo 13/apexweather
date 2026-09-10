@@ -149,8 +149,15 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   purpose, copied from Apex Maps) so a debug build updates a sideloaded release build in place. A real key
   overrides it through the `APEX_KEYSTORE_*` env vars or `keystore/keystore.properties`. Do not ship the
   debug-signed APK to a store.
-- The launcher icon is the Apex Maps A-sharp glyph at the same scale and translate as that app's icon, so
-  the two sit at identical optical size; only the palette differs. Source copy: `assets/apexmaps-A-sharp-source.svg`.
+- The launcher icon is a sun rising over the *lower* chevron of the Apex Maps A-sharp glyph. The
+  chevron keeps that glyph's geometry, scale and translate; the upper chevron is gone, because an
+  arrow says nothing about weather. What is left of the family resemblance is the ridge and the
+  palette. Design and what it cost: `docs/superpowers/specs/2026-09-10-sun-launcher-icon-design.md`.
+  The sun's rays are not decoration — without them a disc above a chevron reads as head and
+  shoulders once Android flattens it for a themed icon — and the ray pointing straight down is
+  omitted, because the ridge stands in front of the sun there. `ic_notification.xml` deliberately
+  keeps the old A-sharp silhouette: at 24 dp the rays turn to mush. Source of the original glyph:
+  `assets/apexmaps-A-sharp-source.svg`.
 
 ## Conventions
 
