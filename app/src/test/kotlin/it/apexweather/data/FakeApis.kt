@@ -34,7 +34,10 @@ internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
     /** Fails this many times and then succeeds, for testing the retry. */
     var failuresBeforeSuccess: Int = 0
 
-    open override suspend fun forecast(latitude: Double, longitude: Double, timezone: String, forecastDays: Int, models: String, hourly: String, daily: String): OpenMeteoResponse {
+    open override suspend fun forecast(
+        latitude: Double, longitude: Double, timezone: String, forecastDays: Int,
+        models: String, hourly: String, daily: String, minutely: String, minutelySteps: Int,
+    ): OpenMeteoResponse {
         forecastCalls++
         if (failuresBeforeSuccess >= forecastCalls) throw IOException("connection reset")
         if (fail) throw IOException("open-meteo down")

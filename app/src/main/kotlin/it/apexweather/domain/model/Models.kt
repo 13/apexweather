@@ -61,6 +61,19 @@ data class HourlyPoint(
     val condition: Condition,
 )
 
+/**
+ * A quarter of an hour of precipitation.
+ *
+ * Only the regional models publish these natively. Asking a 25 km global model for a quarter-hourly
+ * series returns one, but it is interpolation wearing the clothes of resolution, so those are left
+ * out rather than allowed to vote on when the rain starts.
+ */
+@Serializable
+data class MinutePoint(
+    @Serializable(with = InstantSerializer::class) val time: Instant,
+    val precipMm: Double,
+)
+
 @Serializable
 data class DailyPoint(
     @Serializable(with = LocalDateSerializer::class) val date: LocalDate,
@@ -79,6 +92,8 @@ data class SourceForecast(
     @Serializable(with = InstantSerializer::class) val fetchedAt: Instant,
     val hourly: List<HourlyPoint>,
     val daily: List<DailyPoint>,
+    /** Quarter-hourly precipitation for the next twelve hours; empty for a model that has none. */
+    val minutely: List<MinutePoint> = emptyList(),
 )
 
 @Serializable
@@ -230,6 +245,31 @@ data class ConsensusDay(
     val sunset: Instant?,
 )
 
-data class ConsensusForecast(val hourly: List<ConsensusHour>, val daily: List<ConsensusDay>) {
-    companion object { val EMPTY = ConsensusForecast(emptyList(), emptyList()) }
+/** Quarter-hourly precipitation, blended the same way as everything else: the median of the models. */
+data class ConsensusMinute(val time: Instant, val precipMm: Double, val sourceCount: Int)
+
+data class ConsensusForecast(
+    val hourly: List<ConsensusHour>,
+    val daily: List<ConsensusDay>,
+    val minutely: List<ConsensusMinute> = emptyList(),
+) {
+    /**
+     * When precipitation next begins, to the quarter-hour, or null if it is already falling or does
+     * not start inside the sub-hourly window. The threshold is the same one the hourly series uses
+     * for "this counts as rain".
+     */
+    fun precipitationStartsAt(now: Instant): Instant? {
+        val ahead = minutely.filter { it.time.isAfter(now) }
+        if (ahead.isEmpty()) return null
+        // Already raining: the reader can see that out of the window, and a start time would be a lie.
+        if (minutely.lastOrNull { !it.time.isAfter(now) }?.let { it.precipMm >= WET_MM } == true) return null
+        return ahead.firstOrNull { it.precipMm >= WET_MM }?.time
+    }
+
+    companion object {
+        /** Millimetres in a quarter of an hour that count as precipitation rather than damp air. */
+        const val WET_MM = 0.05
+
+        val EMPTY = ConsensusForecast(emptyList(), emptyList())
+    }
 }

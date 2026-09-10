@@ -212,4 +212,7 @@
     <string name="warn_dismiss">Warnung ausblenden</string>
     <string name="warn_restore">Wieder einblenden</string>
     <string name="warn_dismissed">Ausgeblendet</string>
+
+    <!-- The quarter-hour the rain starts, where a regional model published one. -->
+    <string name="rain_starts_at">Niederschlag ab %1$s</string>
 </resources>

@@ -209,4 +209,7 @@
     <string name="warn_dismiss">Dismiss warning</string>
     <string name="warn_restore">Show again</string>
     <string name="warn_dismissed">Dismissed</string>
+
+    <!-- The quarter-hour the rain starts, where a regional model published one. -->
+    <string name="rain_starts_at">Precipitation from %1$s</string>
 </resources>

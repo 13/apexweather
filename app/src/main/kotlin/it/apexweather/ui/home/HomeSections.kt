@@ -100,6 +100,16 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
             state.heroFeelsLikeC?.let { Text(stringResource(R.string.feels_like, Format.temp(it, formats)), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f)) }
             state.bandHalfWidth?.let { AgreementBadge(it, state.currentHour?.agreement ?: 0.5f, sourceCount = state.currentHour?.sourceCount ?: 0) }
         }
+        // A quarter-hour, not an hour: this is the one line on the screen that the sub-hourly series
+        // makes honest, and "ab 14:15" is worth more than "ab 14:00" to someone deciding to leave.
+        state.minutelyStart?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.rain_starts_at, Format.time(it, SouthTyrol.ZONE, formats)),
+                style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.testTag("rain_starts_at"),
+            )
+        }
         Spacer(Modifier.height(4.dp))
         val sourceCount = state.currentHour?.sourceCount ?: 0
         // A moved reading has to say it was moved, and by how much: it is still a measurement, but

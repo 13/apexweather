@@ -52,6 +52,8 @@ data class HomeUiState(
     val warnings: List<Warning> = emptyList(),
     /** Keys of the warnings the reader has waved away; see [WarningDismissals.key]. */
     val dismissedWarnings: Set<String> = emptySet(),
+    /** When precipitation next begins, to the quarter-hour, or null if it is already falling. */
+    val minutelyStart: Instant? = null,
     /**
      * How much the station's reading had to be moved to stand for the village, in degrees. Null when
      * the hero is not a station reading, or when there was nothing to correct it with — the wording
@@ -147,6 +149,7 @@ object HomeStateBuilder {
             station = snapshot.observation,
             warnings = snapshot.warnings,
             dismissedWarnings = dismissedWarnings,
+            minutelyStart = consensus.precipitationStartsAt(now),
             upcomingHours = upcoming,
             days = consensus.daily.filter { !it.date.isBefore(now.atZone(SouthTyrol.ZONE).toLocalDate()) }.take(MAX_DAYS),
             hoursByDate = consensus.hourly.groupBy { it.time.atZone(SouthTyrol.ZONE).toLocalDate() },

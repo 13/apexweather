@@ -7,6 +7,7 @@ import it.apexweather.domain.WmoCodes
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.DailyPoint
 import it.apexweather.domain.model.HourlyPoint
+import it.apexweather.domain.model.MinutePoint
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceForecast
 import kotlinx.serialization.SerialName
@@ -27,6 +28,8 @@ interface OpenMeteoApi {
         @Query("models") models: String = OpenMeteoMapper.MODELS.values.joinToString(","),
         @Query("hourly") hourly: String = OpenMeteoMapper.HOURLY_VARS,
         @Query("daily") daily: String = OpenMeteoMapper.DAILY_VARS,
+        @Query("minutely_15") minutely: String = "precipitation",
+        @Query("forecast_minutely_15") minutelySteps: Int = OpenMeteoMapper.MINUTELY_STEPS,
     ): OpenMeteoResponse
 
     /**
@@ -65,6 +68,7 @@ data class OpenMeteoResponse(
     @SerialName("utc_offset_seconds") val utcOffsetSeconds: Int = 0,
     val hourly: JsonObject,
     val daily: JsonObject,
+    @SerialName("minutely_15") val minutely: JsonObject = JsonObject(emptyMap()),
 )
 
 object OpenMeteoMapper {
@@ -89,10 +93,14 @@ object OpenMeteoMapper {
         "freezing_level_height"
     const val DAILY_VARS = "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,sunrise,sunset"
 
+    /** Twelve hours of quarter-hours. Beyond that the resolution is a claim nobody can support. */
+    const val MINUTELY_STEPS = 48
+
     fun map(resp: OpenMeteoResponse, fetchedAt: Instant): Map<Source, SourceForecast> {
         val zone = SouthTyrol.ZONE
         val times = resp.hourly.strings("time").map { parseLocal(it!!, zone) }
         val dayDates = resp.daily.strings("time").map { LocalDate.parse(it!!) }
+        val minutelyTimes = resp.minutely.strings("time").map { parseLocal(it!!, zone) }
 
         return MODELS.mapNotNull { (source, key) ->
             val h = resp.hourly
@@ -109,6 +117,15 @@ object OpenMeteoMapper {
             val dir = h.ints("wind_direction_10m_$key")
             // ECMWF IFS publishes no freezing level through Open-Meteo; the column comes back all null.
             val freezing = h.doubles("freezing_level_height_$key")
+            // Only the regional models: a 25 km global returns a quarter-hourly series when asked,
+            // but it is interpolated from its own hourly one and would only add false precision to
+            // the question this series exists to answer — when exactly the rain starts.
+            val minutely = if (!source.regional) emptyList() else {
+                val values = resp.minutely.doubles("precipitation_$key")
+                minutelyTimes.indices.mapNotNull { i ->
+                    values.getOrNull(i)?.let { MinutePoint(minutelyTimes[i], it) }
+                }
+            }
 
             val hourly = times.indices.mapNotNull { i ->
                 val t = temps.getOrNull(i) ?: return@mapNotNull null
@@ -152,7 +169,7 @@ object OpenMeteoMapper {
                     sunset = sunset.getOrNull(i)?.let { parseLocal(it, zone) },
                 )
             }
-            source to SourceForecast(source, issuedAt = fetchedAt, fetchedAt = fetchedAt, hourly = hourly, daily = daily)
+            source to SourceForecast(source, issuedAt = fetchedAt, fetchedAt = fetchedAt, hourly = hourly, daily = daily, minutely = minutely)
         }.toMap()
     }
 }

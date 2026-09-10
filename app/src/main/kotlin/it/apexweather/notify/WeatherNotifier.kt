@@ -113,7 +113,7 @@ class WeatherNotifier @Inject constructor(@ApplicationContext private val contex
                 context.getString(
                     R.string.notif_rain_title,
                     context.getString(n.hour.condition.labelRes()),
-                    Format.time(n.hour.time, SouthTyrol.ZONE, formats),
+                    Format.time(n.startsAt, SouthTyrol.ZONE, formats),
                 ),
             )
             .setContentText(context.getString(R.string.notif_rain_text, n.hour.precipProb, Format.mm(n.hour.precipMm, formats)))

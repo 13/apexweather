@@ -4,6 +4,7 @@ import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.ConsensusDay
 import it.apexweather.domain.model.ConsensusForecast
 import it.apexweather.domain.model.ConsensusHour
+import it.apexweather.domain.model.ConsensusMinute
 import it.apexweather.domain.model.HourlyPoint
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceForecast
@@ -60,7 +61,20 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
                 sunrise = d.sunrise, sunset = d.sunset,
             )
         }
-        return ConsensusForecast(hourly, daily)
+        return ConsensusForecast(hourly, daily, blendMinutely(forecasts))
+    }
+
+    /**
+     * The quarter-hourly series, median across whichever models published one. Only the regional
+     * models do, so this is a smaller consensus than the hourly one — and an honest one, rather than
+     * a wide one padded with globals interpolating their own hourly values.
+     */
+    private fun blendMinutely(forecasts: Map<Source, SourceForecast>): List<ConsensusMinute> {
+        val byTime = sortedMapOf<Instant, MutableList<Double>>()
+        forecasts.values.forEach { f ->
+            f.minutely.forEach { p -> byTime.getOrPut(p.time) { mutableListOf() }.add(p.precipMm) }
+        }
+        return byTime.map { (time, values) -> ConsensusMinute(time, median(values), values.size) }
     }
 
     private fun blendHour(time: Instant, points: Map<Source, HourlyPoint>): ConsensusHour {

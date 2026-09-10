@@ -168,4 +168,24 @@ class OpenMeteoMapperTest {
         assertEquals(Source.entries.size - 2, OpenMeteoMapper.MODELS.size) // KMOS and AROME come from elsewhere
         assertEquals(OpenMeteoMapper.MODELS.size, OpenMeteoMapper.MODELS.values.toSet().size)
     }
+
+    /**
+     * Quarter-hourly precipitation is what turns "rain some time in the 15:00 hour" into "rain from
+     * 15:15". Only the regional models publish one natively.
+     */
+    @Test
+    fun `the regional models carry a quarter-hourly series and the globals do not`() {
+        val regional = fourteenDay.getValue(Source.ICON_D2).minutely
+        assertTrue("no quarter-hourly series", regional.isNotEmpty())
+        assertEquals(OpenMeteoMapper.MINUTELY_STEPS, regional.size)
+        // Fifteen minutes apart, in order.
+        val gaps = regional.zipWithNext { a, b -> java.time.Duration.between(a.time, b.time).toMinutes() }
+        assertTrue("steps were $gaps", gaps.all { it == 15L })
+        assertTrue(regional.all { it.precipMm >= 0.0 })
+
+        // A 25 km global returns a series when asked, but it is interpolated from its own hourly
+        // one; letting it vote on when the rain starts would be false precision.
+        assertTrue(fourteenDay.getValue(Source.ECMWF).minutely.isEmpty())
+        assertTrue(fourteenDay.getValue(Source.ECMWF_AIFS).minutely.isEmpty())
+    }
 }

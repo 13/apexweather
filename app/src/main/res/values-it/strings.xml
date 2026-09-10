@@ -214,4 +214,7 @@
     <string name="warn_dismiss">Nascondi allerta</string>
     <string name="warn_restore">Mostra di nuovo</string>
     <string name="warn_dismissed">Nascosta</string>
+
+    <!-- The quarter-hour the rain starts, where a regional model published one. -->
+    <string name="rain_starts_at">Precipitazioni dalle %1$s</string>
 </resources>

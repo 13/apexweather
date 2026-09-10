@@ -235,4 +235,58 @@ class ConsensusBlenderTest {
         assertTrue(c.hourly.isEmpty())
         assertTrue(c.daily.isEmpty())
     }
+
+    private fun minutes(vararg mm: Double) = mm.mapIndexed { i, v ->
+        it.apexweather.domain.model.MinutePoint(T0.plusSeconds(i * 900L), v)
+    }
+
+    @Test
+    fun `the quarter-hourly series is the median of the models that publish one`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.0, 1.0)),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.4, 2.0)),
+            Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.2, 3.0)),
+        )
+        val minutely = blender.blend(f).minutely
+        assertEquals(3, minutely.size)
+        assertEquals(0.2, minutely[1].precipMm, 1e-9)
+        assertEquals(3, minutely[1].sourceCount)
+    }
+
+    /** A model with no quarter-hourly series simply does not vote; it must not count as a dry zero. */
+    @Test
+    fun `a model without a quarter-hourly series is left out of it`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))).copy(minutely = minutes(1.0)),
+            Source.ECMWF to forecast(Source.ECMWF, listOf(point(0, 10.0))),
+        )
+        val minutely = blender.blend(f).minutely
+        assertEquals(1, minutely.single().sourceCount)
+        assertEquals(1.0, minutely.single().precipMm, 0.0)
+    }
+
+    @Test
+    fun `the start of precipitation is found to the quarter-hour`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.0, 0.6, 1.0)),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.0, 0.8, 1.0)),
+        )
+        assertEquals(T0.plusSeconds(2 * 900L), blender.blend(f).precipitationStartsAt(T0))
+    }
+
+    /** Already raining: a start time would be a lie, and the reader can see it out of the window. */
+    @Test
+    fun `no start time is offered while it is already raining`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))).copy(minutely = minutes(1.0, 1.0, 1.0)),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0))).copy(minutely = minutes(1.0, 1.0, 1.0)),
+        )
+        assertNull(blender.blend(f).precipitationStartsAt(T0.plusSeconds(450L)))
+    }
+
+    @Test
+    fun `a dry twelve hours offers no start time`() {
+        val f = mapOf(Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.0, 0.0)))
+        assertNull(blender.blend(f).precipitationStartsAt(T0))
+    }
 }

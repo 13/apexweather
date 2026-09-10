@@ -174,7 +174,7 @@ class NotificationDeciderTest {
         val onset = morning.plusSeconds(3600)
         val posted = listOf(
             WeatherNotification.Summary("Dorf Tirol", today, Condition.RAIN, 11.0, 21.0, 4.0),
-            WeatherNotification.RainStarting(consensusHour(onset, mm = 1.4, prob = 70)),
+            WeatherNotification.RainStarting(consensusHour(onset, mm = 1.4, prob = 70), onset),
         )
         val next = NotificationDecider.remember(NotifyMemory(), posted, activeWarningIds = emptySet())
         assertEquals(today, next.lastSummaryDate)
