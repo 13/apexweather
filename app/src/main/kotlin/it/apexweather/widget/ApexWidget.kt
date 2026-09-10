@@ -45,10 +45,11 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import it.apexweather.MainActivity
 import it.apexweather.R
+import it.apexweather.data.PlaceCatalogue
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
 import it.apexweather.domain.ConsensusBlender
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.ui.common.Formats
 import it.apexweather.ui.home.HomeStateBuilder
 import kotlinx.coroutines.flow.first
@@ -60,6 +61,7 @@ import java.util.Locale
 interface WidgetEntryPoint {
     fun repository(): WeatherRepository
     fun settings(): SettingsRepository
+    fun places(): PlaceCatalogue
     fun blender(): ConsensusBlender
     fun clock(): Clock
 }
@@ -71,15 +73,18 @@ class ApexWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val ep = EntryPointAccessors.fromApplication(context, WidgetEntryPoint::class.java)
         val settings = ep.settings().settings.first()
-        val snapshot = ep.repository().snapshot(settings.bulletinLanguage(Locale.getDefault().toLanguageTag())).first()
-        val home = HomeStateBuilder.build(snapshot, settings, ep.blender().blend(snapshot.forecastsForBlend), ep.clock().instant())
+        // The widget shows the place the app is showing; there is only ever one.
+        val place = ep.places().byIstat(settings.placeIstat)
+            ?: checkNotNull(ep.places().byIstat(SouthTyrol.DEFAULT_ISTAT))
+        val snapshot = ep.repository().snapshot(place, settings.bulletinLanguage(Locale.getDefault().toLanguageTag())).first()
+        val home = HomeStateBuilder.build(place, snapshot, settings, ep.blender().blend(snapshot.forecastsForBlend), ep.clock().instant())
         // The widget renders outside the composition, so it resolves the reader's language and
         // clock preference from its own context.
         val formats = Formats(
             context.resources.configuration.locales[0],
             android.text.format.DateFormat.is24HourFormat(context),
         )
-        val state = WidgetStateBuilder.build(home, DorfTirol.ZONE, formats)
+        val state = WidgetStateBuilder.build(home, SouthTyrol.ZONE, formats)
         val background = gradientBitmap(state.topColor, state.bottomColor)
 
         provideContent { WidgetContent(state, background) }
@@ -112,7 +117,7 @@ private fun WidgetContent(state: WidgetState, background: Bitmap) {
                 Text(state.tempText, style = TextStyle(color = white, fontSize = 30.sp, fontWeight = FontWeight.Medium))
                 Spacer(GlanceModifier.width(10.dp))
                 Column {
-                    Text(DorfTirol.NAME, style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium))
+                    Text(state.placeName, style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Medium))
                     // The small widget has room for two lines. While the data is current those are
                     // the place and the sky; once it goes stale the age takes the second line,
                     // because a small widget showing an old reading with nothing to say so is a lie.

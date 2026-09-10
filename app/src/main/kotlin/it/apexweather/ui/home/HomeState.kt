@@ -1,12 +1,13 @@
 package it.apexweather.ui.home
 
 import it.apexweather.data.AppSettings
+import it.apexweather.domain.Place
 import it.apexweather.domain.SkyPalette
 import it.apexweather.domain.SkyPaletteSelector
 import it.apexweather.domain.SunPhase
 import it.apexweather.domain.SunPhaseCalculator
 import it.apexweather.domain.DailyAggregator
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.StationDownscale
 import it.apexweather.domain.model.Bulletin
 import it.apexweather.domain.model.Condition
@@ -24,6 +25,8 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 data class HomeUiState(
+    /** Which municipality all of this is about. Null only before the catalogue has been read. */
+    val place: Place? = null,
     val loading: Boolean = true,
     val refreshing: Boolean = false,
     val isEmpty: Boolean = true,
@@ -69,8 +72,8 @@ data class HomeUiState(
      * sunrise/sunset and finally to the calculator's 07–19 local rule.
      */
     fun phaseAt(t: Instant): SunPhase {
-        val day = days.firstOrNull { it.date == t.atZone(DorfTirol.ZONE).toLocalDate() }
-        return SunPhaseCalculator.phase(t, day?.sunrise ?: sunrise, day?.sunset ?: sunset, DorfTirol.ZONE)
+        val day = days.firstOrNull { it.date == t.atZone(SouthTyrol.ZONE).toLocalDate() }
+        return SunPhaseCalculator.phase(t, day?.sunrise ?: sunrise, day?.sunset ?: sunset, SouthTyrol.ZONE)
     }
 
     /**
@@ -92,12 +95,12 @@ object HomeStateBuilder {
      */
     const val MAX_DAYS = 14
 
-    fun build(snapshot: WeatherSnapshot, settings: AppSettings, consensus: ConsensusForecast, now: Instant): HomeUiState {
+    fun build(place: Place?, snapshot: WeatherSnapshot, settings: AppSettings, consensus: ConsensusForecast, now: Instant): HomeUiState {
         val thisHour = now.truncatedTo(ChronoUnit.HOURS)
         val upcoming = consensus.hourly.filter { !it.time.isBefore(thisHour) }.take(48)
         val current = upcoming.firstOrNull()
-        val today = consensus.daily.firstOrNull { it.date == now.atZone(DorfTirol.ZONE).toLocalDate() }
-        val phase = SunPhaseCalculator.phase(now, today?.sunrise, today?.sunset, DorfTirol.ZONE)
+        val today = consensus.daily.firstOrNull { it.date == now.atZone(SouthTyrol.ZONE).toLocalDate() }
+        val phase = SunPhaseCalculator.phase(now, today?.sunrise, today?.sunset, SouthTyrol.ZONE)
         val obs = snapshot.observation?.takeIf { Duration.between(it.time, now) <= OBSERVATION_MAX_AGE && it.tempC != null }
         // The station stands 270 m below the village, so its thermometer is only worth quoting once
         // it has been carried up; where it cannot be, the consensus is already at the right height
@@ -107,6 +110,7 @@ object HomeStateBuilder {
         val heroCondition = current?.condition ?: Condition.PARTLY_CLOUDY
         val isEmpty = current == null && obs == null && snapshot.bulletin == null
         return HomeUiState(
+            place = place,
             loading = false,
             isEmpty = isEmpty,
             now = now,
@@ -124,9 +128,9 @@ object HomeStateBuilder {
             station = snapshot.observation,
             warnings = snapshot.warnings,
             upcomingHours = upcoming,
-            days = consensus.daily.filter { !it.date.isBefore(now.atZone(DorfTirol.ZONE).toLocalDate()) }.take(MAX_DAYS),
-            hoursByDate = consensus.hourly.groupBy { it.time.atZone(DorfTirol.ZONE).toLocalDate() },
-            sourceDays = DailyAggregator.perSource(snapshot.forecasts, DorfTirol.ZONE),
+            days = consensus.daily.filter { !it.date.isBefore(now.atZone(SouthTyrol.ZONE).toLocalDate()) }.take(MAX_DAYS),
+            hoursByDate = consensus.hourly.groupBy { it.time.atZone(SouthTyrol.ZONE).toLocalDate() },
+            sourceDays = DailyAggregator.perSource(snapshot.forecasts, SouthTyrol.ZONE),
             bulletin = snapshot.bulletin,
             updatedAt = snapshot.lastSuccessfulRefresh,
             offline = snapshot.lastRefreshFailed,

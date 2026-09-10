@@ -3,10 +3,11 @@ package it.apexweather.widget
 import it.apexweather.R
 import it.apexweather.data.AppSettings
 import it.apexweather.domain.ConsensusBlender
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.forecast
 import it.apexweather.domain.hour
 import it.apexweather.domain.point
+import it.apexweather.domain.DORF_TIROL
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.WeatherSnapshot
@@ -27,8 +28,8 @@ class WidgetStateTest {
     fun `builds temperature, six upcoming hours and icons`() {
         val f = mapOf(Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 24).map { point(it, 20.0 + it, condition = if (it < 3) Condition.RAIN else Condition.CLEAR) }))
         val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = f, lastSuccessfulRefresh = hour(0))
-        val home = HomeStateBuilder.build(snapshot, AppSettings(), ConsensusBlender().blend(f), hour(0).plusSeconds(30))
-        val w = WidgetStateBuilder.build(home, DorfTirol.ZONE, formats)
+        val home = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), ConsensusBlender().blend(f), hour(0).plusSeconds(30))
+        val w = WidgetStateBuilder.build(home, SouthTyrol.ZONE, formats)
         assertTrue(w.hasData)
         assertEquals("20°", w.tempText)
         assertEquals(R.drawable.ic_wx_rain, w.iconRes)
@@ -36,7 +37,7 @@ class WidgetStateTest {
         assertEquals("03", w.hours[0].label) // hour(1) = 03:00 local
         assertEquals(R.drawable.ic_wx_moon, w.hours[2].iconRes) // hour(3) = 05:00 local, clear → night icon
         assertEquals(R.drawable.ic_wx_sun, w.hours[5].iconRes) // hour(6) = 08:00 local, clear → day icon
-        assertEquals(Format.time(hour(0), DorfTirol.ZONE, formats), w.updatedText)
+        assertEquals(Format.time(hour(0), SouthTyrol.ZONE, formats), w.updatedText)
         assertFalse(w.isStale)
     }
 
@@ -51,8 +52,8 @@ class WidgetStateTest {
         val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = f, lastSuccessfulRefresh = hour(0))
         fun stale(hoursLater: Long) =
             WidgetStateBuilder.build(
-                HomeStateBuilder.build(snapshot, AppSettings(), ConsensusBlender().blend(f), hour(0).plusSeconds(hoursLater * 3600)),
-                DorfTirol.ZONE, formats,
+                HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), ConsensusBlender().blend(f), hour(0).plusSeconds(hoursLater * 3600)),
+                SouthTyrol.ZONE, formats,
             ).isStale
         assertFalse(stale(2))
         assertTrue(stale(4))
@@ -60,7 +61,7 @@ class WidgetStateTest {
 
     @Test
     fun `empty home gives no-data widget`() {
-        val w = WidgetStateBuilder.build(HomeUiState(loading = false, isEmpty = true), DorfTirol.ZONE, formats)
+        val w = WidgetStateBuilder.build(HomeUiState(loading = false, isEmpty = true), SouthTyrol.ZONE, formats)
         assertFalse(w.hasData)
         assertEquals("–", w.tempText)
         assertEquals(R.string.empty_title, w.conditionRes)
@@ -76,7 +77,7 @@ class WidgetStateTest {
      */
     @Test
     fun `with nothing cached there is no age to show`() {
-        val w = WidgetStateBuilder.build(HomeUiState(loading = false, isEmpty = true), DorfTirol.ZONE, formats)
+        val w = WidgetStateBuilder.build(HomeUiState(loading = false, isEmpty = true), SouthTyrol.ZONE, formats)
         assertTrue(w.isStale)
         assertEquals("", w.updatedText)
     }
@@ -96,7 +97,7 @@ class WidgetStateTest {
             loading = false, isEmpty = false, heroTempC = 18.0,
             warnings = listOf(warning("a", it.apexweather.domain.model.WarningLevel.RED), warning("b", it.apexweather.domain.model.WarningLevel.YELLOW)),
         )
-        val w = WidgetStateBuilder.build(home, DorfTirol.ZONE, formats)
+        val w = WidgetStateBuilder.build(home, SouthTyrol.ZONE, formats)
         assertEquals(R.string.warn_thunderstorm, w.warningTypeRes)
         assertEquals(R.string.warn_level_red, w.warningLevelRes)
         assertEquals(0xFFFF5A4EL, w.warningColor)
@@ -104,7 +105,7 @@ class WidgetStateTest {
 
     @Test
     fun `with nothing in force the widget is told nothing`() {
-        val w = WidgetStateBuilder.build(HomeUiState(loading = false, isEmpty = false, heroTempC = 18.0), DorfTirol.ZONE, formats)
+        val w = WidgetStateBuilder.build(HomeUiState(loading = false, isEmpty = false, heroTempC = 18.0), SouthTyrol.ZONE, formats)
         assertEquals(null, w.warningTypeRes)
         assertEquals(null, w.warningLevelRes)
     }

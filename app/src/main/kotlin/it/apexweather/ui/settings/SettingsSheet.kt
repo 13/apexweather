@@ -24,7 +24,9 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -49,6 +51,9 @@ fun SettingsSheet(
     onAnimations: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onDismiss: () -> Unit,
+    /** The chosen place, and the way to a different one. Empty until the catalogue has been read. */
+    placeName: String = "",
+    onOpenPlaces: () -> Unit = {},
     /**
      * Notifications. Defaulted so a test, or any caller that does not care, can leave them out; the
      * switches then still render and simply lead nowhere.
@@ -82,6 +87,20 @@ fun SettingsSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineMedium)
+
+            // First, because it is the setting that changes everything else on the screen.
+            Text(stringResource(R.string.setting_place), style = MaterialTheme.typography.labelSmall)
+            Row(
+                Modifier.fillMaxWidth()
+                    .clickable(onClickLabel = stringResource(R.string.change_place), onClick = onOpenPlaces)
+                    .padding(vertical = 8.dp)
+                    .testTag("settings_place"),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(placeName, style = MaterialTheme.typography.bodyLarge)
+                Icon(Icons.Filled.ChevronRight, contentDescription = null)
+            }
 
             Text(stringResource(R.string.setting_language), style = MaterialTheme.typography.labelSmall)
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {

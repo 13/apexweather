@@ -21,6 +21,8 @@ data class NotifyMemory(
 /** Something worth interrupting the reader for. */
 sealed interface WeatherNotification {
     data class Summary(
+        /** The place this is about, so a reader who has switched is not told about the old one. */
+        val placeName: String,
         val date: LocalDate,
         val condition: Condition,
         val minC: Double,
@@ -61,8 +63,14 @@ object NotificationDecider {
         memory: NotifyMemory,
         now: Instant,
         zone: ZoneId,
+        /**
+         * The place's name in the reader's language. Passed in rather than read off the place here,
+         * because which language that is belongs to the caller's configuration, not to the JVM's
+         * default — the same reason [Formats] is passed everywhere else in this app.
+         */
+        placeName: String,
     ): List<WeatherNotification> = buildList {
-        summary(state, settings, memory, now, zone)?.let(::add)
+        summary(state, settings, memory, now, zone, placeName)?.let(::add)
         rain(state, settings, memory, now)?.let(::add)
         if (settings.notifyWarnings) {
             state.warnings.filter { it.identifier !in memory.notifiedWarningIds }.forEach { add(WeatherNotification.Severe(it)) }
@@ -75,6 +83,7 @@ object NotificationDecider {
         memory: NotifyMemory,
         now: Instant,
         zone: ZoneId,
+        placeName: String,
     ): WeatherNotification.Summary? {
         if (!settings.notifySummary) return null
         val local = now.atZone(zone)
@@ -83,7 +92,7 @@ object NotificationDecider {
         val hoursSinceDue = local.hour - settings.notifySummaryHour
         if (hoursSinceDue < 0 || hoursSinceDue > SUMMARY_GRACE_HOURS) return null
         val day = state.days.firstOrNull { it.date == today } ?: return null
-        return WeatherNotification.Summary(today, day.condition, day.minC, day.maxC, day.precipMm)
+        return WeatherNotification.Summary(placeName, today, day.condition, day.minC, day.maxC, day.precipMm)
     }
 
     private fun rain(

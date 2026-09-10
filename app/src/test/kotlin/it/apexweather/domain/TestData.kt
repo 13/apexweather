@@ -29,3 +29,16 @@ fun point(
 fun forecast(source: Source, hourly: List<HourlyPoint>) = SourceForecast(
     source = source, issuedAt = T0, fetchedAt = T0, hourly = hourly, daily = emptyList(),
 )
+
+/** Dorf Tirol, as the generated catalogue has it. */
+val DORF_TIROL = Place(
+    istat = "021101", nameDe = "Dorf Tirol", nameIt = "Tirolo", nameEn = "Tirol",
+    lat = 46.688958, lon = 11.156624, altitudeM = 594, district = 2,
+    station = NearbyStation("23200MS", "Meran", 46.688, 11.1366, 330, 1.53),
+)
+
+/** Sterzing: another district, another valley, and — as constructed here — no station at all. */
+val STERZING = Place(
+    istat = "021115", nameDe = "Sterzing", nameIt = "Vipiteno", nameEn = "Vipiteno",
+    lat = 46.8967, lon = 11.4333, altitudeM = 948, district = 5, station = null,
+)

@@ -1,7 +1,7 @@
 package it.apexweather.data.remote
 
 import it.apexweather.Fixtures
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.WmoCodes
 import it.apexweather.domain.model.Source
 import kotlinx.serialization.json.jsonArray
@@ -45,7 +45,7 @@ class OpenMeteoMapperTest {
         assertEquals(hourly["wind_speed_10m_icon_d2"]!!.jsonArray[0].jsonPrimitive.double, first.windKmh!!, 0.0)
         assertEquals(WmoCodes.toCondition(hourly["weather_code_icon_d2"]!!.jsonArray[0].jsonPrimitive.int), first.condition)
         val firstTime = hourly["time"]!!.jsonArray[0].jsonPrimitive.content
-        assertEquals(LocalDateTime.parse(firstTime).atZone(DorfTirol.ZONE).toInstant(), first.time)
+        assertEquals(LocalDateTime.parse(firstTime).atZone(SouthTyrol.ZONE).toInstant(), first.time)
     }
 
     @Test
@@ -131,7 +131,7 @@ class OpenMeteoMapperTest {
             Fixtures.json.decodeFromString(OpenMeteoStationResponse.serializer(), Fixtures.read("openmeteo_station.json")),
             Instant.parse("2026-09-09T12:00:00Z"),
         )
-        val village = it.apexweather.domain.ConsensusBlender(DorfTirol.ZONE).blend(fourteenDay)
+        val village = it.apexweather.domain.ConsensusBlender(SouthTyrol.ZONE).blend(fourteenDay)
         val shared = village.hourly.mapNotNull { hour -> reference.tempAt(hour.time)?.let { hour.tempC - it } }
         assertTrue("no overlapping hours between the two calls", shared.isNotEmpty())
         val median = shared.sorted()[shared.size / 2]

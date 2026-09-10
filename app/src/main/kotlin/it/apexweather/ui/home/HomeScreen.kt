@@ -44,7 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.apexweather.R
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.ConsensusHour
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
@@ -54,14 +54,14 @@ import java.time.Instant
 import java.time.LocalDate
 
 @Composable
-fun HomeScreen(onOpenBulletin: () -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeScreen(onOpenBulletin: () -> Unit, onOpenPlaces: () -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    HomeContent(state = state, onRefresh = viewModel::refresh, onOpenBulletin = onOpenBulletin)
+    HomeContent(state = state, onRefresh = viewModel::refresh, onOpenBulletin = onOpenBulletin, onOpenPlaces = onOpenPlaces)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () -> Unit) {
+fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () -> Unit, onOpenPlaces: () -> Unit = {}) {
     var selectedHour by remember { mutableStateOf<Instant?>(null) }
     var selectedDay by remember { mutableStateOf<LocalDate?>(null) }
     var warningsOpen by remember { mutableStateOf(false) }
@@ -73,12 +73,12 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
     PullToRefreshBox(isRefreshing = state.refreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
         when {
             state.loading -> Box(Modifier.fillMaxSize())
-            state.isEmpty -> EmptyState(onRefresh, Modifier.fillMaxSize())
+            state.isEmpty -> EmptyState(state.place?.name(LocalConfiguration.current.locales[0]).orEmpty(), onRefresh, Modifier.fillMaxSize())
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (state.offline) item { OfflineBanner(state) }
                 // Above the hero: a warning that has to be scrolled to is a warning that was missed.
                 if (state.warnings.isNotEmpty()) item { WarningSection(state.warnings, state.now) { warningsOpen = true } }
-                item { HeroSection(state) }
+                item { HeroSection(state, onOpenPlaces = onOpenPlaces) }
                 item {
                     AnimatedVisibility(appeared, enter = fadeIn(tween(500)) + slideInVertically(tween(500)) { it / 4 }) {
                         HourlySection(state.upcomingHours, state::phaseAt, accent) { selectedHour = it }
@@ -140,7 +140,7 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
 private fun OfflineBanner(state: HomeUiState) {
     val locale = LocalConfiguration.current.locales[0]
     val formats = LocalFormats.current
-    val text = state.updatedAt?.let { stringResource(R.string.offline_banner, Format.timestamp(it, DorfTirol.ZONE, state.now, formats)) } ?: stringResource(R.string.offline_banner_no_time)
+    val text = state.updatedAt?.let { stringResource(R.string.offline_banner, Format.timestamp(it, SouthTyrol.ZONE, state.now, formats)) } ?: stringResource(R.string.offline_banner_no_time)
     Text(
         text, style = MaterialTheme.typography.labelSmall, color = Color.White,
         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x66FF8A80)).padding(10.dp).testTag("offline_banner"),
@@ -148,11 +148,11 @@ private fun OfflineBanner(state: HomeUiState) {
 }
 
 @Composable
-private fun EmptyState(onRetry: () -> Unit, modifier: Modifier) {
+private fun EmptyState(placeName: String, onRetry: () -> Unit, modifier: Modifier) {
     Column(modifier.padding(32.dp).testTag("empty_state"), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(stringResource(R.string.empty_title), style = MaterialTheme.typography.headlineMedium, color = Color.White)
         Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.empty_body), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f))
+        Text(stringResource(R.string.empty_body, placeName), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f))
         Spacer(Modifier.height(20.dp))
         Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
     }
@@ -165,7 +165,7 @@ private const val MISSING = "\u2013"
 private fun HourDetail(hour: ConsensusHour, state: HomeUiState) {
     val formats = LocalFormats.current
     Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp).padding(bottom = 32.dp)) {
-        Text("${Format.time(hour.time, DorfTirol.ZONE, formats)} · ${hour.condition.label()}", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+        Text("${Format.time(hour.time, SouthTyrol.ZONE, formats)} · ${hour.condition.label()}", style = MaterialTheme.typography.headlineMedium, color = Color.White)
         Spacer(Modifier.height(4.dp))
         Text(
             stringResource(R.string.hour_summary, Format.temp(hour.tempC, formats), Format.temp(hour.tempMinC, formats), Format.temp(hour.tempMaxC, formats), Format.mm(hour.precipMm, formats), hour.precipProb, hour.windKmh?.let { Format.wind(it, state.settings.windUnit, formats) } ?: MISSING),

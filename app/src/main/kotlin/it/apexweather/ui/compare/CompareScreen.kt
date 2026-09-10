@@ -51,7 +51,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.apexweather.R
 import it.apexweather.data.CompareVariable
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceStatus
 import it.apexweather.ui.common.Format
@@ -196,7 +196,7 @@ fun CompareContent(
 @Composable
 private fun DayChips(state: CompareUiState, onDay: (DaySelection) -> Unit) {
     val formats = LocalFormats.current
-    val today = state.now.atZone(DorfTirol.ZONE).toLocalDate()
+    val today = state.now.atZone(SouthTyrol.ZONE).toLocalDate()
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -257,7 +257,7 @@ private fun ChartReadout(state: CompareUiState, selectedHour: Instant?, unitLabe
     Column(Modifier.fillMaxWidth().testTag("chart_readout")) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(
-                Format.time(hour, DorfTirol.ZONE, formats),
+                Format.time(hour, SouthTyrol.ZONE, formats),
                 style = MaterialTheme.typography.titleMedium, color = Color.White,
                 modifier = Modifier.testTag("readout_hour"),
             )
@@ -344,9 +344,9 @@ private fun statusText(source: Source, st: SourceStatus?, now: java.time.Instant
     // Only the sources that publish a run time can claim one; for the rest the timestamp is the fetch time.
     is SourceStatus.Ok -> stringResource(
         if (source.hasRunTime) R.string.status_ok else R.string.status_fetched,
-        Format.timestamp(st.issuedAt, DorfTirol.ZONE, now, formats),
+        Format.timestamp(st.issuedAt, SouthTyrol.ZONE, now, formats),
     )
-    is SourceStatus.Stale -> stringResource(R.string.status_stale, Format.timestamp(st.issuedAt, DorfTirol.ZONE, now, formats))
+    is SourceStatus.Stale -> stringResource(R.string.status_stale, Format.timestamp(st.issuedAt, SouthTyrol.ZONE, now, formats))
     is SourceStatus.Failed -> stringResource(R.string.status_failed, st.reason.take(40))
 }
 

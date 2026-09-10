@@ -34,8 +34,13 @@ class HomeScreenTest {
         hourly = (0 until 168).map { HourlyPoint(t0.plusSeconds(it * 3600L), 15.0 + offset + it % 8, precipMm = if (it % 5 == 0) 1.0 else 0.0, windKmh = 6.0, condition = Condition.PARTLY_CLOUDY) },
         daily = emptyList(),
     )
+    private val dorfTirol = it.apexweather.domain.Place(
+        istat = "021101", nameDe = "Dorf Tirol", nameIt = "Tirolo", nameEn = "Tirol",
+        lat = 46.688958, lon = 11.156624, altitudeM = 594, district = 2,
+        station = it.apexweather.domain.NearbyStation("23200MS", "Meran", 46.688, 11.1366, 330, 1.53),
+    )
     private val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = mapOf(Source.ICON_CH1 to fc(Source.ICON_CH1, 0.0), Source.ICON_D2 to fc(Source.ICON_D2, 2.0)))
-    private val state = HomeStateBuilder.build(snapshot, AppSettings(), ConsensusBlender().blend(snapshot.forecasts), t0.plusSeconds(60))
+    private val state = HomeStateBuilder.build(dorfTirol, snapshot, AppSettings(), ConsensusBlender().blend(snapshot.forecasts), t0.plusSeconds(60))
 
     @Test
     fun heroShowsConsensusTemperature() {

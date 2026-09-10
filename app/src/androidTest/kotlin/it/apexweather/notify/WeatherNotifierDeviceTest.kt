@@ -84,7 +84,7 @@ class WeatherNotifierDeviceTest {
     @Test
     fun aSummaryReachesTheShade() {
         val posted = notifier.post(
-            listOf(WeatherNotification.Summary(LocalDate.of(2026, 9, 9), Condition.RAIN, 11.0, 21.0, 4.0)),
+            listOf(WeatherNotification.Summary("Dorf Tirol", LocalDate.of(2026, 9, 9), Condition.RAIN, 11.0, 21.0, 4.0)),
             formats, now,
         )
         assertEquals(1, posted.size)

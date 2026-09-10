@@ -6,14 +6,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.apexweather.data.PlaceCatalogue
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
+import it.apexweather.domain.Place
 import it.apexweather.ui.WeatherStateHolder
 import it.apexweather.widget.ApexWidget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -29,6 +33,7 @@ class HomeViewModel @Inject constructor(
     private val holder: WeatherStateHolder,
     private val repository: WeatherRepository,
     private val settingsRepository: SettingsRepository,
+    private val catalogue: PlaceCatalogue,
     private val clock: Clock,
 ) : ViewModel() {
 
@@ -41,19 +46,29 @@ class HomeViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            // awaitCached, not weather.first(): a StateFlow hands back its placeholder immediately, and
-            // that placeholder has no lastSuccessfulRefresh — so this guard used to see a null age every
-            // time and refetch all seven models on every single cold start.
-            val weather = holder.awaitCached()
-            if (shouldRefreshOnOpen(weather.snapshot.lastSuccessfulRefresh, clock.instant())) {
-                doRefresh(weather.settings.bulletinLanguage(systemTag()))
-            }
+            // Once per place, not once per launch. A place the reader has just chosen has no cache
+            // and nothing else would ever fill it, so this has to fire on the switch as well as on
+            // the cold start — and the staleness rule below is the same one for both, so returning
+            // to a place refreshed minutes ago still costs nothing.
+            //
+            // The placeholder every StateFlow starts on has no place and no refresh time; taking it
+            // for a real emission is what used to refetch all seven models on every cold start.
+            holder.weather
+                .filter { it.place != null }
+                .distinctUntilChangedBy { it.place!!.istat }
+                .collect { weather ->
+                    val place = weather.place ?: return@collect
+                    if (shouldRefreshOnOpen(weather.snapshot.lastSuccessfulRefresh, clock.instant())) {
+                        doRefresh(place, weather.settings.bulletinLanguage(systemTag()))
+                    }
+                }
         }
     }
 
     fun refresh() {
         viewModelScope.launch {
-            doRefresh(settingsRepository.settings.first().bulletinLanguage(systemTag()))
+            val place = holder.awaitCached().place ?: return@launch
+            doRefresh(place, settingsRepository.settings.first().bulletinLanguage(systemTag()))
         }
     }
 
@@ -71,14 +86,23 @@ class HomeViewModel @Inject constructor(
             lastSuccessfulRefresh == null || Duration.between(lastSuccessfulRefresh, now) > STALE_ON_OPEN
     }
 
-    private suspend fun doRefresh(language: String) {
+    private suspend fun doRefresh(place: Place, language: String) {
         if (refreshing.value) return
         refreshing.value = true
         try {
-            repository.refresh(language)
+            repository.refresh(place, language)
+            // Read after the refresh, not before: the reader may have changed place while it ran,
+            // and a list worked out beforehand would evict the place they are now looking at.
+            evictStalePlaces()
             runCatching { ApexWidget().updateAll(context) }
         } finally {
             refreshing.value = false
         }
+    }
+
+    private suspend fun evictStalePlaces() {
+        val settings = settingsRepository.settings.first()
+        val keep = (listOf(settings.placeIstat) + settings.recentPlaces).distinct()
+        repository.evictAllBut(keep, keep.mapNotNull { catalogue.byIstat(it)?.district }.distinct())
     }
 }

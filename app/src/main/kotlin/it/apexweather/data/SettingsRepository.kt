@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.datastore.preferences.core.emptyPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Source
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -46,6 +47,13 @@ data class AppSettings(
     val notifySummaryHour: Int = 7,
     val notifyRain: Boolean = false,
     val notifyWarnings: Boolean = false,
+    /** The chosen municipality's ISTAT code. */
+    val placeIstat: String = SouthTyrol.DEFAULT_ISTAT,
+    /**
+     * Places by last use, most recent first. This is what cache eviction reads: anything not in
+     * here is deleted after the next refresh, so its length is the number of places the app keeps.
+     */
+    val recentPlaces: List<String> = emptyList(),
 ) {
     val anyNotification: Boolean get() = notifySummary || notifyRain || notifyWarnings
 
@@ -71,6 +79,10 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val notifySummaryHour = intPreferencesKey("notify_summary_hour")
         val notifyRain = booleanPreferencesKey("notify_rain")
         val notifyWarnings = booleanPreferencesKey("notify_warnings")
+        val placeIstat = stringPreferencesKey("place_istat")
+        // A comma-joined list rather than a string set: the order is the whole point of it, and
+        // DataStore's set preference does not keep one.
+        val recentPlaces = stringPreferencesKey("recent_places")
     }
 
     val settings: Flow<AppSettings> = context.settingsStore.data.catch { e ->
@@ -90,6 +102,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             notifySummaryHour = p[Keys.notifySummaryHour]?.takeIf { it in 0..23 } ?: 7,
             notifyRain = p[Keys.notifyRain] ?: false,
             notifyWarnings = p[Keys.notifyWarnings] ?: false,
+            placeIstat = p[Keys.placeIstat]?.takeIf { it.isNotBlank() } ?: SouthTyrol.DEFAULT_ISTAT,
+            recentPlaces = p[Keys.recentPlaces].orEmpty().split(',').filter { it.isNotBlank() },
         )
     }
 
@@ -102,6 +116,28 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     suspend fun setNotifySummaryHour(v: Int) = context.settingsStore.edit { it[Keys.notifySummaryHour] = v.coerceIn(0, 23) }
     suspend fun setNotifyRain(v: Boolean) = context.settingsStore.edit { it[Keys.notifyRain] = v }
     suspend fun setNotifyWarnings(v: Boolean) = context.settingsStore.edit { it[Keys.notifyWarnings] = v }
+
+    /**
+     * Chooses a place and moves it to the head of the recent list, which is what the cache keeps.
+     * Both in one edit, so a reader who switches place can never end up with a chosen place the
+     * cache has already been told to evict.
+     */
+    suspend fun setPlace(istat: String) = context.settingsStore.edit { prefs ->
+        val previous = prefs[Keys.placeIstat]?.takeIf { it.isNotBlank() } ?: SouthTyrol.DEFAULT_ISTAT
+        prefs[Keys.placeIstat] = istat
+        // The place being left has to enter the list here, or it is not in it when eviction reads
+        // it — and the very first switch would throw away the cache of the place the app opened on.
+        val current = prefs[Keys.recentPlaces].orEmpty().split(',').filter { it.isNotBlank() }
+            .ifEmpty { listOf(previous) }
+        prefs[Keys.recentPlaces] = (listOf(istat) + current.filterNot { it == istat })
+            .take(RECENT_PLACES)
+            .joinToString(",")
+    }
+
+    private companion object {
+        /** How many places the cache keeps, and therefore how many are worth remembering. */
+        const val RECENT_PLACES = 3
+    }
 
     suspend fun toggleCompareSource(source: Source) = context.settingsStore.edit { prefs ->
         val current = prefs[Keys.compareSources]?.mapNotNull { runCatching { Source.valueOf(it) }.getOrNull() }?.toSet()

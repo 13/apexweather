@@ -8,7 +8,7 @@ import it.apexweather.data.AppSettings
 import it.apexweather.data.CompareVariable
 import it.apexweather.data.SettingsRepository
 import it.apexweather.domain.DailyAggregator
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.ConsensusForecast
 import it.apexweather.domain.model.HourlyPoint
 import it.apexweather.domain.model.Source
@@ -97,7 +97,7 @@ object CompareStateBuilder {
         now: Instant,
         selection: DaySelection = DaySelection.Sweep,
     ): CompareUiState {
-        val window = window(selection, now, DorfTirol.ZONE)
+        val window = window(selection, now, SouthTyrol.ZONE)
         val from = window.from
         val to = from.plus(window.hours, ChronoUnit.HOURS)
         fun HourlyPoint.value(): Double? = when (settings.compareVariable) {
@@ -125,7 +125,7 @@ object CompareStateBuilder {
         }
         val band = if (settings.compareVariable == CompareVariable.TEMPERATURE) hoursInWindow.map { BandPoint(it.time, it.tempMinC, it.tempMaxC) } else emptyList()
 
-        val perSourceDaily = DailyAggregator.perSource(snapshot.forecasts, DorfTirol.ZONE)
+        val perSourceDaily = DailyAggregator.perSource(snapshot.forecasts, SouthTyrol.ZONE)
         val dayRows = consensus.daily.map { d ->
             DayRow(
                 date = d.date,

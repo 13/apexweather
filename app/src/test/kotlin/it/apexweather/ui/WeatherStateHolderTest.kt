@@ -4,6 +4,8 @@ import androidx.test.core.app.ApplicationProvider
 import it.apexweather.Fixtures
 import it.apexweather.data.FakeGeoSphere
 import it.apexweather.data.FakeMeteoAlarm
+import it.apexweather.data.PlaceCatalogue
+import it.apexweather.domain.DORF_TIROL
 import it.apexweather.data.FakeOdh
 import it.apexweather.data.FakeOpenMeteo
 import it.apexweather.data.FakeSiag
@@ -12,12 +14,13 @@ import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
 import it.apexweather.data.local.AppDatabase
 import it.apexweather.domain.ConsensusBlender
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Source
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -59,8 +62,13 @@ class WeatherStateHolderTest {
         )
         scope = CoroutineScope(UnconfinedTestDispatcher())
         settings = SettingsRepository(context)
+        // The DataStore behind SettingsRepository is shared between test classes under Robolectric,
+        // so the chosen place has to be stated here. Without it the holder subscribes to whichever
+        // place another test left behind, while this one fills Dorf Tirol's cache, and the wait for
+        // data never ends.
+        runBlocking { settings.setPlace(DORF_TIROL.istat) }
         holder = WeatherStateHolder(
-            repository, settings, ConsensusBlender(DorfTirol.ZONE),
+            repository, settings, PlaceCatalogue(context), ConsensusBlender(SouthTyrol.ZONE),
             MutableClock(Instant.parse("2026-09-08T14:00:00Z")), scope,
         )
     }
@@ -80,7 +88,7 @@ class WeatherStateHolderTest {
 
     @Test
     fun `the shared inputs carry the blended forecast every screen derives from`() = runTest {
-        repository.refresh(language())
+        repository.refresh(DORF_TIROL, language())
 
         // Forecasts, bulletin and observation are separate cache rows and land in separate
         // emissions, so wait for the one that carries everything rather than the first that
@@ -98,7 +106,7 @@ class WeatherStateHolderTest {
      */
     @Test
     fun `awaitCached waits for the cache instead of returning the placeholder`() = runTest {
-        repository.refresh(language())
+        repository.refresh(DORF_TIROL, language())
 
         assertNull("the placeholder must not claim a refresh", WeatherState().snapshot.lastSuccessfulRefresh)
         val cached = holder.awaitCached()
@@ -108,7 +116,7 @@ class WeatherStateHolderTest {
 
     @Test
     fun `the home state is derived from those same inputs`() = runTest {
-        repository.refresh(language())
+        repository.refresh(DORF_TIROL, language())
 
         val home = holder.home.first { it.days.isNotEmpty() }
         val weather = holder.weather.value
@@ -117,5 +125,18 @@ class WeatherStateHolderTest {
         assertEquals(weather.consensus.daily.first().date, home.days.first().date)
         // The day sheet needs the hours the 48-hour strip drops; they ride along on the same build.
         assertTrue(home.hoursByDate.size > home.upcomingHours.size / 24)
+    }
+
+    @Test
+    fun `the holder follows the chosen place`() = runTest {
+        settings.setPlace("021115")
+        assertEquals("021115", holder.awaitCached().place?.istat)
+    }
+
+    /** A code the catalogue does not know must not leave the app with no place at all. */
+    @Test
+    fun `an unknown stored place falls back to the default`() = runTest {
+        settings.setPlace("999999")
+        assertEquals(SouthTyrol.DEFAULT_ISTAT, holder.awaitCached().place?.istat)
     }
 }

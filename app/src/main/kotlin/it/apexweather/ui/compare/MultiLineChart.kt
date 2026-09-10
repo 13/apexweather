@@ -22,7 +22,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import it.apexweather.R
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Source
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
@@ -75,7 +75,7 @@ fun MultiLineChart(
         R.plurals.compare_chart_desc, window.hours.toInt(), variableName, window.hours,
         "${values.min().roundToInt()}$unitLabel", "${values.max().roundToInt()}$unitLabel", models,
     )
-    val spokenSelection = selectedHour?.let { Format.time(it, DorfTirol.ZONE, formats) }
+    val spokenSelection = selectedHour?.let { Format.time(it, SouthTyrol.ZONE, formats) }
 
     BoxWithConstraints(modifier) {
         val width = constraints.maxWidth.toFloat()
@@ -134,7 +134,7 @@ fun MultiLineChart(
 
             var t = window.from
             while (!t.isAfter(geometry.until)) {
-                val z = t.atZone(DorfTirol.ZONE)
+                val z = t.atZone(SouthTyrol.ZONE)
                 val label = if (z.hour == 0) Format.weekday(z.toLocalDate(), formats) else "${z.hour}h"
                 drawContext.canvas.nativeCanvas.drawText(label, geometry.x(t) - 12f, size.height - 8f, labelPaint)
                 drawLine(Color.White.copy(alpha = 0.06f), Offset(geometry.x(t), geometry.top), Offset(geometry.x(t), geometry.bottom), strokeWidth = 1f)
