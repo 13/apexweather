@@ -88,7 +88,7 @@ fun HomeContent(
         when {
             state.loading -> Box(Modifier.fillMaxSize())
             state.isEmpty -> EmptyState(state.place?.name(LocalConfiguration.current.locales[0]).orEmpty(), onRefresh, Modifier.fillMaxSize())
-            else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            else -> LazyColumn(Modifier.fillMaxSize().testTag("home_list"), contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (state.offline) item { OfflineBanner(state) }
                 // Above the hero: a warning that has to be scrolled to is a warning that was missed.
                 if (state.visibleWarnings.isNotEmpty()) {
@@ -102,11 +102,6 @@ fun HomeContent(
                 }
                 item {
                     AnimatedVisibility(appeared, enter = fadeIn(tween(600, 100)) + slideInVertically(tween(600, 100)) { it / 4 }) {
-                        StationSection(state.station, state.currentHour, state.settings.windUnit, state.now)
-                    }
-                }
-                item {
-                    AnimatedVisibility(appeared, enter = fadeIn(tween(600, 150)) + slideInVertically(tween(600, 150)) { it / 4 }) {
                         DailySection(state.days, accent) { selectedDay = it }
                     }
                 }
@@ -115,6 +110,15 @@ fun HomeContent(
                         AnimatedVisibility(appeared, enter = fadeIn(tween(700, 200)) + slideInVertically(tween(700, 200)) { it / 4 }) {
                             BulletinTeaser(b, onOpenBulletin)
                         }
+                    }
+                }
+                // Last, above the footer: everything on this card is an observation rather than a
+                // forecast, so it reads as a reference the day list has earned rather than as an
+                // interruption of it. The hero still says on its own line when the temperature it
+                // shows came from the station.
+                item {
+                    AnimatedVisibility(appeared, enter = fadeIn(tween(700, 250)) + slideInVertically(tween(700, 250)) { it / 4 }) {
+                        StationSection(state.station, state.currentHour, state.settings.windUnit, state.now)
                     }
                 }
                 item { AttributionFooter() }
