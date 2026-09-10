@@ -134,12 +134,17 @@ class HomeScreenTest {
         rule.onNodeWithTag("hour_detail_sheet").assertIsDisplayed()
     }
 
+    /**
+     * The sheet's content on its own, not inside the sheet. A partially expanded `ModalBottomSheet`
+     * lays its content out at full height and clips it, so `performScrollTo` brings a row into the
+     * *sheet's* viewport, which reaches below the screen — whether it is then displayed depends on
+     * the device's height. That passed on the phone and failed on CI's smaller emulator. The route
+     * from the strip into the sheet is covered by [hourlyStripScrollsAndOpensDetailSheet] and
+     * [hourSheetClosesFromItsCross]; what is asserted here is the content.
+     */
     @Test
-    fun hourSheetShowsItsStatsAndItsAgreement() {
-        rule.setContent { ApexTheme { HomeContent(state, onRefresh = {}, onOpenBulletin = {}) } }
-        openHourSheet()
-        // The sheet opens partially expanded and its content scrolls, so whether these are on
-        // screen depends on the device's own height — scroll each into view before asserting.
+    fun hourDetailShowsItsStatsAndItsAgreement() {
+        rule.setContent { ApexTheme { HourDetail(state.upcomingHours.first(), state) } }
         rule.onNodeWithTag("hour_stat_temp").assertIsDisplayed()
         rule.onNodeWithTag("hour_stat_precip").assertIsDisplayed()
         // The stat tile merges its label, value and sub-line into one TalkBack stop, which also
@@ -151,11 +156,12 @@ class HomeScreenTest {
 
     /** A quantity nobody publishes is left out rather than drawn as a dash. */
     @Test
-    fun hourSheetLeavesOutTheGustNobodyPublishes() {
-        rule.setContent { ApexTheme { HomeContent(noGustState, onRefresh = {}, onOpenBulletin = {}) } }
-        openHourSheet()
+    fun hourDetailLeavesOutTheGustNobodyPublishes() {
+        rule.setContent { ApexTheme { HourDetail(noGustState.upcomingHours.first(), noGustState) } }
         rule.onNodeWithTag("hour_stat_wind").assertIsDisplayed()
-        rule.onAllNodesWithTag("hour_stat_gust").fetchSemanticsNodes().let {
+        // Unmerged, so this proves the line was never composed rather than merely swallowed by the
+        // tile it would have belonged to.
+        rule.onAllNodesWithTag("hour_stat_gust", useUnmergedTree = true).fetchSemanticsNodes().let {
             assertEquals("no model publishes a gust, so there is no gust line", 0, it.size)
         }
     }
