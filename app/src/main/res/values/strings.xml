@@ -17,6 +17,7 @@
     <string name="now_from_station">Jetzt: Station %1$s, %2$s</string>
     <string name="updated_at">Aktualisiert %1$s</string>
     <string name="section_hourly">NÄCHSTE 48 STUNDEN</string>
+    <string name="precip_legend">Balken: Wahrscheinlichkeit · Zahl: mm</string>
     <string name="section_bulletin">LANDESWETTERDIENST</string>
     <string name="now">Jetzt</string>
     <string name="today">Heute</string>
@@ -71,7 +72,7 @@
     <string name="about_build">Version %1$s (%2$d) · %3$s</string>
     <string name="about_commit">Commit %1$s · %2$s</string>
     <string name="day_source_desc">%1$s: %2$s bis %3$s, %4$s</string>
-    <string name="hour_column_desc">%1$s Uhr: %2$s, %3$s, %4$d %% Niederschlagswahrscheinlichkeit</string>
+    <string name="hour_column_desc">%1$s Uhr: %2$s, %3$s, %4$d %% Niederschlagswahrscheinlichkeit, %5$s</string>
     <plurals name="now_from_consensus">
         <item quantity="one">Konsens aus %1$d Modell</item>
         <item quantity="other">Konsens aus %1$d Modellen</item>
