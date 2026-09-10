@@ -38,7 +38,10 @@ internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
         forecastCalls++
         if (failuresBeforeSuccess >= forecastCalls) throw IOException("connection reset")
         if (fail) throw IOException("open-meteo down")
-        return Fixtures.json.decodeFromString(OpenMeteoResponse.serializer(), Fixtures.read("openmeteo.json"))
+        // The recording of the request the app actually makes today: fourteen days, eight models,
+        // the freezing level asked for. `openmeteo.json` is kept for OpenMeteoMapperTest alone,
+        // where its job is to be a response that predates two of those changes.
+        return Fixtures.json.decodeFromString(OpenMeteoResponse.serializer(), Fixtures.read("openmeteo_14d.json"))
     }
 
     override suspend fun stationForecast(

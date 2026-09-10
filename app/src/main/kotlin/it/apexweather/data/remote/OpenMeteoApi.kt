@@ -73,7 +73,10 @@ object OpenMeteoMapper {
         Source.ICON_CH2 to "meteoswiss_icon_ch2",
         Source.ICON_2I to "italia_meteo_arpae_icon_2i",
         Source.ICON_D2 to "icon_d2",
+        Source.KNMI_HARMONIE to "knmi_harmonie_arome_europe",
+        Source.DMI_HARMONIE to "dmi_harmonie_arome_europe",
         Source.ECMWF to "ecmwf_ifs025",
+        Source.ECMWF_AIFS to "ecmwf_aifs025_single",
     )
     /**
      * Two weeks, although only ECMWF reaches past day five. Every other model returns nulls for the

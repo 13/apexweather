@@ -138,4 +138,34 @@ class OpenMeteoMapperTest {
         assertTrue("village-minus-station came out at $median °C", median < 0.0)
         assertTrue("that is not a height difference: $median °C", median > -6.0)
     }
+
+    /**
+     * The regional half of the consensus used to be four flavours of ICON, and models sharing a core
+     * agree with each other for reasons that have nothing to do with being right. These two are
+     * independent HARMONIE-AROME runs, and the third is ECMWF's machine-learned model — the same
+     * institution, an entirely different way of forecasting.
+     */
+    @Test
+    fun `the three added models all reach this valley`() {
+        listOf(Source.KNMI_HARMONIE, Source.DMI_HARMONIE, Source.ECMWF_AIFS).forEach { source ->
+            val hourly = fourteenDay[source]?.hourly.orEmpty()
+            assertTrue("$source returned nothing", hourly.isNotEmpty())
+            assertTrue("$source returned implausible temperatures", hourly.all { it.tempC in -40.0..45.0 })
+        }
+    }
+
+    /** The two-kilometre runs are short-range; only the global models reach the end of the list. */
+    @Test
+    fun `the added regional models are short-range and the AI model is not`() {
+        val knmi = fourteenDay.getValue(Source.KNMI_HARMONIE).hourly.size
+        val aifs = fourteenDay.getValue(Source.ECMWF_AIFS).hourly.size
+        assertTrue("KNMI reached $knmi hours", knmi in 24..120)
+        assertTrue("AIFS reached only $aifs hours", aifs > 240)
+    }
+
+    @Test
+    fun `every model in the table is asked for by name`() {
+        assertEquals(Source.entries.size - 2, OpenMeteoMapper.MODELS.size) // KMOS and AROME come from elsewhere
+        assertEquals(OpenMeteoMapper.MODELS.size, OpenMeteoMapper.MODELS.values.toSet().size)
+    }
 }

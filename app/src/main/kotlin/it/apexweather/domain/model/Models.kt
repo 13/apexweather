@@ -12,7 +12,14 @@ enum class Source(val displayName: String, val regional: Boolean) {
     ICON_CH2("MeteoSwiss ICON-CH2", true),
     ICON_2I("ARPAE ICON-2I", true),
     ICON_D2("DWD ICON-D2", true),
-    ECMWF("ECMWF IFS", false);
+    // Two independent HARMONIE-AROME runs at about 2 km. They matter because without them the
+    // regional half of the consensus is four flavours of ICON, and four models that share a core
+    // agreeing with each other is not the same thing as four models being right.
+    KNMI_HARMONIE("KNMI HARMONIE", true),
+    DMI_HARMONIE("DMI HARMONIE", true),
+    ECMWF("ECMWF IFS", false),
+    /** ECMWF's machine-learned model: the same institution, an entirely different way of forecasting. */
+    ECMWF_AIFS("ECMWF AIFS", false);
 
     /** True when [SourceStatus.Ok.issuedAt] really is the model run time. Open-Meteo does not report a
      * run time, so for those sources the timestamp is only when we fetched the data. */
@@ -22,7 +29,7 @@ enum class Source(val displayName: String, val regional: Boolean) {
      * (02:00 and 14:00 local), so its threshold is the 12 h cadence plus margin for the publication delay. */
     val staleAfterHours: Int get() = when (this) {
         SIAG_KMOS -> 16
-        ECMWF -> 12
+        ECMWF, ECMWF_AIFS -> 12
         else -> 6
     }
 }

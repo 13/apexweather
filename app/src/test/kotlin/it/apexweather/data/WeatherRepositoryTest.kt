@@ -76,7 +76,7 @@ class WeatherRepositoryTest {
     }
 
     @Test
-    fun `refresh fills all seven sources, bulletin and observation`() = runTest {
+    fun `refresh fills every source, the bulletin and the observation`() = runTest {
         val result = repo.refresh(DORF_TIROL, "de")
         assertTrue(result.failed.isEmpty())
         val s = repo.snapshot(DORF_TIROL, "de").first()
