@@ -17,7 +17,7 @@
     <string name="now_from_station">Jetzt: Station %1$s, %2$s</string>
     <string name="updated_at">Aktualisiert %1$s</string>
     <string name="section_hourly">NÄCHSTE 48 STUNDEN</string>
-    <string name="precip_legend">Balken: Wahrscheinlichkeit · Zahl: mm</string>
+    <string name="precip_legend">Niederschlag in mm · darunter die Wahrscheinlichkeit</string>
     <string name="section_bulletin">LANDESWETTERDIENST</string>
     <string name="now">Jetzt</string>
     <string name="today">Heute</string>

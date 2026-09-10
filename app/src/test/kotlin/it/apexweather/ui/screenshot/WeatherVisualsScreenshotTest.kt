@@ -81,17 +81,19 @@ class WeatherVisualsScreenshotTest {
     }
 
     /**
-     * The bar row across the cases that used to be indistinguishable: a certain drizzle, a likely
-     * downpour, an unlikely shower and a dry hour all drew the same two-pixel sliver.
+     * The bar row across the scale: nothing, a trace, a millimetre, the two step colours, the top of
+     * the scale and past it, and the two frozen conditions that must not be painted as rain.
      */
     @Test
     fun `the precipitation bars`() {
         val cases = listOf(
             Triple(0.0, 0, Condition.CLEAR),
             Triple(0.0, 20, Condition.CLOUDY),
-            Triple(0.3, 100, Condition.DRIZZLE),
-            Triple(1.4, 64, Condition.RAIN),
+            Triple(0.2, 40, Condition.DRIZZLE),
+            Triple(1.0, 64, Condition.RAIN),
+            Triple(2.5, 80, Condition.RAIN),
             Triple(6.2, 90, Condition.HEAVY_RAIN),
+            Triple(14.0, 95, Condition.THUNDERSTORM),
             Triple(2.0, 80, Condition.SNOW),
             Triple(0.8, 55, Condition.SLEET),
         )
@@ -121,13 +123,13 @@ class WeatherVisualsScreenshotTest {
     private fun PrecipBarPreview(mm: Double, prob: Int, condition: Condition) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
-                Modifier.width(18.dp).height(26.dp).clip(RoundedCornerShape(4.dp)).background(PrecipScale.TRACK),
+                Modifier.width(18.dp).height(30.dp).clip(RoundedCornerShape(4.dp)).background(PrecipScale.TRACK),
                 contentAlignment = Alignment.BottomCenter,
             ) {
-                if (PrecipScale.isDrawn(prob)) {
+                if (PrecipScale.hasAmount(mm)) {
                     Box(
                         Modifier.fillMaxWidth()
-                            .height((26.dp * PrecipScale.fillFraction(prob)).coerceAtLeast(2.dp))
+                            .height((30.dp * PrecipScale.fillFraction(mm)).coerceAtLeast(3.dp))
                             .clip(RoundedCornerShape(4.dp))
                             .background(PrecipScale.fillColor(mm, condition)),
                     )
@@ -135,8 +137,9 @@ class WeatherVisualsScreenshotTest {
             }
             Text(
                 if (PrecipScale.hasAmount(mm)) Format.mm(mm, LocalFormats.current) else "",
-                color = Color(0xFFB9D2F5), fontSize = 10.sp,
+                color = Color.White, fontSize = 10.sp,
             )
+            Text(if (prob > 0) "$prob %" else "", color = Color(0xFFB9D2F5), fontSize = 10.sp)
         }
     }
 

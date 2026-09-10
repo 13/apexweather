@@ -17,7 +17,7 @@
     <string name="now_from_station">Ora: stazione %1$s, %2$s</string>
     <string name="updated_at">Aggiornato %1$s</string>
     <string name="section_hourly">PROSSIME 48 ORE</string>
-    <string name="precip_legend">Barra: probabilità · Numero: mm</string>
+    <string name="precip_legend">Precipitazioni in mm · sotto la probabilità</string>
     <string name="section_bulletin">SERVIZIO METEO PROVINCIALE</string>
     <string name="now">Ora</string>
     <string name="today">Oggi</string>

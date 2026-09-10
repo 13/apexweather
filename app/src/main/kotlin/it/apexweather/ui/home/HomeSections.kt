@@ -93,7 +93,7 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
             modifier = Modifier.testTag("hero_temp"),
         )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(painterResource(state.heroCondition.iconRes(state.phase)), contentDescription = null, tint = Color.fromArgb(state.palette.accent), modifier = Modifier.size(22.dp))
+            Icon(painterResource(state.heroCondition.iconRes(state.phase)), contentDescription = null, tint = Color.fromArgb(state.palette.accent), modifier = Modifier.size(30.dp))
             Text(state.heroCondition.label(), style = MaterialTheme.typography.headlineMedium, color = Color.White)
         }
         Spacer(Modifier.height(6.dp))
@@ -217,7 +217,7 @@ fun HourStrip(
                         style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.75f),
                     )
                     Spacer(Modifier.height(6.dp))
-                    Icon(painterResource(h.condition.iconRes(phaseAt(h.time))), contentDescription = h.condition.label(), tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(painterResource(h.condition.iconRes(phaseAt(h.time))), contentDescription = h.condition.label(), tint = Color.White, modifier = Modifier.size(30.dp))
                     Spacer(Modifier.height(6.dp))
                     Text(Format.temp(h.tempC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
@@ -229,8 +229,8 @@ fun HourStrip(
 }
 
 /**
- * Height is the probability, colour is the amount, and the number underneath is the amount in
- * millimetres. See [PrecipScale] for why they are split that way.
+ * Millimetres as a bar, the same millimetres as a number under it, and the probability under that.
+ * See [PrecipScale] for the scale and why it is not linear.
  */
 @Composable
 private fun PrecipBar(mm: Double, prob: Int, condition: Condition) {
@@ -242,26 +242,33 @@ private fun PrecipBar(mm: Double, prob: Int, condition: Condition) {
                 .background(PrecipScale.TRACK),
             contentAlignment = Alignment.BottomCenter,
         ) {
-            if (PrecipScale.isDrawn(prob)) {
+            if (PrecipScale.hasAmount(mm)) {
                 Box(
                     Modifier.fillMaxWidth()
-                        // The floor is what keeps a real chance from rounding away to nothing.
-                        .height((PrecipTrackHeight * PrecipScale.fillFraction(prob)).coerceAtLeast(2.dp))
+                        // The floor keeps the smallest printed amount from rounding away to nothing.
+                        .height((PrecipTrackHeight * PrecipScale.fillFraction(mm)).coerceAtLeast(3.dp))
                         .clip(RoundedCornerShape(4.dp))
                         .background(PrecipScale.fillColor(mm, condition)),
                 )
             }
         }
+        Spacer(Modifier.height(3.dp))
         Text(
             if (PrecipScale.hasAmount(mm)) Format.mm(mm, formats) else "",
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = Color.White,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            if (prob > 0) stringResource(R.string.unit_percent, prob) else "",
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
             color = Color(0xFFB9D2F5),
         )
     }
 }
 
-/** The track every hour's bar is drawn inside, so a small chance reads as small, not as absent. */
-private val PrecipTrackHeight = 26.dp
+/** The track every hour's bar is drawn inside, so a small amount reads as small, not as absent. */
+private val PrecipTrackHeight = 30.dp
 
 /** Consensus temperature line with translucent min/max band. */
 @Composable
@@ -318,7 +325,7 @@ fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate
                     if (i == 0) stringResource(R.string.today) else Format.weekday(d.date, formats),
                     style = MaterialTheme.typography.bodyMedium, color = Color.White, modifier = Modifier.width(52.dp),
                 )
-                Icon(painterResource(d.condition.iconRes(SunPhase.DAY)), contentDescription = d.condition.label(), tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(painterResource(d.condition.iconRes(SunPhase.DAY)), contentDescription = d.condition.label(), tint = Color.White, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(if (d.precipMm >= 0.5) Format.mm(d.precipMm, formats) else "", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5), modifier = Modifier.width(48.dp))
                 Text(Format.temp(d.minC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.width(36.dp))

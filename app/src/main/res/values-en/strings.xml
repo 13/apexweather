@@ -17,7 +17,7 @@
     <string name="now_from_station">Now: station %1$s, %2$s</string>
     <string name="updated_at">Updated %1$s</string>
     <string name="section_hourly">NEXT 48 HOURS</string>
-    <string name="precip_legend">Bar: probability · Number: mm</string>
+    <string name="precip_legend">Precipitation in mm · probability below</string>
     <string name="section_bulletin">SOUTH TYROL WEATHER SERVICE</string>
     <string name="now">Now</string>
     <string name="today">Today</string>
