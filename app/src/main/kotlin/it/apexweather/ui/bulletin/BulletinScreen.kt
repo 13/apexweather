@@ -38,7 +38,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import it.apexweather.R
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.GlassCard
@@ -65,7 +65,7 @@ fun BulletinContent(state: BulletinUiState) {
             GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 Text(b.title, style = MaterialTheme.typography.titleMedium, color = Color.White)
                 Spacer(Modifier.height(4.dp))
-                Text(stringResource(R.string.bulletin_issued, Format.timestamp(b.issuedAt, DorfTirol.ZONE, state.now, formats)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                Text(stringResource(R.string.bulletin_issued, Format.timestamp(b.issuedAt, SouthTyrol.ZONE, state.now, formats)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                 Spacer(Modifier.height(10.dp))
                 Text(b.evolution, style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.92f), modifier = Modifier.testTag("bulletin_text"))
             }

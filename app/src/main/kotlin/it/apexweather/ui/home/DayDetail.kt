@@ -27,7 +27,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import it.apexweather.R
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.SunPhase
 import it.apexweather.domain.model.ConsensusDay
 import it.apexweather.ui.common.Format
@@ -89,7 +89,7 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState) {
         if (day.sunrise != null && day.sunset != null) {
             Spacer(Modifier.height(2.dp))
             Text(
-                stringResource(R.string.day_sun, Format.time(day.sunrise, DorfTirol.ZONE, formats), Format.time(day.sunset, DorfTirol.ZONE, formats)),
+                stringResource(R.string.day_sun, Format.time(day.sunrise, SouthTyrol.ZONE, formats), Format.time(day.sunset, SouthTyrol.ZONE, formats)),
                 style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.65f),
             )
         }

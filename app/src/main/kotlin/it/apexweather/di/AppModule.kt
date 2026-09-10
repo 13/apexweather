@@ -15,7 +15,7 @@ import it.apexweather.data.remote.OdhApi
 import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.SiagApi
 import it.apexweather.domain.ConsensusBlender
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -71,5 +71,5 @@ object AppModule {
 
     @Provides @Singleton @ApplicationScope
     fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    @Provides @Singleton fun blender(): ConsensusBlender = ConsensusBlender(DorfTirol.ZONE)
+    @Provides @Singleton fun blender(): ConsensusBlender = ConsensusBlender(SouthTyrol.ZONE)
 }

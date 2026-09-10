@@ -32,7 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import it.apexweather.R
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Warning
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
@@ -149,7 +149,7 @@ fun WarningDetail(warnings: List<Warning>, now: Instant) {
 @Composable
 private fun warningWindow(w: Warning, now: Instant): String {
     val formats = LocalFormats.current
-    val until = Format.timestamp(w.expires, DorfTirol.ZONE, now, formats)
+    val until = Format.timestamp(w.expires, SouthTyrol.ZONE, now, formats)
     return if (w.hasStartedAt(now)) stringResource(R.string.warn_until, until)
-    else stringResource(R.string.warn_window, Format.timestamp(w.onset, DorfTirol.ZONE, now, formats), until)
+    else stringResource(R.string.warn_window, Format.timestamp(w.onset, SouthTyrol.ZONE, now, formats), until)
 }

@@ -27,6 +27,7 @@ import it.apexweather.domain.model.StationObservation
 import it.apexweather.domain.model.Warning
 import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay

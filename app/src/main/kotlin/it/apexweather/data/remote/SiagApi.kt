@@ -1,6 +1,7 @@
 package it.apexweather.data.remote
 
 import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.SiagCodes
 import it.apexweather.domain.model.Bulletin
 import it.apexweather.domain.model.BulletinCondition
@@ -146,7 +147,7 @@ object SiagMappers {
             val max = pt.value?.doubleOrNull ?: return@mapNotNull null
             val min = minByDate[pt.date] ?: return@mapNotNull null
             DailyPoint(
-                date = parseOffset(pt.date).atZone(DorfTirol.ZONE).toLocalDate(),
+                date = parseOffset(pt.date).atZone(SouthTyrol.ZONE).toLocalDate(),
                 minC = min,
                 maxC = max,
                 precipMm = precDayByDate[pt.date] ?: 0.0,
@@ -164,7 +165,7 @@ object SiagMappers {
     }
 
     fun mapBulletin(weather: OdhWeatherResponse, district: OdhDistrictResponse, language: String): Bulletin {
-        val zone = DorfTirol.ZONE
+        val zone = SouthTyrol.ZONE
         return Bulletin(
             language = language,
             issuedAt = LocalDateTime.parse(weather.date).atZone(zone).toInstant(),
@@ -201,7 +202,7 @@ object SiagMappers {
         fun msToKmh(v: Double?) = v?.let { (it * 3.6 * 10).roundToInt() / 10.0 }
         return StationObservation(
             stationName = row.name ?: "Meran",
-            time = LocalDateTime.parse(updated).atZone(DorfTirol.ZONE).toInstant(),
+            time = LocalDateTime.parse(updated).atZone(SouthTyrol.ZONE).toInstant(),
             tempC = row.t.siagDouble(),
             humidityPct = row.rh.siagDouble()?.roundToInt(),
             windKmh = msToKmh(row.ff.siagDouble()),

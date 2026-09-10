@@ -44,7 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.apexweather.R
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.ConsensusHour
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
@@ -140,7 +140,7 @@ fun HomeContent(state: HomeUiState, onRefresh: () -> Unit, onOpenBulletin: () ->
 private fun OfflineBanner(state: HomeUiState) {
     val locale = LocalConfiguration.current.locales[0]
     val formats = LocalFormats.current
-    val text = state.updatedAt?.let { stringResource(R.string.offline_banner, Format.timestamp(it, DorfTirol.ZONE, state.now, formats)) } ?: stringResource(R.string.offline_banner_no_time)
+    val text = state.updatedAt?.let { stringResource(R.string.offline_banner, Format.timestamp(it, SouthTyrol.ZONE, state.now, formats)) } ?: stringResource(R.string.offline_banner_no_time)
     Text(
         text, style = MaterialTheme.typography.labelSmall, color = Color.White,
         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x66FF8A80)).padding(10.dp).testTag("offline_banner"),
@@ -165,7 +165,7 @@ private const val MISSING = "\u2013"
 private fun HourDetail(hour: ConsensusHour, state: HomeUiState) {
     val formats = LocalFormats.current
     Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp).padding(bottom = 32.dp)) {
-        Text("${Format.time(hour.time, DorfTirol.ZONE, formats)} · ${hour.condition.label()}", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+        Text("${Format.time(hour.time, SouthTyrol.ZONE, formats)} · ${hour.condition.label()}", style = MaterialTheme.typography.headlineMedium, color = Color.White)
         Spacer(Modifier.height(4.dp))
         Text(
             stringResource(R.string.hour_summary, Format.temp(hour.tempC, formats), Format.temp(hour.tempMinC, formats), Format.temp(hour.tempMaxC, formats), Format.mm(hour.precipMm, formats), hour.precipProb, hour.windKmh?.let { Format.wind(it, state.settings.windUnit, formats) } ?: MISSING),

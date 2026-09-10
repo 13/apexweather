@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.apexweather.R
 import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.SunPhase
 import it.apexweather.domain.model.Bulletin
 import it.apexweather.domain.model.ConsensusDay
@@ -86,14 +87,14 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier) {
         // A moved reading has to say it was moved, and by how much: it is still a measurement, but
         // not one taken where the reader is standing.
         val source = state.observation?.let { obs ->
-            val at = Format.timestamp(obs.time, DorfTirol.ZONE, state.now, formats)
+            val at = Format.timestamp(obs.time, SouthTyrol.ZONE, state.now, formats)
             state.heroAdjustmentC
                 ?.let { stringResource(R.string.now_from_station_adjusted, obs.stationName, at, Format.tempDelta(it, formats)) }
                 ?: stringResource(R.string.now_from_station, obs.stationName, at)
         } ?: pluralStringResource(R.plurals.now_from_consensus, sourceCount, sourceCount)
         Text(source, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.65f))
         state.updatedAt?.let {
-            Text(stringResource(R.string.updated_at, Format.timestamp(it, DorfTirol.ZONE, state.now, formats)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
+            Text(stringResource(R.string.updated_at, Format.timestamp(it, SouthTyrol.ZONE, state.now, formats)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
         }
     }
 }
@@ -163,7 +164,7 @@ fun HourStrip(
                 // clickable is what merges a column into one spoken node, so the inert strip has to
                 // say so itself — otherwise every hour is read as four unrelated fragments.
                 val spoken = stringResource(
-                    R.string.hour_column_desc, Format.hour(h.time, DorfTirol.ZONE, formats),
+                    R.string.hour_column_desc, Format.hour(h.time, SouthTyrol.ZONE, formats),
                     h.condition.label(), Format.temp(h.tempC, formats), h.precipProb,
                 )
                 val behaviour = if (onHourClick == null) Modifier.semantics(mergeDescendants = true) { contentDescription = spoken }
@@ -174,7 +175,7 @@ fun HourStrip(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        if (i == 0 && labelFirstAsNow) stringResource(R.string.now) else Format.hour(h.time, DorfTirol.ZONE, formats),
+                        if (i == 0 && labelFirstAsNow) stringResource(R.string.now) else Format.hour(h.time, SouthTyrol.ZONE, formats),
                         style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.75f),
                     )
                     Spacer(Modifier.height(6.dp))

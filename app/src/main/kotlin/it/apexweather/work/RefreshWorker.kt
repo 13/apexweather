@@ -11,7 +11,7 @@ import it.apexweather.data.RefreshResult
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
 import it.apexweather.domain.ConsensusBlender
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.notify.NotificationDecider
 import it.apexweather.notify.NotifyStore
 import it.apexweather.notify.WeatherNotifier
@@ -73,7 +73,7 @@ class RefreshWorker @AssistedInject constructor(
         val now = clock.instant()
         val home = HomeStateBuilder.build(snapshot, appSettings, blender.blend(snapshot.forecastsForBlend), now)
         val memory = notifyStore.read()
-        val decided = NotificationDecider.decide(home, appSettings, memory, now, DorfTirol.ZONE)
+        val decided = NotificationDecider.decide(home, appSettings, memory, now, SouthTyrol.ZONE)
         val formats = Formats(
             applicationContext.resources.configuration.locales[0],
             android.text.format.DateFormat.is24HourFormat(applicationContext),

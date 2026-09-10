@@ -1,8 +1,14 @@
 package it.apexweather.domain
 
-import java.time.ZoneId
-
-/** The one and only location of this app. */
+/**
+ * What is left of the fixed location, while the place is being made choosable.
+ *
+ * Every constant here is a default that belongs to one municipality and is on its way out: the
+ * coordinates and the ISTAT code move into [Place], the district into the bulletin request, the
+ * station into [NearbyStation]. Nothing new may use it, and it is deleted once the last caller is
+ * repointed. The time zone and the warning region moved to [SouthTyrol], where they belong: they
+ * are true of the whole province.
+ */
 object DorfTirol {
     const val NAME = "Dorf Tirol"
     const val LAT = 46.691
@@ -10,16 +16,7 @@ object DorfTirol {
     const val ISTAT = "021101"
     const val STATION_CODE = "23200MS"
     const val DISTRICT_ID = 2
-
-    /**
-     * The weather station whose live reading the app quotes. It is the nearest one at 1.4 km, but it
-     * stands on the valley floor in Meran at 330 m while the village is up at about 600 m, and the
-     * models put the village a median 1.9 K cooler than the station across a two-day run — as much
-     * as 2.7 K on a clear afternoon. Its reading is therefore never shown as the village's
-     * temperature without being carried up the hill first; see StationDownscale.
-     */
     const val STATION_LAT = 46.688
     const val STATION_LON = 11.1366
     const val STATION_ALTITUDE_M = 330
-    val ZONE: ZoneId = ZoneId.of("Europe/Rome")
 }

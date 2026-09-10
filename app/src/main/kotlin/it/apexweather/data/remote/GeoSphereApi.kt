@@ -2,6 +2,7 @@ package it.apexweather.data.remote
 
 import it.apexweather.domain.DailyAggregator
 import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.HourlyPoint
 import it.apexweather.domain.model.Source
@@ -40,7 +41,7 @@ object GeoSphereMapper {
     const val PARAMS = "t2m,rr_acc,snow_acc,rh2m,u10m,v10m,ugust,vgust,tcc,sp,cape"
 
     fun map(resp: GeoSphereResponse, fetchedAt: Instant): SourceForecast {
-        val zone = DorfTirol.ZONE
+        val zone = SouthTyrol.ZONE
         val p = resp.features.firstOrNull()?.properties?.parameters ?: error("GeoSphere: no features")
         fun series(name: String): List<Double?> = p[name]?.data ?: emptyList()
         val t2m = series("t2m")

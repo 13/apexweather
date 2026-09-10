@@ -1,7 +1,7 @@
 package it.apexweather.notify
 
 import it.apexweather.data.AppSettings
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.ConsensusDay
 import it.apexweather.domain.model.ConsensusHour
@@ -21,7 +21,7 @@ import java.time.LocalDate
  */
 class NotificationDeciderTest {
 
-    private val zone = DorfTirol.ZONE
+    private val zone = SouthTyrol.ZONE
 
     /** 07:30 in Rome, i.e. half an hour after the default summary hour. */
     private val morning: Instant = Instant.parse("2026-09-09T05:30:00Z")

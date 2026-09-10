@@ -15,7 +15,7 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.apexweather.MainActivity
 import it.apexweather.R
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.Formats
 import it.apexweather.ui.common.argb
@@ -113,7 +113,7 @@ class WeatherNotifier @Inject constructor(@ApplicationContext private val contex
                 context.getString(
                     R.string.notif_rain_title,
                     context.getString(n.hour.condition.labelRes()),
-                    Format.time(n.hour.time, DorfTirol.ZONE, formats),
+                    Format.time(n.hour.time, SouthTyrol.ZONE, formats),
                 ),
             )
             .setContentText(context.getString(R.string.notif_rain_text, n.hour.precipProb, Format.mm(n.hour.precipMm, formats)))
@@ -132,7 +132,7 @@ class WeatherNotifier @Inject constructor(@ApplicationContext private val contex
                     context.getString(
                         R.string.notif_warning_text,
                         w.areaDesc,
-                        context.getString(R.string.warn_until, Format.timestamp(w.expires, DorfTirol.ZONE, now, formats)),
+                        context.getString(R.string.warn_until, Format.timestamp(w.expires, SouthTyrol.ZONE, now, formats)),
                     ),
                 )
                 .build()

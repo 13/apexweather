@@ -1,7 +1,7 @@
 package it.apexweather.ui.common
 
 import it.apexweather.data.WindUnit
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -43,12 +43,12 @@ class FormatTest {
 
     @Test fun `times follow the phone's clock setting`() {
         val t = Instant.parse("2026-09-08T12:20:00Z") // 14:20 in Europe/Rome
-        assertEquals("14:20", Format.time(t, DorfTirol.ZONE, german))
-        assertTrue("expected a 12-hour time, got ${Format.time(t, DorfTirol.ZONE, american)}",
-            Format.time(t, DorfTirol.ZONE, american).startsWith("2:20"))
+        assertEquals("14:20", Format.time(t, SouthTyrol.ZONE, german))
+        assertTrue("expected a 12-hour time, got ${Format.time(t, SouthTyrol.ZONE, american)}",
+            Format.time(t, SouthTyrol.ZONE, american).startsWith("2:20"))
     }
 
-    @Test fun hour() = assertEquals("14", Format.hour(Instant.parse("2026-09-08T12:00:00Z"), DorfTirol.ZONE, german))
+    @Test fun hour() = assertEquals("14", Format.hour(Instant.parse("2026-09-08T12:00:00Z"), SouthTyrol.ZONE, german))
 
     @Test fun weekday() = assertEquals("Di.", Format.weekday(LocalDate.of(2026, 9, 8), german))
 
@@ -66,10 +66,10 @@ class FormatTest {
         val earlierToday = Instant.parse("2026-09-09T06:30:00Z")
         val daysAgo = Instant.parse("2026-09-06T14:20:00Z")
 
-        assertEquals(Format.time(earlierToday, DorfTirol.ZONE, german), Format.timestamp(earlierToday, DorfTirol.ZONE, now, german))
+        assertEquals(Format.time(earlierToday, SouthTyrol.ZONE, german), Format.timestamp(earlierToday, SouthTyrol.ZONE, now, german))
 
-        val old = Format.timestamp(daysAgo, DorfTirol.ZONE, now, german)
-        assertNotEquals(Format.time(daysAgo, DorfTirol.ZONE, german), old)
+        val old = Format.timestamp(daysAgo, SouthTyrol.ZONE, now, german)
+        assertNotEquals(Format.time(daysAgo, SouthTyrol.ZONE, german), old)
         assertTrue("an older timestamp must name its day: $old", old.contains("6"))
     }
 

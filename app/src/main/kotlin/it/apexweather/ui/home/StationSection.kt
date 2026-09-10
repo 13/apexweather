@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import it.apexweather.R
 import it.apexweather.data.WindUnit
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.ConsensusHour
 import it.apexweather.domain.model.StationObservation
 import it.apexweather.ui.common.Format
@@ -82,7 +82,7 @@ fun StationSection(
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            stringResource(R.string.station_measured_at, Format.timestamp(station.time, DorfTirol.ZONE, now, formats)),
+            stringResource(R.string.station_measured_at, Format.timestamp(station.time, SouthTyrol.ZONE, now, formats)),
             style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.55f),
             modifier = Modifier.testTag("station_measured_at"),
         )

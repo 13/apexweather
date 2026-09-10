@@ -2,6 +2,7 @@ package it.apexweather.data.remote
 
 import it.apexweather.Fixtures
 import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.SiagCodes
 import it.apexweather.domain.model.Source
 import kotlinx.serialization.json.contentOrNull
@@ -66,7 +67,7 @@ class SiagMappersTest {
         val b = SiagMappers.mapBulletin(w, d, "de")
         assertEquals("de", b.language)
         assertEquals(w.evolutionTitle, b.title)
-        assertEquals(LocalDateTime.parse(w.date).atZone(DorfTirol.ZONE).toInstant(), b.issuedAt)
+        assertEquals(LocalDateTime.parse(w.date).atZone(SouthTyrol.ZONE).toInstant(), b.issuedAt)
         assertEquals(w.conditions.size, b.conditions.size)
         assertEquals(d.forecast.size, b.days.size)
         val day0 = b.days[0]
@@ -83,7 +84,7 @@ class SiagMappersTest {
         assertEquals(row.name, obs.stationName)
         assertEquals(row.t.siagDouble(), obs.tempC)
         row.ff.siagDouble()?.let { assertEquals(it * 3.6, obs.windKmh!!, 0.051) } ?: assertNull(obs.windKmh) // km/h rounded to 1 decimal
-        assertEquals(LocalDateTime.parse(row.lastUpdated).atZone(DorfTirol.ZONE).toInstant(), obs.time)
+        assertEquals(LocalDateTime.parse(row.lastUpdated).atZone(SouthTyrol.ZONE).toInstant(), obs.time)
     }
 
     @Test

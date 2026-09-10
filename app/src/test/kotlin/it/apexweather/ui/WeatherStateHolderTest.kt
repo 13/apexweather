@@ -12,7 +12,7 @@ import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
 import it.apexweather.data.local.AppDatabase
 import it.apexweather.domain.ConsensusBlender
-import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Source
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -60,7 +60,7 @@ class WeatherStateHolderTest {
         scope = CoroutineScope(UnconfinedTestDispatcher())
         settings = SettingsRepository(context)
         holder = WeatherStateHolder(
-            repository, settings, ConsensusBlender(DorfTirol.ZONE),
+            repository, settings, ConsensusBlender(SouthTyrol.ZONE),
             MutableClock(Instant.parse("2026-09-08T14:00:00Z")), scope,
         )
     }

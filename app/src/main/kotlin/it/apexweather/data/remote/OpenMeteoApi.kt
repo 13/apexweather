@@ -3,6 +3,7 @@ package it.apexweather.data.remote
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.DailyAggregator
 import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.WmoCodes
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.DailyPoint
@@ -22,7 +23,7 @@ interface OpenMeteoApi {
     suspend fun forecast(
         @Query("latitude") latitude: Double = DorfTirol.LAT,
         @Query("longitude") longitude: Double = DorfTirol.LON,
-        @Query("timezone") timezone: String = DorfTirol.ZONE.id,
+        @Query("timezone") timezone: String = SouthTyrol.ZONE.id,
         @Query("forecast_days") forecastDays: Int = OpenMeteoMapper.FORECAST_DAYS,
         @Query("models") models: String = OpenMeteoMapper.MODELS.values.joinToString(","),
         @Query("hourly") hourly: String = OpenMeteoMapper.HOURLY_VARS,
@@ -42,7 +43,7 @@ interface OpenMeteoApi {
         @Query("latitude") latitude: Double = DorfTirol.STATION_LAT,
         @Query("longitude") longitude: Double = DorfTirol.STATION_LON,
         @Query("elevation") elevation: Int = DorfTirol.STATION_ALTITUDE_M,
-        @Query("timezone") timezone: String = DorfTirol.ZONE.id,
+        @Query("timezone") timezone: String = SouthTyrol.ZONE.id,
         @Query("past_days") pastDays: Int = 1,
         @Query("forecast_days") forecastDays: Int = 1,
         @Query("models") models: String = OpenMeteoMapper.MODELS.values.joinToString(","),
@@ -87,7 +88,7 @@ object OpenMeteoMapper {
     const val DAILY_VARS = "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,sunrise,sunset"
 
     fun map(resp: OpenMeteoResponse, fetchedAt: Instant): Map<Source, SourceForecast> {
-        val zone = DorfTirol.ZONE
+        val zone = SouthTyrol.ZONE
         val times = resp.hourly.strings("time").map { parseLocal(it!!, zone) }
         val dayDates = resp.daily.strings("time").map { LocalDate.parse(it!!) }
 
@@ -174,7 +175,7 @@ data class StationReference(
 
 object OpenMeteoStationMapper {
     fun map(resp: OpenMeteoStationResponse, fetchedAt: Instant): StationReference {
-        val times = resp.hourly.strings("time").map { parseLocal(it!!, DorfTirol.ZONE) }
+        val times = resp.hourly.strings("time").map { parseLocal(it!!, SouthTyrol.ZONE) }
         val series = OpenMeteoMapper.MODELS.values.map { key -> resp.hourly.doubles("temperature_2m_$key") }
         val byHour = times.indices.mapNotNull { i ->
             // A model that does not reach this hour contributes nothing rather than a zero.

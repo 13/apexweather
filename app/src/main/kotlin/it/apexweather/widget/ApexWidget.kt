@@ -49,6 +49,7 @@ import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.DorfTirol
+import it.apexweather.domain.SouthTyrol
 import it.apexweather.ui.common.Formats
 import it.apexweather.ui.home.HomeStateBuilder
 import kotlinx.coroutines.flow.first
@@ -79,7 +80,7 @@ class ApexWidget : GlanceAppWidget() {
             context.resources.configuration.locales[0],
             android.text.format.DateFormat.is24HourFormat(context),
         )
-        val state = WidgetStateBuilder.build(home, DorfTirol.ZONE, formats)
+        val state = WidgetStateBuilder.build(home, SouthTyrol.ZONE, formats)
         val background = gradientBitmap(state.topColor, state.bottomColor)
 
         provideContent { WidgetContent(state, background) }
