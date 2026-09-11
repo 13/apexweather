@@ -10,6 +10,13 @@ import org.junit.Test
 class ConsensusBlenderTest {
     private val blender = ConsensusBlender(ROME)
 
+    /**
+     * A bias of [c] for [source] at every part of the day and every lead time, so a test about the
+     * correction is not also a test about which six hours or which lead it was measured in.
+     */
+    private fun bias(source: Source, c: Double) =
+        ModelBias(mapOf(source to DayPart.entries.associateWith { LeadBucket.entries.associateWith { c } }))
+
     @Test
     fun `median temperature and min max band from regional sources`() {
         val f = mapOf(
@@ -59,12 +66,42 @@ class ConsensusBlenderTest {
     }
 
     @Test
-    fun `precip probability is max of model probabilities`() {
+    fun `precip probability is the mean of the model probabilities`() {
         val f = mapOf(
             Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, prob = 20))),
             Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0, prob = 60))),
         )
-        assertEquals(60, blender.blend(f).hourly.single().precipProb)
+        assertEquals(40, blender.blend(f).hourly.single().precipProb)
+    }
+
+    /**
+     * The reason it is not the maximum: one model seeing a shower is not the hour being likely to
+     * rain, and it used to be allowed to say so on its own. Five models at zero and three at 60 is
+     * a 23 % hour, not a 60 % one.
+     */
+    @Test
+    fun `one alarmed model does not set the chance on its own`() {
+        val wet = (0 until 3).map { Source.entries[it] to 60 }
+        val dry = (3 until 8).map { Source.entries[it] to 0 }
+        val f = (wet + dry).associate { (source, prob) ->
+            source to forecast(source, listOf(point(0, 10.0, prob = prob)))
+        }
+        assertEquals(23, blender.blend(f).hourly.single().precipProb)
+    }
+
+    /**
+     * And the reason it is not the median either, which is the same reason the amount is a mean:
+     * once half the models are dry the median is zero and every model that sees the shower is
+     * thrown away.
+     */
+    @Test
+    fun `a minority of wet models still moves the chance off zero`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, prob = 80))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0, prob = 0))),
+            Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 10.0, prob = 0))),
+        )
+        assertEquals(27, blender.blend(f).hourly.single().precipProb)
     }
 
     @Test
@@ -306,22 +343,54 @@ class ConsensusBlenderTest {
             Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 10.0))),
         )
         val uncorrected = blender.blend(f).hourly.single().tempC
-        val corrected = blender.blend(f, mapOf(Source.ICON_D2 to 4.0), now = T0).hourly.single().tempC
+        val corrected = blender.blend(f, bias(Source.ICON_D2, 4.0), now = T0).hourly.single().tempC
         assertEquals(10.0, uncorrected, 0.0)
         // ICON-D2 comes back to 10 too, so the band closes rather than the median moving.
         assertEquals(10.0, corrected, 0.0)
-        assertEquals(10.0, blender.blend(f, mapOf(Source.ICON_D2 to 4.0), now = T0).hourly.single().tempMaxC, 0.0)
+        assertEquals(10.0, blender.blend(f, bias(Source.ICON_D2, 4.0), now = T0).hourly.single().tempMaxC, 0.0)
     }
 
-    /** Far enough ahead the habit says nothing, and the forecast is left as the model wrote it. */
+    /**
+     * The habit holds out to where the record reaches and fades past it, so the far end of a
+     * two-day strip is left closer to what the model actually wrote.
+     */
     @Test
-    fun `the correction has faded by the far end of the day`() {
+    fun `the correction has faded by the far end of the run`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 48).map { point(it, 10.0) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 48).map { point(it, 14.0) }),
+        )
+        val hourly = blender.blend(f, bias(Source.ICON_D2, 4.0), now = T0).hourly
+        // Within the verified range the whole four degrees comes off, so both models say 10.
+        assertEquals(10.0, hourly.first { it.time == hour(12) }.tempMaxC, 0.0)
+        // Past a full day nothing does, and ICON-D2 is left as it wrote itself.
+        assertEquals(14.0, hourly.first { it.time == hour(30) }.tempMaxC, 0.0)
+    }
+
+    /**
+     * The habit belongs to the hour being forecast, not to the hour the app is looking.
+     *
+     * A model measured two degrees warm in the afternoon must have those two degrees taken off
+     * tomorrow afternoon whenever the reader opens the app — and nothing taken off tonight, where
+     * it was never measured.
+     */
+    @Test
+    fun `the bias is read at the part of the day of the hour being blended`() {
         val f = mapOf(
             Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 24).map { point(it, 10.0) }),
             Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 24).map { point(it, 14.0) }),
         )
-        val hourly = blender.blend(f, mapOf(Source.ICON_D2 to 4.0), now = T0).hourly
-        assertEquals(12.0, hourly.first { it.time == hour(20) }.tempC, 0.0)
+        // T0 is 02:00 local, so hour 1 is the night and hour 11 is the afternoon.
+        val nightOnly = ModelBias(
+            mapOf(Source.ICON_D2 to mapOf(DayPart.NIGHT to LeadBucket.entries.associateWith { 4.0 })),
+        )
+        val hourly = blender.blend(f, nightOnly, now = T0).hourly
+        assertEquals(DayPart.NIGHT, DayPart.of(hour(1), ROME))
+        assertEquals(DayPart.AFTERNOON, DayPart.of(hour(11), ROME))
+        // Corrected in the night, where it was measured: ICON-D2 comes back to 10 and the band closes.
+        assertEquals(10.0, hourly.first { it.time == hour(1) }.tempMaxC, 0.0)
+        // Untouched in the afternoon, where nothing was measured.
+        assertEquals(14.0, hourly.first { it.time == hour(11) }.tempMaxC, 0.0)
     }
 
     @Test
@@ -330,7 +399,7 @@ class ConsensusBlenderTest {
             Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))),
             Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 14.0))),
         )
-        assertEquals(blender.blend(f).hourly.single().tempC, blender.blend(f, emptyMap(), T0).hourly.single().tempC, 0.0)
+        assertEquals(blender.blend(f).hourly.single().tempC, blender.blend(f, ModelBias.NONE, T0).hourly.single().tempC, 0.0)
     }
 
     private fun ensemble(halfWidth: Double, hours: Int = 24) = it.apexweather.data.remote.EnsembleSpread(
@@ -349,13 +418,39 @@ class ConsensusBlenderTest {
             Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 14.0))),
         )
         val without = blender.blend(f).hourly.single()
-        val with = blender.blend(f, emptyMap(), T0, ensemble(halfWidth = 0.5)).hourly.single()
+        val with = blender.blend(f, ModelBias.NONE, T0, ensemble(halfWidth = 0.5)).hourly.single()
 
         assertNull(without.ensembleHalfWidthC)
         assertEquals(0.5, with.ensembleHalfWidthC!!, 0.0)
         // Six degrees apart, so the model spread reads as total disagreement; the ensemble does not.
         assertTrue("agreement was ${without.agreement}", without.agreement < 0.1f)
         assertTrue("agreement was ${with.agreement}", with.agreement > 0.7f)
+    }
+
+    /**
+     * The far end of the day list, and the reason ECMWF's ensemble is fetched at all.
+     *
+     * Past about day five only ECMWF reaches, so the day carries one model and there is no spread
+     * between models to measure. Its own fifty ensemble members are what is left to measure, and
+     * the day has to carry that fact out to the badge — otherwise a day with a real, measured
+     * confidence is painted grey and labelled "1 model".
+     */
+    @Test
+    fun `a day only one model reaches still carries the ensemble's own spread`() {
+        val f = mapOf(Source.ECMWF to forecast(Source.ECMWF, (0 until 48).map { point(it, 10.0) }))
+        val day = blender.blend(f, ModelBias.NONE, T0, ensemble(halfWidth = 1.0, hours = 48)).daily.first()
+        assertEquals(1, day.sourceCount)
+        assertEquals(1.0, day.ensembleHalfWidthC!!, 1e-9)
+        // Two degrees of full range out of the six the scale runs over: two thirds agreement.
+        assertTrue("agreement was ${day.agreement}", day.agreement > 0.6f)
+    }
+
+    /** A day no ensemble reaches says so, rather than reporting a spread of zero. */
+    @Test
+    fun `a day beyond every ensemble has no half-width at all`() {
+        val f = mapOf(Source.ECMWF to forecast(Source.ECMWF, (0 until 48).map { point(it, 10.0) }))
+        val days = blender.blend(f, ModelBias.NONE, T0, ensemble(halfWidth = 1.0, hours = 12)).daily
+        assertNull(days.last().ensembleHalfWidthC)
     }
 
     /** An hour the ensemble does not reach falls back to the models, rather than to certainty. */
@@ -365,10 +460,33 @@ class ConsensusBlenderTest {
             Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 48).map { point(it, 8.0) }),
             Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 48).map { point(it, 14.0) }),
         )
-        val hourly = blender.blend(f, emptyMap(), T0, ensemble(halfWidth = 0.5, hours = 24)).hourly
+        val hourly = blender.blend(f, ModelBias.NONE, T0, ensemble(halfWidth = 0.5, hours = 24)).hourly
         assertEquals(0.5, hourly.first { it.time == hour(5) }.ensembleHalfWidthC!!, 0.0)
         assertNull(hourly.first { it.time == hour(40) }.ensembleHalfWidthC)
-        assertTrue(hourly.first { it.time == hour(40) }.agreement < 0.1f)
+        // Six degrees apart. Nearly two days out that is not quite the total disagreement it would
+        // be for the current hour, because the scale opens with lead time — see below.
+        assertTrue(hourly.first { it.time == hour(40) }.agreement < 0.2f)
+    }
+
+    /**
+     * The scale the badge is read against opens with lead time, because the spread does.
+     *
+     * Six degrees between the models an hour from now is them telling you nothing. Six degrees ten
+     * days out is an ordinary ten-day forecast — ECMWF's own ensemble opens from about 2 K over the
+     * first four days to 8,5 K by day fourteen — and against a fixed scale every far day pins at
+     * 0 %, which is a red dot that says the same thing about a settled week as an unsettled one.
+     */
+    @Test
+    fun `the scale for total disagreement opens with lead time`() {
+        val hours = 24 * 11
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until hours).map { point(it, 8.0) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until hours).map { point(it, 14.0) }),
+        )
+        val hourly = blender.blend(f, now = T0).hourly
+        assertEquals(0.0, hourly.first { it.time == hour(0) }.agreement.toDouble(), 1e-6)
+        val far = hourly.first { it.time == hour(24 * 10) }.agreement
+        assertTrue("ten days out the same six degrees read $far", far > 0.3f)
     }
 
     /**

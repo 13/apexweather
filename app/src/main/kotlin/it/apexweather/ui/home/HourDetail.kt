@@ -89,6 +89,7 @@ fun HourDetail(hour: ConsensusHour, state: HomeUiState, onClose: () -> Unit = {}
                 halfWidth = hour.ensembleHalfWidthC ?: ((hour.tempMaxC - hour.tempMinC) / 2),
                 agreement = hour.agreement,
                 sourceCount = hour.sourceCount,
+                ensembleBacked = hour.ensembleHalfWidthC != null,
                 tag = "hour_agreement_badge",
             )
             IconButton(onClick = onClose, modifier = Modifier.testTag("hour_detail_close")) {

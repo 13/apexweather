@@ -188,6 +188,7 @@
     <string name="agreement_single">1 modello</string>
     <string name="section_daily_long">14 GIORNI</string>
     <string name="daily_tail_note">Dal sesto giorno calcola solo ECMWF: nessun consenso, una previsione sola.</string>
+    <string name="daily_tail_note_ensemble">Dal sesto giorno calcola solo ECMWF: l\'accordo viene dai suoi 50 membri d\'insieme, non da un consenso tra modelli.</string>
 
     <!-- Notifiche. Tutte disattivate finché non vengono accese nelle impostazioni. -->
     <string name="channel_summary_name">Riepilogo del mattino</string>

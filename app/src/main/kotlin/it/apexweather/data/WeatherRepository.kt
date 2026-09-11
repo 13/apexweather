@@ -33,7 +33,9 @@ import it.apexweather.domain.model.Warning
 import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.domain.BiasCorrector
 import it.apexweather.domain.Place
+import it.apexweather.domain.LeadBucket
 import it.apexweather.domain.StationSample
+import it.apexweather.domain.SouthTyrol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -113,13 +115,19 @@ class WeatherRepository @Inject constructor(
             // than at fetch time: one that expired since is gone from the app the minute it expires.
             val warnings = warningRow?.json?.let { decode("warnings", WARNINGS, it) }
             val reference = referenceRow?.json?.let { decode("station reference", StationReference.serializer(), it) }
+            // A row whose hour has not happened yet holds forecasts and no thermometer reading, and
+            // is nothing to learn from until it does.
             val samples = historyRows.mapNotNull { row ->
-                val models = decode("station history", MODEL_TEMPS, row.modelsJson) ?: return@mapNotNull null
+                val observed = row.observedC ?: return@mapNotNull null
+                val byLead = decode("station history", LEAD_MODEL_TEMPS, row.modelsJson) ?: return@mapNotNull null
                 StationSample(
                     time = Instant.ofEpochSecond(row.hourEpoch),
-                    observedC = row.observedC,
-                    modelC = models.mapNotNull { (name, temp) ->
-                        runCatching { Source.valueOf(name) }.getOrNull()?.let { it to temp }
+                    observedC = observed,
+                    predictedC = byLead.mapNotNull { (leadName, models) ->
+                        val lead = runCatching { LeadBucket.valueOf(leadName) }.getOrNull() ?: return@mapNotNull null
+                        lead to models.mapNotNull { (name, temp) ->
+                            runCatching { Source.valueOf(name) }.getOrNull()?.let { it to temp }
+                        }.toMap()
                     }.toMap(),
                 )
             }
@@ -129,8 +137,9 @@ class WeatherRepository @Inject constructor(
                 observation = observation,
                 warnings = warnings.orEmpty().filter { it.isActiveAt(now) },
                 stationReference = reference,
-                // How wrong each model has lately been here; empty until enough hours have accumulated.
-                modelBias = BiasCorrector.biases(samples, now),
+                // How wrong each model has lately been here, by part of the day; empty until enough
+                // hours of a part have accumulated.
+                modelBias = BiasCorrector.biases(samples, now, SouthTyrol.ZONE),
                 ensemble = ensembleRow?.json?.let { decode("ensemble", EnsembleSpread.serializer(), it) },
                 status = status,
                 bulletinStatus = bulletinRow?.let {
@@ -283,7 +292,24 @@ class WeatherRepository @Inject constructor(
             }
             val en = async {
                 isolate("ENSEMBLE") {
-                    val sp = attempt("ENSEMBLE") { EnsembleMapper.map(ensembleApi.forecast(place.lat, place.lon), now) }
+                    // Two ensembles, one row: ICON-D2 for the next two days and ECMWF's fifty
+                    // members for the fortnight behind it. They are fetched together and counted as
+                    // one source, because either on its own is still an ensemble — if ICON-D2 fails
+                    // ECMWF covers the whole list at coarser resolution, and if ECMWF fails the far
+                    // days simply go back to saying they are a single model.
+                    val near = attempt("ENSEMBLE") {
+                        EnsembleMapper.map(ensembleApi.forecast(place.lat, place.lon), now)
+                    }
+                    val far = attempt("ENSEMBLE_ECMWF") {
+                        EnsembleMapper.map(
+                            ensembleApi.forecast(
+                                place.lat, place.lon,
+                                models = EnsembleApi.ECMWF_ENS, forecastDays = EnsembleApi.ECMWF_ENS_DAYS,
+                            ),
+                            now,
+                        )
+                    }
+                    val sp = EnsembleSpread.combine(near, far)
                     val prev = dao.ensembleOnce(place.istat)
                     dao.upsertEnsemble(
                         if (sp != null) EnsembleEntity(place.istat, json.encodeToString(EnsembleSpread.serializer(), sp), now.toEpochMilli(), null, null)
@@ -319,36 +345,74 @@ class WeatherRepository @Inject constructor(
     }
 
     /**
-     * Writes down what the station read this hour and what each model said it would read.
+     * Writes down what each model says about the hours ahead, and what the station actually read.
+     *
+     * Two halves that meet in the same row. The run just fetched is asked what it makes of this
+     * hour, of six hours' time and of twelve — those are forecasts at three distances, written into
+     * the rows of the hours they are about, which mostly have not happened yet. Separately, the
+     * thermometer's reading for the hour it belongs to is written into that hour's row, which by
+     * then is already holding what the models said about it half a day ago.
+     *
+     * That is the only way to have it. Nobody publishes what a model said yesterday about an hour
+     * that has since happened, so the app has to have written it down before the hour arrived.
      *
      * Read back from the cache rather than threaded out of the fetches, because that is the version
      * that survived storage and because a refresh where one of the two failed simply has nothing to
-     * record. Keyed by the observation's own hour, so an hour is written once however many times the
-     * app refreshes inside it.
-     *
-     * This is the only thing the app keeps that nobody publishes: what a model said about an hour
-     * that has since happened.
+     * record. Rows are merged rather than replaced: a refresh inside an hour must not wipe the
+     * twelve-hour-old forecast that is the whole point of the row.
      */
     private suspend fun recordStationHour(place: Place, now: Instant) {
-        val observation = dao.observationOnce(place.istat)?.json
-            ?.let { decode("observation", StationObservation.serializer(), it) } ?: return
-        val observed = observation.tempC ?: return
         val reference = dao.stationReferenceOnce(place.istat)?.json
-            ?.let { decode("station reference", StationReference.serializer(), it) } ?: return
+            ?.let { decode("station reference", StationReference.serializer(), it) }
+        val thisHour = now.truncatedTo(ChronoUnit.HOURS)
 
-        val hour = observation.time.truncatedTo(ChronoUnit.HOURS)
-        val models = reference.at(hour).mapKeys { it.key.name }
-        if (models.isEmpty()) return
+        // What this run says about the hours still to come, filed under the hours it is about.
+        if (reference != null) {
+            listOf(LeadBucket.SIX, LeadBucket.TWELVE).forEach { lead ->
+                val target = thisHour.plusSeconds(lead.hours * 3600)
+                val models = reference.at(target).mapKeys { it.key.name }
+                // A model whose run does not reach that far contributes nothing rather than a gap
+                // that later reads as agreement.
+                if (models.isNotEmpty()) mergeStationHour(place, target) { it + (lead.name to models) }
+            }
+        }
 
+        // The reading, and the same run's word on the hour it belongs to — which is the station's
+        // own hour, not the clock's: a reading taken at 13:40 is verified against what the models
+        // said about 13:00, whatever time the refresh happens to run at.
+        val observation = dao.observationOnce(place.istat)?.json
+            ?.let { decode("observation", StationObservation.serializer(), it) }
+        val observed = observation?.tempC
+        if (observed != null) {
+            val hour = observation.time.truncatedTo(ChronoUnit.HOURS)
+            val atHour = reference?.at(hour)?.mapKeys { it.key.name }.orEmpty()
+            mergeStationHour(place, hour, observed) {
+                if (atHour.isEmpty()) it else it + (LeadBucket.NOW.name to atHour)
+            }
+        }
+        dao.pruneStationHistory(now.minus(BiasCorrector.WINDOW).epochSecond)
+    }
+
+    /**
+     * Read, change, write one history row. [observed] is written where it is given and the stored
+     * reading is kept where it is not, so the two halves above can arrive in either order.
+     */
+    private suspend fun mergeStationHour(
+        place: Place,
+        hour: Instant,
+        observed: Double? = null,
+        change: (Map<String, Map<String, Double>>) -> Map<String, Map<String, Double>>,
+    ) {
+        val existing = dao.stationHistoryAt(place.istat, hour.epochSecond)
+        val stored = existing?.modelsJson?.let { decode("station history", LEAD_MODEL_TEMPS, it) }.orEmpty()
         dao.upsertStationHistory(
             StationHistoryEntity(
                 place = place.istat,
                 hourEpoch = hour.epochSecond,
-                observedC = observed,
-                modelsJson = json.encodeToString(MODEL_TEMPS, models),
+                observedC = observed ?: existing?.observedC,
+                modelsJson = json.encodeToString(LEAD_MODEL_TEMPS, change(stored)),
             ),
         )
-        dao.pruneStationHistory(now.minus(BiasCorrector.WINDOW).epochSecond)
     }
 
     /**
@@ -395,8 +459,9 @@ class WeatherRepository @Inject constructor(
         private const val RETRY_DELAY_MS = 3_000L
 
         private val WARNINGS: KSerializer<List<Warning>> = ListSerializer(Warning.serializer())
-        private val MODEL_TEMPS: KSerializer<Map<String, Double>> =
-            MapSerializer(String.serializer(), Double.serializer())
+        /** Lead bucket name → source name → temperature, which is what a history row holds. */
+        private val LEAD_MODEL_TEMPS: KSerializer<Map<String, Map<String, Double>>> =
+            MapSerializer(String.serializer(), MapSerializer(String.serializer(), Double.serializer()))
 
         /** MeteoAlarm publishes a few times a day; six hours without one means we are behind. */
         private val WARNINGS_STALE_AFTER: Duration = Duration.ofHours(6)

@@ -98,11 +98,17 @@ internal class FakeMeteoAlarm(var fail: Boolean = false) : MeteoAlarmApi {
 }
 
 internal class FakeEnsemble(var fail: Boolean = false) : EnsembleApi {
+    /** Which ensembles were asked for, in order, so a test can prove both halves were fetched. */
+    val requested = mutableListOf<String>()
+
     override suspend fun forecast(
-        latitude: Double, longitude: Double, timezone: String, forecastDays: Int, models: String, hourly: String,
+        latitude: Double, longitude: Double, models: String, forecastDays: Int, timezone: String, hourly: String,
     ): EnsembleResponse {
+        requested += models
         if (fail) throw IOException("ensemble down")
-        return Fixtures.json.decodeFromString(EnsembleResponse.serializer(), Fixtures.read("openmeteo_ensemble.json"))
+        val fixture =
+            if (models == EnsembleApi.ECMWF_ENS) "openmeteo_ensemble_ecmwf.json" else "openmeteo_ensemble.json"
+        return Fixtures.json.decodeFromString(EnsembleResponse.serializer(), Fixtures.read(fixture))
     }
 }
 

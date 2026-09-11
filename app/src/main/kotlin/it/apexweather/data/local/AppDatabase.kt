@@ -75,18 +75,22 @@ data class EnsembleEntity(
 )
 
 /**
- * One hour of ground truth: what the station read, and what each model said it would read.
+ * One hour of ground truth: what the station read, and what each model said it would read — from
+ * how far away.
  *
  * This is the only record in the app that is not a cache of something fetchable — nobody publishes
- * what a model said yesterday about an hour that has since happened. It is accumulated an hour at a
- * time and is what [it.apexweather.domain.BiasCorrector] learns from.
+ * what a model said yesterday about an hour that has since happened. It is what
+ * [it.apexweather.domain.BiasCorrector] learns from, and a row is filled in over half a day rather
+ * than all at once: the twelve-hour-ahead forecast is written twelve hours before the hour, the
+ * six-hour one six hours before, and the observation when the hour finally arrives.
  */
 @Entity(tableName = "station_history", primaryKeys = ["place", "hourEpoch"])
 data class StationHistoryEntity(
     val place: String,
     val hourEpoch: Long,
-    val observedC: Double,
-    /** Source name → temperature at the station, as JSON. */
+    /** Null while the hour is still in the future and only forecasts have been written down. */
+    val observedC: Double?,
+    /** Lead bucket name → source name → temperature at the station, as JSON. */
     val modelsJson: String,
 )
 
@@ -126,6 +130,8 @@ interface WeatherDao {
 
     @Query("SELECT * FROM station_history WHERE place = :place AND hourEpoch >= :since ORDER BY hourEpoch")
     fun stationHistory(place: String, since: Long): Flow<List<StationHistoryEntity>>
+    @Query("SELECT * FROM station_history WHERE place = :place AND hourEpoch = :hourEpoch")
+    suspend fun stationHistoryAt(place: String, hourEpoch: Long): StationHistoryEntity?
     @Upsert suspend fun upsertStationHistory(entity: StationHistoryEntity)
     @Query("DELETE FROM station_history WHERE hourEpoch < :before") suspend fun pruneStationHistory(before: Long)
 
@@ -167,8 +173,14 @@ interface WeatherDao {
     // 2: the warnings table. 3: the station reference. 4: every row keyed by the place it belongs
     // to, and the bulletin by its district. Every row here is a cache of something fetchable, so a
     // schema change drops the database rather than migrating it; the next refresh fills it again.
-    // 6: the ensemble spread.
-    version = 6,
+    // 6: the ensemble spread. 7: station_history records a forecast per lead time rather than one
+    // analysis, and holds a row before its hour has happened.
+    //
+    // station_history is the exception to the sentence above — it is the one table nobody
+    // publishes, so a version bump really does cost something. It costs at most the seven days in
+    // the window, a day of which is enough for the corrector to speak again, and a migration that
+    // could only delete those rows anyway would buy nothing over dropping them.
+    version = 7,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

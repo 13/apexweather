@@ -83,7 +83,10 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState, onClose: () -> Unit = {}) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(Format.temp(day.minC, formats), style = MaterialTheme.typography.headlineMedium, color = Color.White.copy(alpha = 0.7f))
             Text(Format.temp(day.maxC, formats), style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
-            AgreementBadge(halfWidth = 0.0, agreement = day.agreement, sourceCount = day.sourceCount, showSpread = false)
+            AgreementBadge(
+                halfWidth = 0.0, agreement = day.agreement, sourceCount = day.sourceCount,
+                showSpread = false, ensembleBacked = day.ensembleHalfWidthC != null,
+            )
         }
         Spacer(Modifier.height(6.dp))
 

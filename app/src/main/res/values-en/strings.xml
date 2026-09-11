@@ -183,6 +183,7 @@
     <string name="agreement_single">1 model</string>
     <string name="section_daily_long">14 DAYS</string>
     <string name="daily_tail_note">From day six only ECMWF still reaches: no consensus, a single forecast.</string>
+    <string name="daily_tail_note_ensemble">From day six only ECMWF still reaches: the agreement is its own 50 ensemble members, not a consensus of models.</string>
 
     <!-- Notifications. Every one of them is off until switched on in the settings. -->
     <string name="channel_summary_name">Morning summary</string>

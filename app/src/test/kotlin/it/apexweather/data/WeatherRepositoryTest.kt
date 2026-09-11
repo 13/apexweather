@@ -37,6 +37,8 @@ import org.robolectric.annotation.Config
 import java.io.IOException
 import java.time.Clock
 import java.time.Duration
+import it.apexweather.data.remote.EnsembleApi
+import it.apexweather.domain.LeadBucket
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.coroutines.cancellation.CancellationException
@@ -87,6 +89,22 @@ class WeatherRepositoryTest {
         assertTrue(s.status.values.all { it is SourceStatus.Ok })
         assertEquals(clock.now, s.lastSuccessfulRefresh)
         assertFalse(s.lastRefreshFailed)
+    }
+
+    /**
+     * Both halves of the ensemble are asked for and stored as one: ICON-D2 for the next two days,
+     * ECMWF's fifty members for the fortnight behind it. Before this, every day past about the
+     * fifth had no measure of uncertainty at all.
+     */
+    @Test
+    fun `both ensembles are fetched and the far one carries the rest of the fortnight`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        assertEquals(setOf(EnsembleApi.ICON_D2, EnsembleApi.ECMWF_ENS), ensemble.requested.toSet())
+        val spread = repo.snapshot(DORF_TIROL, "de").first().ensemble!!
+        // Something well past where ICON-D2 stops: the fixtures are recorded around 2026-09-10, so
+        // an hour eight days out is ECMWF's alone.
+        val far = Instant.parse("2026-09-18T12:00:00Z")
+        assertNotNull("the far end of the fortnight has no spread", spread.halfWidthAt(far))
     }
 
     @Test
@@ -257,17 +275,61 @@ class WeatherRepositoryTest {
     fun `a refresh writes down what the station read and what the models said it would`() = runTest {
         repo.refresh(DORF_TIROL, "de")
         val history = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first()
-        assertEquals(1, history.size)
-        assertTrue(history.single().modelsJson.contains("ICON"))
-        assertTrue(history.single().observedC in -40.0..45.0)
+        val observed = history.filter { it.observedC != null }
+        assertEquals(1, observed.size)
+        assertTrue(observed.single().modelsJson.contains("ICON"))
+        assertTrue(observed.single().observedC!! in -40.0..45.0)
+        assertTrue("the reading's own hour must carry a lead-zero forecast", observed.single().modelsJson.contains("NOW"))
+    }
+
+    /**
+     * And the half of it that has to be written before the hour happens: what this run says about
+     * six and twelve hours from now, filed under the hours it is about. Nothing can go back and
+     * ask a model what it thought yesterday.
+     */
+    @Test
+    fun `a refresh files what the models say about the hours still to come`() = runTest {
+        // Inside the recorded station series, so the run really does reach twelve hours ahead.
+        clock.now = Instant.parse("2026-09-09T08:00:00Z")
+        repo.refresh(DORF_TIROL, "de")
+        val history = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first()
+        val thisHour = clock.now.truncatedTo(java.time.temporal.ChronoUnit.HOURS)
+        listOf(LeadBucket.SIX, LeadBucket.TWELVE).forEach { lead ->
+            val row = history.single { it.hourEpoch == thisHour.plusSeconds(lead.hours * 3600).epochSecond }
+            assertTrue("${lead.name} was not filed", row.modelsJson.contains(lead.name))
+            assertNull("an hour that has not happened has nothing measured", row.observedC)
+        }
+    }
+
+    /**
+     * A refresh inside an hour must merge, never replace: the twelve-hour-old forecast already in
+     * the row is the only thing about it nobody can fetch again.
+     */
+    @Test
+    fun `refreshing again in the same hour keeps what was written twelve hours ago`() = runTest {
+        clock.now = Instant.parse("2026-09-09T08:00:00Z")
+        repo.refresh(DORF_TIROL, "de")
+        val before = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first()
+        val target = clock.now.truncatedTo(java.time.temporal.ChronoUnit.HOURS).plusSeconds(12 * 3600)
+        assertTrue(before.single { it.hourEpoch == target.epochSecond }.modelsJson.contains("TWELVE"))
+
+        // Six hours on, that same hour is six hours away and is written again. The row has to end
+        // up holding both, because the twelve-hour-old forecast can never be fetched a second time.
+        clock.now = clock.now.plus(Duration.ofHours(6))
+        repo.refresh(DORF_TIROL, "de")
+        val row = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first()
+            .single { it.hourEpoch == target.epochSecond }
+        assertTrue("the twelve-hour-old forecast was overwritten", row.modelsJson.contains("TWELVE"))
+        assertTrue("the newer six-hour forecast was not added", row.modelsJson.contains("SIX"))
     }
 
     /** Once per hour, however many times the app refreshes inside it. */
     @Test
     fun `refreshing twice in the same hour records that hour once`() = runTest {
         repo.refresh(DORF_TIROL, "de")
+        val after = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first().size
         repo.refresh(DORF_TIROL, "de")
-        assertEquals(1, db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first().size)
+        assertEquals(after, db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first().size)
     }
 
     /** A place with no station has nothing to measure a model against, and records nothing. */

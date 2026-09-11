@@ -21,11 +21,14 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
      * [bias] is how warm each model has lately run at the nearest station, from [BiasCorrector]. It
      * is subtracted from that model's temperatures before they are compared with anyone else's, and
      * fades with lead time — a model's habit today says a lot about this afternoon and little about
-     * Thursday. An empty map is the normal state until enough hours have accumulated.
+     * Thursday. It is read at the part of the day of the hour being blended, not of now: a model
+     * that runs warm at four in the afternoon should be corrected for tomorrow afternoon, whatever
+     * time the app happens to be looking. [ModelBias.NONE] is the normal state until enough hours
+     * have accumulated.
      */
     fun blend(
         forecasts: Map<Source, SourceForecast>,
-        bias: Map<Source, Double> = emptyMap(),
+        bias: ModelBias = ModelBias.NONE,
         now: Instant? = null,
         ensemble: EnsembleSpread? = null,
     ): ConsensusForecast {
@@ -47,13 +50,13 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             if (contributing.isEmpty()) return@mapNotNull null
             val lead = Duration.between(from, time).toHours().coerceAtLeast(0)
             val corrected = contributing.mapValues { (source, point) ->
-                val correction = BiasCorrector.correctionAt(bias[source], lead)
+                val correction = BiasCorrector.correctionAt(bias.at(source, time, zone, lead), lead)
                 if (correction == 0.0) point else point.copy(
                     tempC = point.tempC - correction,
                     feelsLikeC = point.feelsLikeC?.minus(correction),
                 )
             }
-            blendHour(time, corrected, ensemble?.halfWidthAt(time))
+            blendHour(time, corrected, ensemble?.halfWidthAt(time), lead)
         }
 
         val sunTimes = forecasts.values.flatMap { it.daily }
@@ -79,6 +82,11 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
                 // an empty average is NaN and NaN would reach the screen as a blank badge.
                 agreement = if (agreements.isEmpty()) 0.5f else agreements.average().toFloat(),
                 sourceCount = hoursOfDay.maxOfOrNull { it.sourceCount } ?: 0,
+                // Where an ensemble reaches the day at all, its own spread is what the day's
+                // agreement was built from, and the badge needs to know that before it calls a day
+                // uncomparable for having a single model in it.
+                ensembleHalfWidthC = hoursOfDay.mapNotNull { it.ensembleHalfWidthC }
+                    .takeIf { it.isNotEmpty() }?.average(),
                 freezingLevelMinM = hoursOfDay.mapNotNull { it.freezingLevelM }.minOrNull(),
                 sunrise = d.sunrise, sunset = d.sunset,
             )
@@ -99,7 +107,29 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         return byTime.map { (time, values) -> ConsensusMinute(time, median(values), values.size) }
     }
 
-    private fun blendHour(time: Instant, points: Map<Source, HourlyPoint>, ensembleHalfWidth: Double?): ConsensusHour {
+    /**
+     * The spread at which the forecast is said to be telling you nothing, in degrees.
+     *
+     * It was a flat 6 K, which was right while everything the badge measured was inside two days.
+     * It is wrong once the badge is fed a fortnight: ECMWF's ensemble opens from about 2 K over the
+     * first four days to 8,5 K by day fourteen — measured on
+     * `openmeteo_ensemble_ecmwf.json` — so against a constant 6 K every day past the ninth pins at
+     * 0 %, a red dot that says the same thing about a settled week as about an unsettled one.
+     *
+     * Spread that grows with lead time is not the forecast failing, it is what a forecast a
+     * fortnight out *is*. So the scale opens with it, by half a degree a day, and the badge goes on
+     * meaning "unusually uncertain for this far ahead" rather than "far ahead". The near end is
+     * untouched: at lead zero this is still exactly 6 K.
+     */
+    private fun fullDisagreementAt(leadHours: Long): Double =
+        FULL_DISAGREEMENT_C + FULL_DISAGREEMENT_GROWTH_C_PER_DAY * (leadHours / 24.0)
+
+    private fun blendHour(
+        time: Instant,
+        points: Map<Source, HourlyPoint>,
+        ensembleHalfWidth: Double?,
+        leadHours: Long,
+    ): ConsensusHour {
         val values = points.values
         val temps = values.map { it.tempC }
         val tMin = temps.min()
@@ -110,7 +140,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         val spread = ensembleHalfWidth?.times(2) ?: (tMax - tMin)
         val agreement = when {
             ensembleHalfWidth == null && values.size == 1 -> 0.5f
-            else -> (1.0 - (spread / 6.0).coerceIn(0.0, 1.0)).toFloat()
+            else -> (1.0 - (spread / fullDisagreementAt(leadHours)).coerceIn(0.0, 1.0)).toFloat()
         }
 
         // The **mean**, where every other quantity here takes the median, and the one place that
@@ -121,8 +151,21 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         // six is 0,13 mm, which is what the hour actually amounts to.
         val precip = values.map { it.precipMm }.average()
 
+        // The **mean**, for the same reason the amount above is: a probability is the other
+        // zero-inflated quantity here, and averaging is what the number actually means. Asked
+        // "will it rain at four", each model answers with its own chance, and the chance across a
+        // set of equally good models is the average of theirs — three models at 60 % and five at
+        // 0 % is a 23 % hour.
+        //
+        // It used to be the maximum, which let the single most alarmist of ten models set the
+        // figure on the screen on its own: the same eight-model hour read 60 %. The median is no
+        // better here than it is for the amount, and for the same reason — five dry models put it
+        // at zero and the three that see the shower are discarded.
+        //
+        // The fallback, for an hour no model publishes a probability for, is already this same
+        // average, of ones and zeroes.
         val probs = values.mapNotNull { it.precipProb }
-        val precipProb = if (probs.isNotEmpty()) probs.max()
+        val precipProb = if (probs.isNotEmpty()) probs.average().roundToInt()
         else (100.0 * values.count { it.precipMm > 0.1 } / values.size).roundToInt()
 
         val feels = values.mapNotNull { it.feelsLikeC }
@@ -154,6 +197,12 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
     }
 
     companion object {
+        /** The spread at which a forecast for the current hour is telling you nothing. */
+        const val FULL_DISAGREEMENT_C = 6.0
+
+        /** How much of that a day of lead time is worth; see `fullDisagreementAt`. */
+        const val FULL_DISAGREEMENT_GROWTH_C_PER_DAY = 0.5
+
         fun median(xs: List<Double>): Double {
             val s = xs.sorted()
             val n = s.size

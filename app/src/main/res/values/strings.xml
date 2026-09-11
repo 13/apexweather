@@ -185,6 +185,7 @@
     <string name="agreement_single">1 Modell</string>
     <string name="section_daily_long">14 TAGE</string>
     <string name="daily_tail_note">Ab Tag 6 rechnet nur noch ECMWF — kein Konsens, eine einzelne Vorhersage.</string>
+    <string name="daily_tail_note_ensemble">Ab Tag 6 rechnet nur noch ECMWF — die Übereinstimmung stammt aus seinen 50 Ensemble-Läufen, nicht aus einem Modellkonsens.</string>
 
     <!-- Notifications. Every one of them is off until it is switched on in the settings. -->
     <string name="channel_summary_name">Morgenübersicht</string>

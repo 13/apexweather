@@ -124,7 +124,13 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             state.heroFeelsLikeC?.let { Text(stringResource(R.string.feels_like, Format.temp(it, formats)), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f)) }
-            state.bandHalfWidth?.let { AgreementBadge(it, state.currentHour?.agreement ?: 0.5f, sourceCount = state.currentHour?.sourceCount ?: 0) }
+            state.bandHalfWidth?.let {
+                AgreementBadge(
+                    it, state.currentHour?.agreement ?: 0.5f,
+                    sourceCount = state.currentHour?.sourceCount ?: 0,
+                    ensembleBacked = state.currentHour?.ensembleHalfWidthC != null,
+                )
+            }
         }
         // A quarter-hour, not an hour: this is the one line on the screen that the sub-hourly series
         // makes honest, and "ab 14:15" is worth more than "ab 14:00" to someone deciding to leave.
@@ -156,12 +162,24 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
 /**
  * How far the models spread, as a coloured pill. [halfWidth] is half the min/max band in degrees;
  * a day has no single band to quote, so it passes [showSpread] false and shows the dot alone.
+ *
+ * [ensembleBacked] says an ensemble reached this hour or day. It matters because a single model
+ * with an ensemble behind it is not the same thing as a single model alone.
  */
 @Composable
-fun AgreementBadge(halfWidth: Double, agreement: Float, sourceCount: Int = 0, showSpread: Boolean = true, tag: String = "agreement_badge") {
-    // One model has nothing to agree with. Saying "50 %" there would invent a comparison that never
-    // happened, which is exactly what the later days of the week are: ECMWF on its own.
-    val single = sourceCount == 1
+fun AgreementBadge(
+    halfWidth: Double,
+    agreement: Float,
+    sourceCount: Int = 0,
+    showSpread: Boolean = true,
+    ensembleBacked: Boolean = false,
+    tag: String = "agreement_badge",
+) {
+    // One model with nothing behind it has nothing to agree with, and saying "50 %" there would
+    // invent a comparison that never happened. One model whose own fifty ensemble members have been
+    // counted is a different case: the percentage is measured, not inferred, and is the only thing
+    // the far end of the day list has to offer.
+    val single = sourceCount == 1 && !ensembleBacked
     val color = if (single) SingleModelColor else agreementColor(agreement)
     val description = if (single) stringResource(R.string.agreement_single)
     else stringResource(R.string.agreement_desc, (agreement * 100).roundToInt())
@@ -324,14 +342,20 @@ fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate
                 RangeBar(d.minC, d.maxC, globalMin, globalMax, accent, Modifier.weight(1f).height(6.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(Format.temp(d.maxC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(36.dp))
-                AgreementDot(d.agreement, d.sourceCount)
+                AgreementDot(d.agreement, d.sourceCount, ensembleBacked = d.ensembleHalfWidthC != null)
             }
         }
-        // Only worth saying once, and only when the list actually reaches that far.
-        if (days.any { it.sourceCount == 1 }) {
+        // Only worth saying once, and only when the list actually reaches that far. Which of the two
+        // sentences it is depends on whether ECMWF's ensemble reached those days: a coloured dot on
+        // a single-model day has to be accounted for, and a grey one has to be explained.
+        val tail = days.filter { it.sourceCount == 1 }
+        if (tail.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
             Text(
-                stringResource(R.string.daily_tail_note),
+                stringResource(
+                    if (tail.any { it.ensembleHalfWidthC != null }) R.string.daily_tail_note_ensemble
+                    else R.string.daily_tail_note,
+                ),
                 style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.55f),
                 modifier = Modifier.testTag("daily_tail_note"),
             )
@@ -365,8 +389,8 @@ internal fun agreementColor(agreement: Float): Color = when {
 private val SingleModelColor = Color(0xFF9AA6B8)
 
 @Composable
-private fun AgreementDot(agreement: Float, sourceCount: Int) {
-    val single = sourceCount == 1
+private fun AgreementDot(agreement: Float, sourceCount: Int, ensembleBacked: Boolean) {
+    val single = sourceCount == 1 && !ensembleBacked
     val color = if (single) SingleModelColor else agreementColor(agreement)
     val description = if (single) stringResource(R.string.agreement_single)
     else stringResource(R.string.agreement_desc, (agreement * 100).roundToInt())

@@ -47,7 +47,11 @@ interface OpenMeteoApi {
         @Query("elevation") elevation: Int,
         @Query("timezone") timezone: String = SouthTyrol.ZONE.id,
         @Query("past_days") pastDays: Int = 1,
-        @Query("forecast_days") forecastDays: Int = 1,
+        // Two days, not one. The series has to reach twelve hours past the current hour whatever
+        // time it is, or `station_history` could only ever record a twelve-hour-ahead forecast in
+        // the morning — a gap in the record that lines up exactly with the part of the day
+        // BiasCorrector splits on. It costs about 1,8 kB.
+        @Query("forecast_days") forecastDays: Int = 2,
         @Query("models") models: String = OpenMeteoMapper.MODELS.values.joinToString(","),
         @Query("hourly") hourly: String = "temperature_2m",
     ): OpenMeteoStationResponse

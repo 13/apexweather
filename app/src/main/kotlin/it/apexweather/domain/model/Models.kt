@@ -189,8 +189,9 @@ data class WeatherSnapshot(
     val warnings: List<Warning>,
     /** The models' temperature at the weather station, for carrying its reading up to the village. */
     val stationReference: it.apexweather.data.remote.StationReference?,
-    /** How wrong each model has lately been at the station; empty until enough hours have accumulated. */
-    val modelBias: Map<Source, Double>,
+    /** How wrong each model has lately been at the station, by part of the day; empty until enough
+     * hours have accumulated. */
+    val modelBias: it.apexweather.domain.ModelBias,
     /** How far ICON-D2's ensemble members spread, which is uncertainty rather than disagreement. */
     val ensemble: it.apexweather.data.remote.EnsembleSpread?,
     val status: Map<Source, SourceStatus>,
@@ -219,7 +220,7 @@ data class WeatherSnapshot(
     companion object {
         val EMPTY = WeatherSnapshot(
             forecasts = emptyMap(), bulletin = null, observation = null, warnings = emptyList(),
-            stationReference = null, modelBias = emptyMap(), ensemble = null, status = emptyMap(),
+            stationReference = null, modelBias = it.apexweather.domain.ModelBias.NONE, ensemble = null, status = emptyMap(),
             bulletinStatus = null, observationStatus = null, warningStatus = null,
             lastSuccessfulRefresh = null, lastRefreshFailed = false,
         )
@@ -258,8 +259,20 @@ data class ConsensusDay(
     val precipMm: Double,
     val condition: Condition,
     val agreement: Float,
-    /** Most models that agreed on any hour of this day. One means nothing was compared. */
+    /**
+     * Most models that agreed on any hour of this day. One means no two models were compared — but
+     * see [ensembleHalfWidthC], which is the other thing there is to compare.
+     */
     val sourceCount: Int,
+    /**
+     * The day's mean ensemble half-width in degrees, where an ensemble reaches it at all.
+     *
+     * This is what makes the far end of the list worth a number. From about day six only ECMWF's
+     * deterministic run reaches, so [sourceCount] is one and there is no model spread — but its own
+     * fifty ensemble members still say how confident that forecast is, and [agreement] is built
+     * from them.
+     */
+    val ensembleHalfWidthC: Double? = null,
     /** Lowest 0 °C isotherm of the day in metres — the snow line at its lowest. Null where no model says. */
     val freezingLevelMinM: Double?,
     val sunrise: Instant?,
