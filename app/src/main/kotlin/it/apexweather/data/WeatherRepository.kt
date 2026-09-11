@@ -238,7 +238,7 @@ class WeatherRepository @Inject constructor(
             }
             val gs = async {
                 isolate("GEOSPHERE_AROME") {
-                    val fc = attempt("GEOSPHERE_AROME") { GeoSphereMapper.map(geoSphere.forecast("${'$'}{place.lat},${'$'}{place.lon}"), now) }
+                    val fc = attempt("GEOSPHERE_AROME") { GeoSphereMapper.map(geoSphere.forecast("${place.lat},${place.lon}"), now) }
                     storeForecast(place, Source.GEOSPHERE_AROME, fc, failed["GEOSPHERE_AROME"], now)
                 }
             }
@@ -266,7 +266,7 @@ class WeatherRepository @Inject constructor(
                 place.station?.let { station ->
                     isolate("SIAG_STATION") {
                         val o = attempt("SIAG_STATION") {
-                            SiagMappers.mapObservation(siag.stations(), station) ?: error("station ${'$'}{station.code} not in response")
+                            SiagMappers.mapObservation(siag.stations(), station) ?: error("station ${station.code} not in response")
                         }
                         val prev = dao.observationOnce(place.istat)
                         dao.upsertObservation(

@@ -107,6 +107,24 @@ class WeatherRepositoryTest {
         assertNotNull("the far end of the fortnight has no spread", spread.halfWidthAt(far))
     }
 
+    /**
+     * The coordinates have to be the place's, and nothing here used to check.
+     *
+     * From the commit that made the place choosable until this one, the app asked GeoSphere for the
+     * literal text of an un-interpolated Kotlin template and was answered HTTP 400 every time — one
+     * of the ten sources simply dead, hidden by the app's own habit of keeping whatever it had and
+     * carrying on. The fixture came back regardless of what the fake was asked, so the suite stayed
+     * green throughout.
+     */
+    @Test
+    fun `geosphere is asked about the place's own coordinates`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        assertEquals("${DORF_TIROL.lat},${DORF_TIROL.lon}", geoSphere.askedFor)
+
+        repo.refresh(STERZING, "de")
+        assertEquals("${STERZING.lat},${STERZING.lon}", geoSphere.askedFor)
+    }
+
     @Test
     fun `a failing source keeps its cached data and reports Failed`() = runTest {
         repo.refresh(DORF_TIROL, "de")

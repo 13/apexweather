@@ -59,9 +59,23 @@ internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
 }
 
 internal class FakeGeoSphere(var fail: Boolean = false, var cancel: Boolean = false) : GeoSphereApi {
+    /**
+     * What it was asked about, so a test can check it.
+     *
+     * This fake used to ignore its arguments and hand back the fixture whatever it was given, and
+     * for months the app asked GeoSphere for the literal text `${'$'}{place.lat},${'$'}{place.lon}` — an
+     * un-interpolated string template — and got HTTP 400 for it every time. Every test passed. A
+     * fake that does not look at the request cannot fail for the one reason that mattered.
+     */
+    var askedFor: String? = null
+
     override suspend fun forecast(latLon: String, parameters: String): GeoSphereResponse {
+        askedFor = latLon
         if (cancel) throw CancellationException("worker stopped")
         if (fail) throw IOException("geosphere down")
+        require(latLon.split(",").mapNotNull { it.trim().toDoubleOrNull() }.size == 2) {
+            "lat_lon must be two numbers, was \"$latLon\""
+        }
         return Fixtures.json.decodeFromString(GeoSphereResponse.serializer(), Fixtures.read("geosphere.json"))
     }
 }

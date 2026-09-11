@@ -117,6 +117,14 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   station) and MeteoAlarm (the Italian civil-protection Atom feed). Each mapper is tested against
   recorded fixtures in `app/src/test/resources/fixtures/`; re-record with the curl commands in
   `docs/superpowers/plans/2026-09-08-apexweather.md` Task 4 when an upstream changes.
+  **A fake that ignores its arguments cannot fail for the reason that matters.** From the commit
+  that made the place choosable until v0.17.0, the app asked GeoSphere for the literal text of an
+  un-interpolated Kotlin template — an escaped dollar, so `lat_lon` went out as the source code —
+  and was answered HTTP 400 every single time. One of the ten sources was simply dead, for months,
+  hidden by the app's own good manners: a failed source keeps its last JSON and the screen carries
+  on. Every test passed throughout, because `FakeGeoSphere` returned the fixture whatever it was
+  handed. It checks its `lat_lon` now and `WeatherRepositoryTest` asserts the place's own
+  coordinates; any fake taking a query that varies by place should do the same.
 - `MeteoAlarmMapper` parses XML with `javax.xml`, and that is the one mapper a JVM test cannot be
   trusted on: Android's `DocumentBuilderFactory` rejects the two hardening features the JVM's
   accepts and throws the feature name back, which is exactly how warnings failed on a phone while
