@@ -61,7 +61,7 @@
     <string name="nav_bulletin">Bulletin</string>
     <string name="nav_map">Map</string>
     <string name="nav_settings">More</string>
-    <string name="map_attribution">© OpenStreetMap contributors · Weather data by RainViewer</string>
+    <string name="map_attribution">Map: Autonomous Province of Bozen – South Tyrol · Weather data by RainViewer</string>
     <string name="map_radar_unavailable">Radar images unavailable</string>
     <string name="map_play">Play</string>
     <string name="map_pause">Pause</string>

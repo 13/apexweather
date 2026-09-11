@@ -29,8 +29,15 @@ class NoHardcodedPlaceNamesTest {
      * The seven weather districts are named after the valleys and towns they cover — the reader
      * chooses among them nowhere, they are simply what the bulletin's own areas are called — so
      * `district_1` really does have to say "Bozen" and `district_4` "Sarntal".
+     *
+     * And `map_attribution` credits the province, whose name is "Autonome Provinz Bozen – Südtirol"
+     * and "Provincia autonoma di Bolzano – Alto Adige". That is the map's author, not the reader's
+     * village.
      */
-    private val allowed = setOf("district_1", "district_2", "district_3", "district_4", "district_5", "district_6", "district_7")
+    private val allowed = setOf(
+        "district_1", "district_2", "district_3", "district_4", "district_5", "district_6", "district_7",
+        "map_attribution",
+    )
 
     /**
      * Names too ordinary to search for. The Italian for Auer is "Ora", which is also the Italian for

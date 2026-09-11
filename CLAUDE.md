@@ -175,9 +175,9 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   are not cached across runs either, so a stored frame list would name pictures that can no longer be
   fetched. `nowcast` has been empty every time it was checked and is ignored.
   **RainViewer's radar stops at zoom 7.** Zoom 8 returns a PNG reading "Zoom Level Not Supported"
-  rather than a 404, so `RadarTileSource` declares the ceiling and the map's own zoom is clamped to
-  6-11. Drawing a z7 tile at z9 is osmdroid's *approximater*, and it only works if the z7 tile is
-  already cached — so `fetchRadarParents` asks for those tiles explicitly on every pan and zoom.
+  rather than a 404, so `RadarTileSource` declares the ceiling. Drawing a z7 tile at z9 is osmdroid's
+  *approximater*, and it only works if the z7 tile is already cached — so `fetchRadarParents` asks
+  for those tiles explicitly on every pan and zoom.
   **Do not replace it with a protected-tile computer:** `MapTileCache.garbageCollection()` returns
   before running the computers unless the memory cache is over capacity, which a dozen radar tiles
   never manage, so osmdroid's own `MapTileAreaZoomComputer(-1)` never fires either. Two more
@@ -185,11 +185,27 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   arrive and nothing redraws until the reader pans; and the tile source must **not** carry
   `FLAG_NO_PREVENTIVE`, which osmdroid's own OSM source sets to honour the OSM policy and which
   `MapTilePreCache` checks before fetching anything.
-  The basemap is osmdroid over the standard OpenStreetMap tiles, which the OSM tile policy allows for
-  live app use given a unique User-Agent, honoured cache headers and **no pre-emptive fetching** — so
-  there is no download-for-offline here and there must not be one. Both credits in `map_attribution`
-  are required, by OSM and by RainViewer respectively, and the bottom of the map carries a scrim so
-  they stay readable over heavy rain. GeoSphere's `nowcast-v1-15min-1km` is the better forecast for
+  **The basemap is the province's own, shaded from the province's own DEM.**
+  `SouthTyrolTileSource` draws `p_bz-BaseMap:Basemap-Meteo-Dark` from the Autonome Provinz Bozen –
+  Südtirol's WMTS, which is a grey relief map with roads and bilingual labels, published under CC0
+  and made for exactly this: ground to be looked *through*. It replaced OpenStreetMap's daylight
+  raster style held down by a colour matrix, and it is better on three counts. In a province that is
+  all valleys the shape of the ground is itself the information — rain in the Etschtal and rain on
+  the Schlern are different facts. It draws streets at zoom 17 where the OSM raster stopped being
+  useful around 11, which is why the map's own ceiling could rise from 11 to 16. And CC0 means the
+  OSM tile policy's **no pre-emptive fetching** no longer binds the basemap, so `FLAG_NO_PREVENTIVE`
+  is off there too — but there is still no download-for-offline here and there must not be one.
+  The service is WMTS; its `EPSG_3857` matrix set is ordinary Web Mercator with 256 px tiles, so row
+  and column are y and x and only the **zero-padded two-digit zoom** has to be written out.
+  **The map may not leave the province.** `setScrollableAreaLimitDouble` holds it inside
+  `SouthTyrol.NORTH/SOUTH/WEST/EAST`: outside those lines the basemap has nothing to draw and the
+  radar is somebody else's weather.
+  **The radar is drawn at 62 % alpha**, because an opaque block of blue hides the valley the rain is
+  sitting in, and because at zoom 16 a z7 radar pixel is 20 km smeared over a village — a wash of
+  colour is honest about being a wash where a solid block is not. The alpha goes on a `ColorMatrix`,
+  since osmdroid's `TilesOverlay` has none of its own.
+  The RainViewer credit in `map_attribution` is required and the province is credited beside it; the
+  bottom of the map carries a scrim so both stay readable over heavy rain. GeoSphere's `nowcast-v1-15min-1km` is the better forecast for
   this province — 1 km, 15 minutes, three hours ahead, covering all of South Tyrol — and is not used
   because a South Tyrol bounding box costs 4.6 MB of ungzipped GeoJSON against 198 kB of NetCDF; see
   `docs/superpowers/specs/2026-09-10-icons-bars-and-radar-design.md`.

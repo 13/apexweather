@@ -50,7 +50,7 @@ import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.MapTileProviderBasic
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
@@ -162,26 +162,27 @@ private fun RadarMap(state: MapUiState, modifier: Modifier = Modifier) {
             osmdroidTileCache = File(context.cacheDir, "osmdroid-tiles")
         }
         MapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
+            setTileSource(SouthTyrolTileSource())
             setMultiTouchControls(true)
-            // The OSM raster style is a daylight map and this app is a night sky. Darkened and
-            // desaturated it stops fighting the radar drawn over it.
+            // The province's map is already grey and already made to be drawn over, so all this
+            // does now is take it down to the app's own night. The OSM raster style needed
+            // desaturating as well, because it was a green-and-beige daylight road map.
             overlayManager.tilesOverlay.setColorFilter(
                 ColorMatrixColorFilter(
-                    ColorMatrix().apply {
-                        setSaturation(0.35f)
-                        postConcat(
-                            ColorMatrix(
-                                floatArrayOf(
-                                    0.55f, 0f, 0f, 0f, 0f,
-                                    0f, 0.55f, 0f, 0f, 0f,
-                                    0f, 0f, 0.62f, 0f, 0f,
-                                    0f, 0f, 0f, 1f, 0f,
-                                ),
-                            ),
-                        )
-                    },
+                    ColorMatrix(
+                        floatArrayOf(
+                            0.62f, 0f, 0f, 0f, 0f,
+                            0f, 0.62f, 0f, 0f, 0f,
+                            0f, 0f, 0.70f, 0f, 0f,
+                            0f, 0f, 0f, 1f, 0f,
+                        ),
+                    ),
                 ),
+            )
+            // The map is the province's map. Outside it the basemap has nothing to draw and the
+            // radar is somebody else's weather, so the reader cannot wander off the edge.
+            setScrollableAreaLimitDouble(
+                BoundingBox(SouthTyrol.NORTH, SouthTyrol.EAST, SouthTyrol.SOUTH, SouthTyrol.WEST),
             )
             addMapListener(object : MapListener {
                 // A pan or a zoom brings different ground into view, and its zoom-7 tiles have to be
@@ -197,7 +198,6 @@ private fun RadarMap(state: MapUiState, modifier: Modifier = Modifier) {
                 }
             })
             minZoomLevel = MIN_ZOOM
-            // Past this the z7 radar is upscaled past the point of meaning anything.
             maxZoomLevel = MAX_ZOOM
             controller.setZoom(START_ZOOM)
         }
@@ -249,8 +249,26 @@ private fun RadarMap(state: MapUiState, modifier: Modifier = Modifier) {
                 }
                 map.overlays.add(
                     0,
-                    TilesOverlay(provider, map.context)
-                        .apply { loadingBackgroundColor = android.graphics.Color.TRANSPARENT },
+                    TilesOverlay(provider, map.context).apply {
+                        loadingBackgroundColor = android.graphics.Color.TRANSPARENT
+                        // Rain you can see the ground through. RainViewer's tiles are painted
+                        // opaque, which hides the valley the rain is sitting in — and the valley is
+                        // half the information on a map of this province. The alpha is on the
+                        // colour matrix rather than on the overlay because osmdroid's TilesOverlay
+                        // has no alpha of its own.
+                        setColorFilter(
+                            ColorMatrixColorFilter(
+                                ColorMatrix(
+                                    floatArrayOf(
+                                        1f, 0f, 0f, 0f, 0f,
+                                        0f, 1f, 0f, 0f, 0f,
+                                        0f, 0f, 1f, 0f, 0f,
+                                        0f, 0f, 0f, RADAR_ALPHA, 0f,
+                                    ),
+                                ),
+                            ),
+                        )
+                    },
                 )
                 // Without this the map draws no rain at all above zoom 7; see fetchRadarParents.
                 provider.fetchRadarParents(map)
@@ -261,6 +279,20 @@ private fun RadarMap(state: MapUiState, modifier: Modifier = Modifier) {
     )
 }
 
-private const val MIN_ZOOM = 6.0
-private const val MAX_ZOOM = 11.0
-private const val START_ZOOM = 9.5
+/** The whole province on one screen. There is nothing under the map further out than this. */
+private const val MIN_ZOOM = 7.0
+
+/**
+ * As deep as the province's basemap draws streets.
+ *
+ * It used to be 11, because the basemap was OSM's raster style and the radar is RainViewer's zoom
+ * 7 upscaled — and the second of those has not changed. Rain drawn at 16 is a 20 km pixel smeared
+ * across a village, and that is exactly why it is now drawn at [RADAR_ALPHA]: a wash of colour over
+ * ground the reader can still read is honest about being a wash, where an opaque block of it is
+ * not.
+ */
+private const val MAX_ZOOM = 16.0
+private const val START_ZOOM = 10.0
+
+/** How much of the radar is let through, so the valley under the rain stays visible. */
+private const val RADAR_ALPHA = 0.62f
