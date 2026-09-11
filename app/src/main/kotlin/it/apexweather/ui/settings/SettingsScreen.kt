@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -16,11 +17,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
@@ -29,6 +29,19 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.runtime.Composable
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -42,15 +55,76 @@ import it.apexweather.data.WindUnit
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
 
+/**
+ * Settings as a destination of its own, which is what it should always have been.
+ *
+ * It was a `ModalBottomSheet` opened from the bottom bar — an action rather than a place, so its
+ * bar item could never be *selected*, the back button dismissed it instead of going anywhere, and
+ * `ApexApp` carried forty lines of notification-permission plumbing that belong to this screen and
+ * to nothing else. Being a destination also ends the sheet's own quarrel with its scroll, described
+ * in [SettingsContent].
+ *
+ * The permission is asked for from here and re-read afterwards: Android answers in its own dialog,
+ * and on a refusal the hint has to come back rather than the screen claiming the switch took
+ * effect. It is re-read on every entry too — the reader may have changed it in Android's settings
+ * since.
+ */
+@Composable
+fun SettingsScreen(
+    onOpenPlaces: () -> Unit,
+    onRefresh: () -> Unit,
+    /** Applying a language is the caller's business: it restarts the activity's locale list. */
+    onLanguage: (LanguageSetting) -> Unit,
+    placeName: String,
+    viewModel: SettingsViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
+    updateSection: @Composable () -> Unit = {},
+) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var notificationsAllowed by remember { mutableStateOf(true) }
+    fun readPermission() {
+        val granted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        notificationsAllowed = granted && NotificationManagerCompat.from(context).areNotificationsEnabled()
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { readPermission() }
+    LaunchedEffect(Unit) { readPermission() }
+
+    SettingsContent(
+        settings = settings,
+        onLanguage = onLanguage,
+        onWindUnit = viewModel::setWindUnit,
+        onAnimations = viewModel::setAnimations,
+        onRefresh = onRefresh,
+        placeName = placeName,
+        onOpenPlaces = onOpenPlaces,
+        notificationsAllowed = notificationsAllowed,
+        onRequestNotifications = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                // Below Tiramisu there is no runtime permission to ask for, only the app's own
+                // notification settings, and the hint never appears there anyway.
+                readPermission()
+            }
+        },
+        onNotifySummary = viewModel::setNotifySummary,
+        onNotifySummaryHour = viewModel::setNotifySummaryHour,
+        onNotifyRain = viewModel::setNotifyRain,
+        onNotifyWarnings = viewModel::setNotifyWarnings,
+        updateSection = updateSection,
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsSheet(
+fun SettingsContent(
     settings: AppSettings,
     onLanguage: (LanguageSetting) -> Unit,
     onWindUnit: (WindUnit) -> Unit,
     onAnimations: (Boolean) -> Unit,
     onRefresh: () -> Unit,
-    onDismiss: () -> Unit,
     /** The chosen place, and the way to a different one. Empty until the catalogue has been read. */
     placeName: String = "",
     onOpenPlaces: () -> Unit = {},
@@ -71,19 +145,16 @@ fun SettingsSheet(
      */
     updateSection: @Composable () -> Unit = {},
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        // Open fully: the sheet is long enough now that a half-height one would start folded.
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.testTag("settings_sheet"),
-    ) {
-        // The sheet is no longer short: language, wind, animations, three notification switches and
-        // their hour, the update row and the build lines run past a phone screen in landscape or at a
-        // large font scale, and ModalBottomSheet scrolls nothing by itself.
+    Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize().testTag("settings_screen")) {
+        // Language, wind, animations, three notification switches and their hour, the update row and
+        // the build lines run past a phone screen in landscape or at a large font scale, so the
+        // column scrolls. It did as a sheet too, where it had to: ModalBottomSheet handed a downward
+        // drag to the inner scroll first, so once the reader had scrolled, dragging the sheet down
+        // scrolled the content back instead of dismissing. A destination has no such argument with
+        // itself, which is half of why this stopped being a sheet.
         Column(
             Modifier.verticalScroll(rememberScrollState())
-                .navigationBarsPadding().padding(horizontal = 24.dp).padding(bottom = 32.dp),
+                .navigationBarsPadding().padding(horizontal = 24.dp).padding(top = 24.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineMedium)
@@ -135,7 +206,11 @@ fun SettingsSheet(
                 onWarnings = onNotifyWarnings,
             )
 
-            Button(onClick = { onRefresh(); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.refresh_now)) }
+            // It used to close the sheet on the way, because a refresh behind a sheet is a refresh
+            // the reader cannot see. A destination does not need to get out of its own way.
+            Button(onClick = onRefresh, modifier = Modifier.fillMaxWidth().testTag("refresh_now")) {
+                Text(stringResource(R.string.refresh_now))
+            }
 
             updateSection()
 

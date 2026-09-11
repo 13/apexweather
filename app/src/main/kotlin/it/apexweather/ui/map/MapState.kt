@@ -4,6 +4,7 @@ import it.apexweather.data.remote.NowcastStep
 import it.apexweather.data.remote.RadarFrame
 import it.apexweather.domain.Place
 import java.time.Instant
+import kotlin.math.abs
 
 /**
  * One position on the map's timeline: either something a radar saw, or something a model expects.
@@ -52,6 +53,25 @@ data class MapUiState(
 
     /** True when the frame on screen is a forecast rather than an observation. */
     val showingForecast: Boolean get() = frame is MapFrame.Forecast
+
+    /**
+     * Where the reader should be standing once [next] replaces the timeline.
+     *
+     * The list is rebuilt every ten minutes and on every return to the tab, and an index into the
+     * old one means nothing in the new — a frame can appear at the front or fall off the back, and
+     * the same number is then a different minute. So the position is carried across by **time**:
+     * whatever the reader was looking at, they end up on the frame nearest to it.
+     *
+     * Only a first load starts somewhere of its own: the newest frame a radar actually saw — the
+     * present, with the past behind it and the forecast ahead. Opening on the last forecast step
+     * would lead with the least certain thing on the timeline.
+     */
+    fun selectionAfter(next: List<MapFrame>): Int {
+        if (next.isEmpty()) return 0
+        val was = frame?.time ?: return next.indexOfLast { it is MapFrame.Observed }
+            .takeIf { it >= 0 } ?: next.lastIndex
+        return next.indices.minBy { i -> abs(next[i].time.epochSecond - was.epochSecond) }
+    }
 
     companion object {
         /**

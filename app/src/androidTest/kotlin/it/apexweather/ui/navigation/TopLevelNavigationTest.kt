@@ -33,6 +33,7 @@ class TopLevelNavigationTest {
             composable<MapRoute> { Text("map", Modifier.testTag("screen_map")) }
             composable<CompareRoute> { Text("compare", Modifier.testTag("screen_compare")) }
             composable<BulletinRoute> { Text("bulletin", Modifier.testTag("screen_bulletin")) }
+            composable<SettingsRoute> { Text("settings", Modifier.testTag("screen_settings")) }
         }
     }
 
@@ -51,12 +52,13 @@ class TopLevelNavigationTest {
     @Test
     fun everyTabReachesEveryOtherTab() {
         show()
-        listOf(CompareRoute, MapRoute, BulletinRoute, HomeRoute, MapRoute, BulletinRoute, CompareRoute, HomeRoute).forEach { route ->
+        listOf(CompareRoute, MapRoute, SettingsRoute, BulletinRoute, HomeRoute, MapRoute, SettingsRoute, BulletinRoute, CompareRoute, HomeRoute).forEach { route ->
             open(route)
             val tag = when (route) {
                 HomeRoute -> "screen_home"
                 CompareRoute -> "screen_compare"
                 MapRoute -> "screen_map"
+                SettingsRoute -> "screen_settings"
                 else -> "screen_bulletin"
             }
             rule.onNodeWithTag(tag).assertIsDisplayed()

@@ -56,7 +56,7 @@ import it.apexweather.ui.home.HomeScreen
 import it.apexweather.ui.home.HomeViewModel
 import it.apexweather.ui.map.MapScreen
 import it.apexweather.ui.place.PlacePickerScreen
-import it.apexweather.ui.settings.SettingsSheet
+import it.apexweather.ui.settings.SettingsScreen
 import it.apexweather.update.UpdateSection
 import it.apexweather.ui.settings.SettingsViewModel
 import it.apexweather.ui.sky.SkyBackground
@@ -91,6 +91,13 @@ internal fun NavHostController.openTopLevel(route: Any) {
 @Serializable object CompareRoute
 @Serializable object BulletinRoute
 
+/**
+ * Settings, which used to be a sheet. Making it a destination is what lets its bar item be
+ * *selected* like every other, and lets the back button take the reader out of it rather than
+ * dismissing something.
+ */
+@Serializable object SettingsRoute
+
 private data class NavItem(val route: Any, val tag: String, val labelRes: Int, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
 @Composable
@@ -99,10 +106,8 @@ fun ApexApp() {
     val skyVm: SkyViewModel = hiltViewModel()
     val sky by skyVm.state.collectAsStateWithLifecycle()
     val settingsVm: SettingsViewModel = hiltViewModel()
-    val settings by settingsVm.settings.collectAsStateWithLifecycle()
     val homeVm: HomeViewModel = hiltViewModel()
     val homeState by homeVm.state.collectAsStateWithLifecycle()
-    var settingsOpen by remember { mutableStateOf(false) }
     val backStack by nav.currentBackStackEntryAsState()
     val dest = backStack?.destination
 
@@ -143,12 +148,13 @@ fun ApexApp() {
                             modifier = Modifier.testTag("nav_${item.tag}"),
                         )
                     }
-                    // Settings is an action, not a destination — it opens a sheet and nothing is ever
-                    // "on" it — so it is never selected. It sits here rather than floating over the
+                    // A destination like the rest of them, so it can be selected and the back
+                    // button leads out of it. It sits in the bar rather than floating over the
                     // top-right corner, where it covered the first warning card.
+                    val settingsSelected = dest?.hasRoute(SettingsRoute::class) == true
                     NavigationBarItem(
-                        selected = false,
-                        onClick = { settingsOpen = true },
+                        selected = settingsSelected,
+                        onClick = { nav.openTopLevel(SettingsRoute) },
                         icon = { Icon(Icons.Rounded.Settings, null) },
                         label = { Text(stringResource(R.string.nav_settings)) },
                         colors = barColors,
@@ -169,50 +175,25 @@ fun ApexApp() {
                 composable<MapRoute> { MapScreen() }
                 composable<CompareRoute> { CompareScreen() }
                 composable<BulletinRoute> { BulletinScreen() }
+                composable<SettingsRoute> {
+                    SettingsScreen(
+                        onOpenPlaces = { nav.navigate(PlacePickerRoute) },
+                        onRefresh = homeVm::refresh,
+                        // Applying a language restarts the activity's locale list, which is the
+                        // app shell's business rather than the screen's.
+                        onLanguage = { l ->
+                            settingsVm.setLanguage(l) { homeVm.refresh() }
+                            AppCompatDelegate.setApplicationLocales(
+                                l.tag?.let { LocaleListCompat.forLanguageTags(it) } ?: LocaleListCompat.getEmptyLocaleList(),
+                            )
+                        },
+                        placeName = homeState.place?.name(LocalConfiguration.current.locales[0]).orEmpty(),
+                        viewModel = settingsVm,
+                        updateSection = { UpdateSection() },
+                    )
+                }
             }
         }
     }
 
-    if (settingsOpen) {
-        // Asked for straight from the sheet, and re-read afterwards: Android answers the request in
-        // its own dialog, and on a refusal the hint has to come back rather than the sheet claiming
-        // the switch took effect. Re-read on every open, too — the reader may have changed it in
-        // Android's settings since.
-        val context = LocalContext.current
-        var notificationsAllowed by remember { mutableStateOf(true) }
-        fun readPermission() {
-            val granted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            notificationsAllowed = granted && NotificationManagerCompat.from(context).areNotificationsEnabled()
-        }
-        val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { readPermission() }
-        LaunchedEffect(Unit) { readPermission() }
-
-        SettingsSheet(
-            settings = settings,
-            onLanguage = { l ->
-                settingsVm.setLanguage(l) { homeVm.refresh() }
-                AppCompatDelegate.setApplicationLocales(l.tag?.let { LocaleListCompat.forLanguageTags(it) } ?: LocaleListCompat.getEmptyLocaleList())
-            },
-            onWindUnit = settingsVm::setWindUnit,
-            onAnimations = settingsVm::setAnimations,
-            onRefresh = homeVm::refresh,
-            onDismiss = { settingsOpen = false },
-            placeName = homeState.place?.name(LocalConfiguration.current.locales[0]).orEmpty(),
-            onOpenPlaces = { settingsOpen = false; nav.navigate(PlacePickerRoute) },
-            notificationsAllowed = notificationsAllowed,
-            onRequestNotifications = {
-                // Below API 33 there is no permission to ask for; the switch that is off lives in
-                // Android's own notification settings, and the hint never appears there anyway.
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-            },
-            onNotifySummary = settingsVm::setNotifySummary,
-            onNotifySummaryHour = settingsVm::setNotifySummaryHour,
-            onNotifyRain = settingsVm::setNotifyRain,
-            onNotifyWarnings = settingsVm::setNotifyWarnings,
-            updateSection = { UpdateSection() },
-        )
-    }
 }

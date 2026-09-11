@@ -58,8 +58,11 @@ class NavigationTest {
         assertTrue("bulletin tab rendered neither text nor empty state", hasText || hasEmpty)
         rule.onNodeWithTag("nav_home").performClick(); settle()
         awaitTag("hero_temp")
+        // Settings is a destination now, not a sheet: it can be left the way every other tab is.
         rule.onNodeWithTag("settings_button").performClick(); settle()
-        rule.onNodeWithTag("settings_sheet").assertIsDisplayed()
+        rule.onNodeWithTag("settings_screen").assertIsDisplayed()
+        rule.onNodeWithTag("nav_home").performClick(); settle()
+        awaitTag("hero_temp")
     }
 
 }

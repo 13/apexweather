@@ -81,6 +81,42 @@ class MapTimelineTest {
         assertTrue(MapUiState(frames = frames, selected = 2).showingForecast)
     }
 
+    /**
+     * The timeline is rebuilt every ten minutes and on every return to the tab, and an index into
+     * the old list means nothing in the new one — frames fall off the back as they age out. Before
+     * this, a refresh dropped the reader wherever that number happened to land, which on a playing
+     * loop looked like the map jumping about on its own.
+     */
+    @Test
+    fun `a refreshed timeline keeps the reader on the minute they were looking at`() {
+        val before = MapUiState(frames = MapUiState.timeline(radar(-20, -10, 0), steps(15, 30)), selected = 1)
+        val wasLookingAt = before.frames[1].time
+        // Ten minutes on: the oldest frame has aged out and a new one has arrived at the front.
+        val after = MapUiState.timeline(radar(-10, 0, 10), steps(25, 40))
+        val moved = before.selectionAfter(after)
+        assertEquals(wasLookingAt, after[moved].time)
+    }
+
+    @Test
+    fun `a first load opens on the present rather than on the far end of the forecast`() {
+        val frames = MapUiState.timeline(radar(-10, 0), steps(15, 30))
+        val opened = MapUiState().selectionAfter(frames)
+        assertEquals(frames.indexOfLast { it is MapFrame.Observed }, opened)
+        assertFalse(MapUiState(frames = frames, selected = opened).showingForecast)
+    }
+
+    /** With nothing observed at all there is no present to open on, so the newest frame will do. */
+    @Test
+    fun `a first load with only a forecast opens on its last step`() {
+        val frames = MapUiState.timeline(emptyList(), steps(15, 30))
+        assertEquals(frames.lastIndex, MapUiState().selectionAfter(frames))
+    }
+
+    @Test
+    fun `an emptied timeline resolves to zero rather than throwing`() {
+        assertEquals(0, MapUiState(frames = MapUiState.timeline(radar(0), emptyList()), selected = 0).selectionAfter(emptyList()))
+    }
+
     @Test
     fun `a selection off the end resolves to no frame rather than throwing`() {
         assertNull(MapUiState(frames = MapUiState.timeline(radar(0), emptyList()), selected = 7).frame)

@@ -17,7 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-class SettingsSheetTest {
+class SettingsContentTest {
     @get:Rule val rule = createComposeRule()
 
     private fun show(
@@ -27,9 +27,9 @@ class SettingsSheetTest {
         onNotifySummaryHour: (Int) -> Unit = {},
     ) = rule.setContent {
         ApexTheme {
-            SettingsSheet(
+            SettingsContent(
                 settings = settings,
-                onLanguage = {}, onWindUnit = {}, onAnimations = {}, onRefresh = {}, onDismiss = {},
+                onLanguage = {}, onWindUnit = {}, onAnimations = {}, onRefresh = {},
                 notificationsAllowed = notificationsAllowed,
                 onNotifySummary = onNotifySummary,
                 onNotifySummaryHour = onNotifySummaryHour,

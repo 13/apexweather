@@ -55,16 +55,8 @@ class MapViewModel @Inject constructor(
             // looking at without a forecast until now, and still is.
             val ahead = _state.value.place?.let { nowcast.forPlace(it).steps }.orEmpty()
             val frames = MapUiState.timeline(past, ahead)
-            _state.update {
-                // Open on the newest frame a radar actually saw — the present, with the past behind
-                // it and the forecast ahead. Opening on the last forecast step would lead with the
-                // least certain thing on the timeline.
-                val now = frames.indexOfLast { f -> f is MapFrame.Observed }
-                it.copy(
-                    frames = frames,
-                    selected = if (now >= 0) now else (frames.size - 1).coerceAtLeast(0),
-                    loading = false,
-                )
+            _state.update { state ->
+                state.copy(frames = frames, selected = state.selectionAfter(frames), loading = false)
             }
         }
     }
@@ -74,18 +66,43 @@ class MapViewModel @Inject constructor(
         _state.update { it.copy(selected = index.coerceIn(0, (it.frames.size - 1).coerceAtLeast(0))) }
     }
 
+    /**
+     * Runs the loop, deciding each step from the state as it is *now* rather than as it was when
+     * the step began.
+     *
+     * It used to read the selection, work out the next index, sleep, and only then write that index
+     * down — so the number it wrote was decided before the sleep and applied after it, and it
+     * replaced whatever the selection had become rather than following from it. A scrub is safe
+     * from that, because `pause` cancels at the delay; a refresh landing mid-step is the case that
+     * is not, and the list is rebuilt every ten minutes. I could not construct a deterministic
+     * failure for it under virtual time, so this is written as a narrowing rather than sold as a
+     * fixed bug: the step is a single `update` off the current value, it cannot leave the list's
+     * bounds, and it stops itself the moment `playing` goes false.
+     *
+     * The bug that *was* reproducible is next door, in `refresh`: see [MapUiState.selectionAfter].
+     * The other half of "it does not stop" is not here at all — it is that nothing paused this when
+     * the tab was left. The bottom bar saves the map's back stack rather than popping it, so this
+     * ViewModel outlives the trip; `MapScreen` now pauses on the way out.
+     */
     fun play() {
         if (_state.value.frames.size < 2) return
         animation?.cancel()
         _state.update { it.copy(playing = true) }
         animation = viewModelScope.launch {
             while (true) {
-                val s = _state.value
-                val last = s.frames.lastIndex
-                val next = if (s.selected >= last) 0 else s.selected + 1
-                // A beat on the newest frame, so the eye can find where the loop restarts.
-                delay(if (s.selected >= last) LOOP_PAUSE_MS else FRAME_MS)
-                _state.update { it.copy(selected = next) }
+                // A beat on the last frame, so the eye can find where the loop restarts.
+                val atEnd = _state.value.let { it.selected >= it.frames.lastIndex }
+                delay(if (atEnd) LOOP_PAUSE_MS else FRAME_MS)
+                var running = true
+                _state.update { s ->
+                    if (!s.playing || s.frames.size < 2) {
+                        running = false
+                        s
+                    } else {
+                        s.copy(selected = if (s.selected >= s.frames.lastIndex) 0 else s.selected + 1)
+                    }
+                }
+                if (!running) return@launch
             }
         }
     }
@@ -93,7 +110,7 @@ class MapViewModel @Inject constructor(
     fun pause() {
         animation?.cancel()
         animation = null
-        _state.update { it.copy(playing = false) }
+        _state.update { if (it.playing) it.copy(playing = false) else it }
     }
 
     override fun onCleared() {

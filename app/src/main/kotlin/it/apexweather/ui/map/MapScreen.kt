@@ -80,7 +80,12 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
     // RainViewer's publishing interval, so asking on every resume costs nothing.
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
-        onPauseOrDispose { }
+        // And stop the loop on the way out. The bottom bar saves this destination's back stack
+        // rather than popping it, so the ViewModel — and its animation — outlive a trip to another
+        // tab: without this the frames go on turning and the tiles go on downloading behind the
+        // home screen, and the reader comes back to a map that has wandered off somewhere while
+        // they were not looking.
+        onPauseOrDispose { viewModel.pause() }
     }
     MapContent(
         state,

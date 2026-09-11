@@ -295,6 +295,25 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
 ## Conventions
 
 - Screens are split into `XScreen` (ViewModel wiring) and `XContent(state, callbacks)`; UI tests drive `XContent` with hand-built states.
+- **The map's animation must be stopped on the way out of the tab.** `openTopLevel` saves the back
+  stack rather than popping it, so `MapViewModel` — and its `while (true)` of delays — outlives a
+  trip to another tab: without `MapScreen`'s `onPauseOrDispose { viewModel.pause() }` the frames go
+  on turning and the tiles go on downloading behind the home screen, and the reader comes back to a
+  map that wandered off while they were not looking. The other half of "it jumps around" was
+  `refresh` resetting the selection outright; it carries the position across by **time** now
+  (`MapUiState.selectionAfter`), because the frame list is rebuilt every ten minutes and an index
+  into the old one means a different minute in the new. `MapViewModelTest` covers that one, and
+  fails against the old code; the loop's own rewrite is a narrowing, not a reproduced bug — see its
+  doc on `play`. That test must keep `Dispatchers.setMain` and stop the loop in a `finally`:
+  `viewModelScope` runs on Main, so without the first the animation never turns and every assertion
+  about it passes for the wrong reason, and without the second `runTest` never drains and the test
+  hangs rather than fails.
+- **Settings is a destination, not a sheet.** It was a `ModalBottomSheet` opened from the bottom bar,
+  which meant its bar item could never be selected, the back button dismissed instead of navigating,
+  and `ApexApp` carried the notification-permission plumbing that belongs to that screen alone.
+  `SettingsRoute` + `SettingsScreen` (wiring) + `SettingsContent(state, callbacks)` follow the
+  convention every other screen uses. It is also why the bottom-sheet scroll rule below no longer
+  applies to it.
 - Everything that opens a bottom-bar destination goes through `NavHostController.openTopLevel` in
   `ui/navigation/AppNavigation.kt`. The bulletin has two entrances, its tab and the teaser card on
   home; when the card used a plain `navigate` the home tab could no longer bring itself back.
