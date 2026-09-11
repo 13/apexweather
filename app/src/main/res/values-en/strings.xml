@@ -102,6 +102,9 @@
         <item quantity="other">%1$d degrees from the consensus</item>
     </plurals>
 
+    <!-- The preview's sample place: the province, never a municipality. -->
+    <string name="widget_preview_place">South Tyrol</string>
+
     <!-- In-app update, all of it driven by the button in the settings sheet. -->
     <string name="update_check">Check for updates</string>
     <string name="update_checking">Checking …</string>

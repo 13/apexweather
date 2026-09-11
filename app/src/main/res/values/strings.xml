@@ -101,8 +101,10 @@
         <item quantity="one">%1$d Grad vom Konsens entfernt</item>
         <item quantity="other">%1$d Grad vom Konsens entfernt</item>
     </plurals>
-    <!-- The place itself and the preview's sample reading: the same in every language. -->
-    <string name="location_name" translatable="false">Dorf Tirol</string>
+    <!-- The preview's sample place and reading. The place is the province, never a municipality:
+         the widget picker is shown to every reader and 115 of them do not live in the village a
+         hardcoded name would have chosen. -->
+    <string name="widget_preview_place">Südtirol</string>
     <string name="widget_preview_temp" translatable="false">18°</string>
 
     <!-- In-app update, all of it driven by the button in the settings sheet. -->

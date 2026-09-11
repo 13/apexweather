@@ -106,6 +106,9 @@
         <item quantity="other">%1$d gradi dal consenso</item>
     </plurals>
 
+    <!-- The preview's sample place: the province, never a municipality. -->
+    <string name="widget_preview_place">Alto Adige</string>
+
     <!-- In-app update, all of it driven by the button in the settings sheet. -->
     <string name="update_check">Cerca aggiornamenti</string>
     <string name="update_checking">Ricerca …</string>
