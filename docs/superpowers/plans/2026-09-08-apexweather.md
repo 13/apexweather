@@ -1505,9 +1505,12 @@ curl -sf 'https://api-weather.services.siag.it/api/v2/municipality/MunicipalityB
 curl -sf 'https://api-weather.services.siag.it/api/v2/station?categoryId=1&visibility=11' -o siag_stations.json
 curl -sf 'https://tourism.opendatahub.com/v1/Weather?language=de' -o odh_weather_de.json
 curl -sf 'https://tourism.opendatahub.com/v1/Weather/District/2?language=de' -o odh_district2_de.json
+# The two ensembles: ICON-D2 for the next two days, ECMWF's fifty members for the fortnight behind it.
+curl -sf 'https://ensemble-api.open-meteo.com/v1/ensemble?latitude=46.691&longitude=11.155&timezone=Europe%2FRome&forecast_days=2&models=icon_d2&hourly=temperature_2m' -o openmeteo_ensemble.json
+curl -sf 'https://ensemble-api.open-meteo.com/v1/ensemble?latitude=46.691&longitude=11.155&timezone=Europe%2FRome&forecast_days=15&models=ecmwf_ifs025&hourly=temperature_2m' -o openmeteo_ensemble_ecmwf.json
 ls -la && python3 -c "import json,glob; [json.load(open(f)) for f in glob.glob('*.json')]; print('all valid JSON')"
 ```
-Expected: six files, each > 1 KB, `all valid JSON`. (If an endpoint is down, retry later; do not hand-write fixtures.)
+Expected: eight files, each > 1 KB, `all valid JSON`. (If an endpoint is down, retry later; do not hand-write fixtures.)
 
 - [ ] **Step 2: Location constants and JSON helpers**
 
