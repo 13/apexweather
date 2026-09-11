@@ -111,15 +111,21 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
      * The spread at which the forecast is said to be telling you nothing, in degrees.
      *
      * It was a flat 6 K, which was right while everything the badge measured was inside two days.
-     * It is wrong once the badge is fed a fortnight: ECMWF's ensemble opens from about 2 K over the
-     * first four days to 8,5 K by day fourteen — measured on
-     * `openmeteo_ensemble_ecmwf.json` — so against a constant 6 K every day past the ninth pins at
-     * 0 %, a red dot that says the same thing about a settled week as about an unsettled one.
+     * It is wrong once the badge is fed a fortnight: ECMWF's ensemble opens from under 2 K on the
+     * first days to 8 or 10 K by day fourteen, so against a constant 6 K every day past the ninth
+     * pins at 0 % — a red dot that says the same thing about a settled week as about an unsettled
+     * one.
      *
      * Spread that grows with lead time is not the forecast failing, it is what a forecast a
-     * fortnight out *is*. So the scale opens with it, by half a degree a day, and the badge goes on
-     * meaning "unusually uncertain for this far ahead" rather than "far ahead". The near end is
-     * untouched: at lead zero this is still exactly 6 K.
+     * fortnight out *is*. So the scale opens with it and the badge goes on meaning "unusually
+     * uncertain for this far ahead" rather than "far ahead". The near end is untouched: at lead
+     * zero this is still exactly 6 K.
+     *
+     * The growth was measured, not guessed: the full ensemble spread across eight places spanning
+     * the province — Bozen at 262 m to Corvara at 1568 m, one run on 2026-09-11 — fits
+     * 0,84 K + 0,62 K per lead day, with per-place slopes from 0,54 to 0,78. [
+     * FULL_DISAGREEMENT_GROWTH_C_PER_DAY] is 0,6. That is eight places in one weather regime, not
+     * eight regimes, so it is the shape that is measured rather than the exact number.
      */
     private fun fullDisagreementAt(leadHours: Long): Double =
         FULL_DISAGREEMENT_C + FULL_DISAGREEMENT_GROWTH_C_PER_DAY * (leadHours / 24.0)
@@ -201,7 +207,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         const val FULL_DISAGREEMENT_C = 6.0
 
         /** How much of that a day of lead time is worth; see `fullDisagreementAt`. */
-        const val FULL_DISAGREEMENT_GROWTH_C_PER_DAY = 0.5
+        const val FULL_DISAGREEMENT_GROWTH_C_PER_DAY = 0.6
 
         fun median(xs: List<Double>): Double {
             val s = xs.sorted()

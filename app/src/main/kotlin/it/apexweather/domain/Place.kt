@@ -12,6 +12,15 @@ data class NearbyStation(
     val lon: Double,
     val altitudeM: Int,
     val distanceKm: Double,
+    /**
+     * How steady village-minus-station is in ICON-D2 over eight weeks, in kelvin — the number this
+     * station was chosen on, and a fair warning about how much the reading is worth.
+     *
+     * A station in the same air has a difference that barely moves whatever its size; one over a
+     * ridge spends every clear night in a different inversion. Null where the place had only one
+     * candidate, or the models could not be asked when the catalogue was generated.
+     */
+    val stabilityK: Double? = null,
 )
 
 /**

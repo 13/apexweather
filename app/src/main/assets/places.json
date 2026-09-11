@@ -9,12 +9,13 @@
   "altitudeM": 1225,
   "district": 1,
   "station": {
-   "code": "87300MS",
-   "name": "Radein",
-   "lat": 46.3465,
-   "lon": 11.3968,
-   "altitudeM": 1551,
-   "distanceKm": 4.24
+   "code": "85120MS",
+   "name": "Deutschnofen",
+   "lat": 46.4205,
+   "lon": 11.4269,
+   "altitudeM": 1470,
+   "distanceKm": 8.35,
+   "stabilityK": 0.62
   }
  },
  {
@@ -27,12 +28,13 @@
   "altitudeM": 274,
   "district": 1,
   "station": {
-   "code": "83200MS",
-   "name": "Bozen",
-   "lat": 46.4977,
-   "lon": 11.3128,
-   "altitudeM": 245,
-   "distanceKm": 6.51
+   "code": "27100MS",
+   "name": "Gargazon",
+   "lat": 46.5767,
+   "lon": 11.2008,
+   "altitudeM": 254,
+   "distanceKm": 6.88,
+   "stabilityK": 0.94
   }
  },
  {
@@ -50,7 +52,8 @@
    "lat": 46.3465,
    "lon": 11.3968,
    "altitudeM": 1551,
-   "distanceKm": 7.95
+   "distanceKm": 7.95,
+   "stabilityK": 1.51
   }
  },
  {
@@ -68,7 +71,8 @@
    "lat": 46.4423,
    "lon": 11.2525,
    "altitudeM": 495,
-   "distanceKm": 1.52
+   "distanceKm": 1.52,
+   "stabilityK": 0.71
   }
  },
  {
@@ -81,12 +85,13 @@
   "altitudeM": 1290,
   "district": 2,
   "station": {
-   "code": "82200MS",
-   "name": "Sarnthein",
-   "lat": 46.6406,
-   "lon": 11.3551,
+   "code": "82910MS",
+   "name": "Jenesien",
+   "lat": 46.5304,
+   "lon": 11.3319,
    "altitudeM": 970,
-   "distanceKm": 10.06
+   "distanceKm": 15.09,
+   "stabilityK": 0.78
   }
  },
  {
@@ -99,12 +104,13 @@
   "altitudeM": 1315,
   "district": 7,
   "station": {
-   "code": "61300MS",
-   "name": "Corvara",
-   "lat": 46.5504,
-   "lon": 11.8733,
-   "altitudeM": 1530,
-   "distanceKm": 6.82
+   "code": "62600MS",
+   "name": "St. Martin in Thurn",
+   "lat": 46.6792,
+   "lon": 11.8979,
+   "altitudeM": 1150,
+   "distanceKm": 7.6,
+   "stabilityK": 0.91
   }
  },
  {
@@ -117,12 +123,13 @@
   "altitudeM": 830,
   "district": 4,
   "station": {
-   "code": "74900MS",
-   "name": "Barbian Kollmann",
-   "lat": 46.5951,
-   "lon": 11.5291,
-   "altitudeM": 490,
-   "distanceKm": 1.11
+   "code": "75600MS",
+   "name": "Völs am Schlern",
+   "lat": 46.5134,
+   "lon": 11.506,
+   "altitudeM": 840,
+   "distanceKm": 9.94,
+   "stabilityK": 0.91
   }
  },
  {
@@ -140,7 +147,8 @@
    "lat": 46.4977,
    "lon": 11.3128,
    "altitudeM": 245,
-   "distanceKm": 3.22
+   "distanceKm": 3.22,
+   "stabilityK": 0.48
   }
  },
  {
@@ -158,7 +166,8 @@
    "lat": 46.7119,
    "lon": 12.1,
    "altitudeM": 1285,
-   "distanceKm": 2.41
+   "distanceKm": 2.41,
+   "stabilityK": 0.0
   }
  },
  {
@@ -176,7 +185,8 @@
    "lat": 46.9557,
    "lon": 11.3793,
    "altitudeM": 1154,
-   "distanceKm": 5.29
+   "distanceKm": 5.29,
+   "stabilityK": 0.83
   }
  },
  {
@@ -194,7 +204,8 @@
    "lat": 46.731,
    "lon": 11.6451,
    "altitudeM": 585,
-   "distanceKm": 1.91
+   "distanceKm": 1.91,
+   "stabilityK": 0.05
   }
  },
  {
@@ -212,7 +223,8 @@
    "lat": 46.4065,
    "lon": 11.3111,
    "altitudeM": 226,
-   "distanceKm": 0.69
+   "distanceKm": 0.69,
+   "stabilityK": 0.72
   }
  },
  {
@@ -230,7 +242,8 @@
    "lat": 46.8043,
    "lon": 11.9315,
    "altitudeM": 828,
-   "distanceKm": 0.93
+   "distanceKm": 0.93,
+   "stabilityK": 0.0
   }
  },
  {
@@ -248,7 +261,8 @@
    "lat": 46.688,
    "lon": 11.1366,
    "altitudeM": 330,
-   "distanceKm": 2.87
+   "distanceKm": 2.87,
+   "stabilityK": 0.45
   }
  },
  {
@@ -266,7 +280,8 @@
    "lat": 46.4423,
    "lon": 11.2525,
    "altitudeM": 495,
-   "distanceKm": 3.26
+   "distanceKm": 3.26,
+   "stabilityK": 0.62
   }
  },
  {
@@ -284,7 +299,8 @@
    "lat": 46.885,
    "lon": 11.4386,
    "altitudeM": 943,
-   "distanceKm": 3.74
+   "distanceKm": 3.74,
+   "stabilityK": 0.91
   }
  },
  {
@@ -302,7 +318,8 @@
    "lat": 46.9003,
    "lon": 11.9474,
    "altitudeM": 851,
-   "distanceKm": 2.16
+   "distanceKm": 2.16,
+   "stabilityK": 0.0
   }
  },
  {
@@ -320,7 +337,8 @@
    "lat": 46.6477,
    "lon": 10.9912,
    "altitudeM": 541,
-   "distanceKm": 7.18
+   "distanceKm": 7.18,
+   "stabilityK": 0.99
   }
  },
  {
@@ -338,7 +356,8 @@
    "lat": 46.529,
    "lon": 11.4638,
    "altitudeM": 987,
-   "distanceKm": 8.49
+   "distanceKm": 8.49,
+   "stabilityK": 0.54
   }
  },
  {
@@ -356,7 +375,8 @@
    "lat": 46.688,
    "lon": 11.1366,
    "altitudeM": 330,
-   "distanceKm": 6.16
+   "distanceKm": 6.16,
+   "stabilityK": 0.79
   }
  },
  {
@@ -374,7 +394,8 @@
    "lat": 46.8111,
    "lon": 11.7534,
    "altitudeM": 746,
-   "distanceKm": 6.33
+   "distanceKm": 6.33,
+   "stabilityK": 0.69
   }
  },
  {
@@ -392,7 +413,8 @@
    "lat": 46.5951,
    "lon": 11.5291,
    "altitudeM": 490,
-   "distanceKm": 5.72
+   "distanceKm": 5.72,
+   "stabilityK": 0.98
   }
  },
  {
@@ -405,12 +427,13 @@
   "altitudeM": 290,
   "district": 1,
   "station": {
-   "code": "83200MS",
-   "name": "Bozen",
-   "lat": 46.4977,
-   "lon": 11.3128,
-   "altitudeM": 245,
-   "distanceKm": 10.98
+   "code": "74900MS",
+   "name": "Barbian Kollmann",
+   "lat": 46.5951,
+   "lon": 11.5291,
+   "altitudeM": 490,
+   "distanceKm": 13.36,
+   "stabilityK": 1.03
   }
  },
  {
@@ -423,12 +446,13 @@
   "altitudeM": 333,
   "district": 1,
   "station": {
-   "code": "86900MS",
-   "name": "Auer",
-   "lat": 46.3469,
-   "lon": 11.305,
-   "altitudeM": 250,
-   "distanceKm": 7.15
+   "code": "85700MS",
+   "name": "Branzoll",
+   "lat": 46.4065,
+   "lon": 11.3111,
+   "altitudeM": 226,
+   "distanceKm": 12.17,
+   "stabilityK": 1.08
   }
  },
  {
@@ -446,7 +470,8 @@
    "lat": 46.2362,
    "lon": 11.1855,
    "altitudeM": 212,
-   "distanceKm": 4.79
+   "distanceKm": 4.79,
+   "stabilityK": 1.13
   }
  },
  {
@@ -464,7 +489,8 @@
    "lat": 46.5504,
    "lon": 11.8733,
    "altitudeM": 1530,
-   "distanceKm": 0.1
+   "distanceKm": 0.1,
+   "stabilityK": 0.58
   }
  },
  {
@@ -482,7 +508,8 @@
    "lat": 46.7759,
    "lon": 10.5289,
    "altitudeM": 1499,
-   "distanceKm": 3.56
+   "distanceKm": 3.56,
+   "stabilityK": 1.02
   }
  },
  {
@@ -500,7 +527,8 @@
    "lat": 46.7299,
    "lon": 12.2191,
    "altitudeM": 1219,
-   "distanceKm": 0.69
+   "distanceKm": 0.69,
+   "stabilityK": 0.57
   }
  },
  {
@@ -513,12 +541,13 @@
   "altitudeM": 214,
   "district": 1,
   "station": {
-   "code": "86900MS",
-   "name": "Auer",
-   "lat": 46.3469,
-   "lon": 11.305,
-   "altitudeM": 250,
-   "distanceKm": 4.58
+   "code": "85700MS",
+   "name": "Branzoll",
+   "lat": 46.4065,
+   "lon": 11.3111,
+   "altitudeM": 226,
+   "distanceKm": 10.81,
+   "stabilityK": 0.68
   }
  },
  {
@@ -531,12 +560,13 @@
   "altitudeM": 1022,
   "district": 6,
   "station": {
-   "code": "59700MS",
-   "name": "Bruneck",
-   "lat": 46.8043,
-   "lon": 11.9315,
-   "altitudeM": 828,
-   "distanceKm": 3.81
+   "code": "65350MS",
+   "name": "Obervintl",
+   "lat": 46.8111,
+   "lon": 11.7534,
+   "altitudeM": 746,
+   "distanceKm": 9.84,
+   "stabilityK": 0.74
   }
  },
  {
@@ -554,7 +584,8 @@
    "lat": 46.5134,
    "lon": 11.506,
    "altitudeM": 840,
-   "distanceKm": 0.52
+   "distanceKm": 0.52,
+   "stabilityK": 0.65
   }
  },
  {
@@ -567,12 +598,13 @@
   "altitudeM": 749,
   "district": 4,
   "station": {
-   "code": "37700MS",
-   "name": "Franzensfeste Grasstein",
-   "lat": 46.8125,
-   "lon": 11.5488,
-   "altitudeM": 850,
-   "distanceKm": 5.48
+   "code": "39100MS",
+   "name": "Brixen - Vahrn",
+   "lat": 46.731,
+   "lon": 11.6451,
+   "altitudeM": 585,
+   "distanceKm": 6.87,
+   "stabilityK": 0.9
   }
  },
  {
@@ -590,7 +622,8 @@
    "lat": 46.6479,
    "lon": 11.6894,
    "altitudeM": 1327,
-   "distanceKm": 0.91
+   "distanceKm": 0.91,
+   "stabilityK": 0.9
   }
  },
  {
@@ -603,12 +636,13 @@
   "altitudeM": 841,
   "district": 6,
   "station": {
-   "code": "59700MS",
-   "name": "Bruneck",
-   "lat": 46.8043,
-   "lon": 11.9315,
-   "altitudeM": 828,
-   "distanceKm": 3.81
+   "code": "65350MS",
+   "name": "Obervintl",
+   "lat": 46.8111,
+   "lon": 11.7534,
+   "altitudeM": 746,
+   "distanceKm": 14.97,
+   "stabilityK": 0.81
   }
  },
  {
@@ -626,7 +660,8 @@
    "lat": 46.5767,
    "lon": 11.2008,
    "altitudeM": 254,
-   "distanceKm": 0.91
+   "distanceKm": 0.91,
+   "stabilityK": 0.0
   }
  },
  {
@@ -644,7 +679,8 @@
    "lat": 46.6249,
    "lon": 10.6496,
    "altitudeM": 874,
-   "distanceKm": 8.76
+   "distanceKm": 8.76,
+   "stabilityK": 0.89
   }
  },
  {
@@ -662,7 +698,8 @@
    "lat": 46.6238,
    "lon": 10.7803,
    "altitudeM": 698,
-   "distanceKm": 6.1
+   "distanceKm": 6.1,
+   "stabilityK": 1.01
   }
  },
  {
@@ -680,7 +717,8 @@
    "lat": 46.688,
    "lon": 11.1366,
    "altitudeM": 330,
-   "distanceKm": 1.26
+   "distanceKm": 1.26,
+   "stabilityK": 0.53
   }
  },
  {
@@ -693,12 +731,13 @@
   "altitudeM": 1093,
   "district": 4,
   "station": {
-   "code": "71510MS",
-   "name": "Villnöss",
-   "lat": 46.6479,
-   "lon": 11.6894,
-   "altitudeM": 1327,
-   "distanceKm": 10.45
+   "code": "79300MS",
+   "name": "Ritten Siffian",
+   "lat": 46.529,
+   "lon": 11.4638,
+   "altitudeM": 987,
+   "distanceKm": 11.76,
+   "stabilityK": 0.69
   }
  },
  {
@@ -716,7 +755,8 @@
    "lat": 46.4065,
    "lon": 11.3111,
    "altitudeM": 226,
-   "distanceKm": 3.01
+   "distanceKm": 3.01,
+   "stabilityK": 0.72
   }
  },
  {
@@ -734,7 +774,8 @@
    "lat": 46.5767,
    "lon": 11.2008,
    "altitudeM": 254,
-   "distanceKm": 6.1
+   "distanceKm": 6.1,
+   "stabilityK": 0.83
   }
  },
  {
@@ -752,7 +793,8 @@
    "lat": 46.6249,
    "lon": 10.6496,
    "altitudeM": 874,
-   "distanceKm": 4.02
+   "distanceKm": 4.02,
+   "stabilityK": 0.93
   }
  },
  {
@@ -770,7 +812,8 @@
    "lat": 46.5417,
    "lon": 10.9898,
    "altitudeM": 1142,
-   "distanceKm": 11.09
+   "distanceKm": 11.09,
+   "stabilityK": null
   }
  },
  {
@@ -783,12 +826,13 @@
   "altitudeM": 972,
   "district": 4,
   "station": {
-   "code": "65350MS",
-   "name": "Obervintl",
-   "lat": 46.8111,
-   "lon": 11.7534,
-   "altitudeM": 746,
-   "distanceKm": 7.24
+   "code": "71510MS",
+   "name": "Villnöss",
+   "lat": 46.6479,
+   "lon": 11.6894,
+   "altitudeM": 1327,
+   "distanceKm": 12.13,
+   "stabilityK": 0.89
   }
  },
  {
@@ -806,7 +850,8 @@
    "lat": 46.2362,
    "lon": 11.1855,
    "altitudeM": 212,
-   "distanceKm": 5.96
+   "distanceKm": 5.96,
+   "stabilityK": 1.13
   }
  },
  {
@@ -824,7 +869,8 @@
    "lat": 46.7057,
    "lon": 10.5213,
    "altitudeM": 1310,
-   "distanceKm": 2.41
+   "distanceKm": 2.41,
+   "stabilityK": 0.68
   }
  },
  {
@@ -842,7 +888,8 @@
    "lat": 46.6792,
    "lon": 11.8979,
    "altitudeM": 1150,
-   "distanceKm": 3.27
+   "distanceKm": 3.27,
+   "stabilityK": 0.85
   }
  },
  {
@@ -860,7 +907,8 @@
    "lat": 46.688,
    "lon": 11.1366,
    "altitudeM": 330,
-   "distanceKm": 3.69
+   "distanceKm": 3.69,
+   "stabilityK": 0.53
   }
  },
  {
@@ -878,7 +926,8 @@
    "lat": 46.5417,
    "lon": 10.9898,
    "altitudeM": 1142,
-   "distanceKm": 16.08
+   "distanceKm": 16.08,
+   "stabilityK": 1.14
   }
  },
  {
@@ -896,7 +945,8 @@
    "lat": 46.5304,
    "lon": 11.3319,
    "altitudeM": 970,
-   "distanceKm": 8.54
+   "distanceKm": 8.54,
+   "stabilityK": 0.73
   }
  },
  {
@@ -914,7 +964,8 @@
    "lat": 46.688,
    "lon": 11.1366,
    "altitudeM": 330,
-   "distanceKm": 2.63
+   "distanceKm": 2.63,
+   "stabilityK": 0.71
   }
  },
  {
@@ -932,7 +983,8 @@
    "lat": 46.7431,
    "lon": 12.1289,
    "altitudeM": 1131,
-   "distanceKm": 2.34
+   "distanceKm": 2.34,
+   "stabilityK": 0.05
   }
  },
  {
@@ -945,12 +997,13 @@
   "altitudeM": 497,
   "district": 1,
   "station": {
-   "code": "86900MS",
-   "name": "Auer",
-   "lat": 46.3469,
-   "lon": 11.305,
-   "altitudeM": 250,
-   "distanceKm": 1.74
+   "code": "85700MS",
+   "name": "Branzoll",
+   "lat": 46.4065,
+   "lon": 11.3111,
+   "altitudeM": 226,
+   "distanceKm": 8.35,
+   "stabilityK": 1.04
   }
  },
  {
@@ -968,7 +1021,8 @@
    "lat": 46.8215,
    "lon": 11.1762,
    "altitudeM": 1145,
-   "distanceKm": 1.32
+   "distanceKm": 1.32,
+   "stabilityK": 0.0
   }
  },
  {
@@ -981,12 +1035,13 @@
   "altitudeM": 321,
   "district": 2,
   "station": {
-   "code": "27100MS",
-   "name": "Gargazon",
-   "lat": 46.5767,
-   "lon": 11.2008,
-   "altitudeM": 254,
-   "distanceKm": 3.73
+   "code": "89190MS",
+   "name": "Kaltern Oberplanitzing",
+   "lat": 46.4423,
+   "lon": 11.2525,
+   "altitudeM": 495,
+   "distanceKm": 11.75,
+   "stabilityK": 0.76
   }
  },
  {
@@ -1004,7 +1059,8 @@
    "lat": 46.6477,
    "lon": 10.9912,
    "altitudeM": 541,
-   "distanceKm": 1.1
+   "distanceKm": 1.1,
+   "stabilityK": 0.71
   }
  },
  {
@@ -1022,7 +1078,8 @@
    "lat": 46.731,
    "lon": 11.6451,
    "altitudeM": 585,
-   "distanceKm": 3.6
+   "distanceKm": 3.6,
+   "stabilityK": 0.92
   }
  },
  {
@@ -1040,7 +1097,8 @@
    "lat": 46.4289,
    "lon": 11.5366,
    "altitudeM": 1128,
-   "distanceKm": 0.55
+   "distanceKm": 0.55,
+   "stabilityK": 0.76
   }
  },
  {
@@ -1058,7 +1116,8 @@
    "lat": 46.4205,
    "lon": 11.4269,
    "altitudeM": 1470,
-   "distanceKm": 0.73
+   "distanceKm": 0.73,
+   "stabilityK": 0.43
   }
  },
  {
@@ -1076,7 +1135,8 @@
    "lat": 46.3469,
    "lon": 11.305,
    "altitudeM": 250,
-   "distanceKm": 0.46
+   "distanceKm": 0.46,
+   "stabilityK": 0.05
   }
  },
  {
@@ -1094,7 +1154,8 @@
    "lat": 46.6479,
    "lon": 11.6894,
    "altitudeM": 1327,
-   "distanceKm": 8.29
+   "distanceKm": 8.29,
+   "stabilityK": 0.99
   }
  },
  {
@@ -1107,12 +1168,13 @@
   "altitudeM": 626,
   "district": 2,
   "station": {
-   "code": "23200MS",
-   "name": "Meran",
-   "lat": 46.688,
-   "lon": 11.1366,
-   "altitudeM": 330,
-   "distanceKm": 4.93
+   "code": "19300MS",
+   "name": "Naturns",
+   "lat": 46.6477,
+   "lon": 10.9912,
+   "altitudeM": 541,
+   "distanceKm": 7.34,
+   "stabilityK": 0.81
   }
  },
  {
@@ -1130,7 +1192,8 @@
    "lat": 46.8043,
    "lon": 11.9315,
    "altitudeM": 828,
-   "distanceKm": 4.04
+   "distanceKm": 4.04,
+   "stabilityK": 0.83
   }
  },
  {
@@ -1148,7 +1211,8 @@
    "lat": 46.6477,
    "lon": 10.9912,
    "altitudeM": 541,
-   "distanceKm": 4.0
+   "distanceKm": 4.0,
+   "stabilityK": 0.71
   }
  },
  {
@@ -1166,7 +1230,8 @@
    "lat": 46.5951,
    "lon": 11.5291,
    "altitudeM": 490,
-   "distanceKm": 0.38
+   "distanceKm": 0.38,
+   "stabilityK": 0.0
   }
  },
  {
@@ -1184,7 +1249,8 @@
    "lat": 46.5767,
    "lon": 11.2008,
    "altitudeM": 254,
-   "distanceKm": 3.53
+   "distanceKm": 3.53,
+   "stabilityK": 0.48
   }
  },
  {
@@ -1202,7 +1268,8 @@
    "lat": 46.6249,
    "lon": 10.6496,
    "altitudeM": 874,
-   "distanceKm": 4.51
+   "distanceKm": 4.51,
+   "stabilityK": 1.08
   }
  },
  {
@@ -1220,7 +1287,8 @@
    "lat": 47.0366,
    "lon": 12.0991,
    "altitudeM": 1450,
-   "distanceKm": 3.33
+   "distanceKm": 3.33,
+   "stabilityK": 0.91
   }
  },
  {
@@ -1238,7 +1306,8 @@
    "lat": 46.5417,
    "lon": 10.9898,
    "altitudeM": 1142,
-   "distanceKm": 7.66
+   "distanceKm": 7.66,
+   "stabilityK": null
   }
  },
  {
@@ -1256,7 +1325,8 @@
    "lat": 46.885,
    "lon": 11.4386,
    "altitudeM": 943,
-   "distanceKm": 2.12
+   "distanceKm": 2.12,
+   "stabilityK": 0.0
   }
  },
  {
@@ -1274,7 +1344,8 @@
    "lat": 46.7431,
    "lon": 12.1289,
    "altitudeM": 1131,
-   "distanceKm": 7.35
+   "distanceKm": 7.35,
+   "stabilityK": 0.79
   }
  },
  {
@@ -1292,7 +1363,8 @@
    "lat": 46.529,
    "lon": 11.4638,
    "altitudeM": 987,
-   "distanceKm": 0.86
+   "distanceKm": 0.86,
+   "stabilityK": 0.0
   }
  },
  {
@@ -1310,7 +1382,8 @@
    "lat": 46.688,
    "lon": 11.1366,
    "altitudeM": 330,
-   "distanceKm": 3.69
+   "distanceKm": 3.69,
+   "stabilityK": 0.45
   }
  },
  {
@@ -1323,12 +1396,13 @@
   "altitudeM": 777,
   "district": 4,
   "station": {
-   "code": "65350MS",
-   "name": "Obervintl",
-   "lat": 46.8111,
-   "lon": 11.7534,
-   "altitudeM": 746,
-   "distanceKm": 6.83
+   "code": "39100MS",
+   "name": "Brixen - Vahrn",
+   "lat": 46.731,
+   "lon": 11.6451,
+   "altitudeM": 585,
+   "distanceKm": 7.38,
+   "stabilityK": 1.06
   }
  },
  {
@@ -1346,7 +1420,8 @@
    "lat": 46.8111,
    "lon": 11.7534,
    "altitudeM": 746,
-   "distanceKm": 6.1
+   "distanceKm": 6.1,
+   "stabilityK": 0.78
   }
  },
  {
@@ -1364,7 +1439,8 @@
    "lat": 46.2362,
    "lon": 11.1855,
    "altitudeM": 212,
-   "distanceKm": 2.08
+   "distanceKm": 2.08,
+   "stabilityK": 0.0
   }
  },
  {
@@ -1377,12 +1453,13 @@
   "altitudeM": 1175,
   "district": 6,
   "station": {
-   "code": "41000MS",
-   "name": "Toblach",
-   "lat": 46.7299,
-   "lon": 12.2191,
-   "altitudeM": 1219,
-   "distanceKm": 4.77
+   "code": "91510MS",
+   "name": "Sexten",
+   "lat": 46.6915,
+   "lon": 12.3577,
+   "altitudeM": 1322,
+   "distanceKm": 7.4,
+   "stabilityK": 0.63
   }
  },
  {
@@ -1400,7 +1477,8 @@
    "lat": 46.5304,
    "lon": 11.3319,
    "altitudeM": 970,
-   "distanceKm": 0.55
+   "distanceKm": 0.55,
+   "stabilityK": 0.68
   }
  },
  {
@@ -1418,7 +1496,8 @@
    "lat": 46.7822,
    "lon": 11.2294,
    "altitudeM": 588,
-   "distanceKm": 3.55
+   "distanceKm": 3.55,
+   "stabilityK": 0.05
   }
  },
  {
@@ -1436,7 +1515,8 @@
    "lat": 46.8043,
    "lon": 11.9315,
    "altitudeM": 828,
-   "distanceKm": 3.27
+   "distanceKm": 3.27,
+   "stabilityK": 0.66
   }
  },
  {
@@ -1454,7 +1534,8 @@
    "lat": 46.6792,
    "lon": 11.8979,
    "altitudeM": 1150,
-   "distanceKm": 0.31
+   "distanceKm": 0.31,
+   "stabilityK": 0.0
   }
  },
  {
@@ -1472,7 +1553,8 @@
    "lat": 46.7822,
    "lon": 11.2294,
    "altitudeM": 588,
-   "distanceKm": 0.23
+   "distanceKm": 0.23,
+   "stabilityK": 0.05
   }
  },
  {
@@ -1490,7 +1572,8 @@
    "lat": 46.6477,
    "lon": 10.9912,
    "altitudeM": 541,
-   "distanceKm": 9.97
+   "distanceKm": 9.97,
+   "stabilityK": 1.54
   }
  },
  {
@@ -1508,7 +1591,8 @@
    "lat": 46.5456,
    "lon": 11.7684,
    "altitudeM": 1594,
-   "distanceKm": 4.31
+   "distanceKm": 4.31,
+   "stabilityK": 0.85
   }
  },
  {
@@ -1526,7 +1610,8 @@
    "lat": 46.6406,
    "lon": 11.3551,
    "altitudeM": 970,
-   "distanceKm": 0.29
+   "distanceKm": 0.29,
+   "stabilityK": 0.05
   }
  },
  {
@@ -1544,7 +1629,8 @@
    "lat": 46.688,
    "lon": 11.1366,
    "altitudeM": 330,
-   "distanceKm": 3.88
+   "distanceKm": 3.88,
+   "stabilityK": 0.45
   }
  },
  {
@@ -1562,7 +1648,8 @@
    "lat": 46.8901,
    "lon": 11.8744,
    "altitudeM": 1141,
-   "distanceKm": 0.74
+   "distanceKm": 0.74,
+   "stabilityK": 0.66
   }
  },
  {
@@ -1580,7 +1667,8 @@
    "lat": 46.5456,
    "lon": 11.7684,
    "altitudeM": 1594,
-   "distanceKm": 1.56
+   "distanceKm": 1.56,
+   "stabilityK": 0.0
   }
  },
  {
@@ -1598,7 +1686,8 @@
    "lat": 46.7357,
    "lon": 10.8493,
    "altitudeM": 1700,
-   "distanceKm": 5.66
+   "distanceKm": 5.66,
+   "stabilityK": 1.18
   }
  },
  {
@@ -1616,7 +1705,8 @@
    "lat": 46.6915,
    "lon": 12.3577,
    "altitudeM": 1322,
-   "distanceKm": 1.3
+   "distanceKm": 1.3,
+   "stabilityK": 0.0
   }
  },
  {
@@ -1634,7 +1724,8 @@
    "lat": 46.6238,
    "lon": 10.7803,
    "altitudeM": 698,
-   "distanceKm": 0.69
+   "distanceKm": 0.69,
+   "stabilityK": 0.05
   }
  },
  {
@@ -1652,7 +1743,8 @@
    "lat": 46.6249,
    "lon": 10.6496,
    "altitudeM": 874,
-   "distanceKm": 6.57
+   "distanceKm": 6.57,
+   "stabilityK": 1.03
   }
  },
  {
@@ -1670,7 +1762,8 @@
    "lat": 46.7057,
    "lon": 10.5213,
    "altitudeM": 1310,
-   "distanceKm": 12.03
+   "distanceKm": 12.03,
+   "stabilityK": 0.9
   }
  },
  {
@@ -1688,7 +1781,8 @@
    "lat": 46.8345,
    "lon": 11.7856,
    "altitudeM": 1349,
-   "distanceKm": 0.84
+   "distanceKm": 0.84,
+   "stabilityK": 0.97
   }
  },
  {
@@ -1701,12 +1795,13 @@
   "altitudeM": 248,
   "district": 1,
   "station": {
-   "code": "83200MS",
-   "name": "Bozen",
-   "lat": 46.4977,
-   "lon": 11.3128,
-   "altitudeM": 245,
-   "distanceKm": 6.03
+   "code": "27100MS",
+   "name": "Gargazon",
+   "lat": 46.5767,
+   "lon": 11.2008,
+   "altitudeM": 254,
+   "distanceKm": 6.39,
+   "stabilityK": 0.94
   }
  },
  {
@@ -1719,12 +1814,13 @@
   "altitudeM": 276,
   "district": 1,
   "station": {
-   "code": "86900MS",
-   "name": "Auer",
-   "lat": 46.3469,
-   "lon": 11.305,
-   "altitudeM": 250,
-   "distanceKm": 5.06
+   "code": "89190MS",
+   "name": "Kaltern Oberplanitzing",
+   "lat": 46.4423,
+   "lon": 11.2525,
+   "altitudeM": 495,
+   "distanceKm": 11.23,
+   "stabilityK": 0.96
   }
  },
  {
@@ -1742,7 +1838,8 @@
    "lat": 46.5767,
    "lon": 11.2008,
    "altitudeM": 254,
-   "distanceKm": 2.8
+   "distanceKm": 2.8,
+   "stabilityK": 0.99
   }
  },
  {
@@ -1755,12 +1852,13 @@
   "altitudeM": 1028,
   "district": 4,
   "station": {
-   "code": "78305MS",
-   "name": "Welschnofen",
-   "lat": 46.4289,
-   "lon": 11.5366,
-   "altitudeM": 1128,
-   "distanceKm": 4.45
+   "code": "75600MS",
+   "name": "Völs am Schlern",
+   "lat": 46.5134,
+   "lon": 11.506,
+   "altitudeM": 840,
+   "distanceKm": 5.19,
+   "stabilityK": 0.82
   }
  },
  {
@@ -1778,7 +1876,8 @@
    "lat": 46.688,
    "lon": 11.1366,
    "altitudeM": 330,
-   "distanceKm": 1.53
+   "distanceKm": 1.53,
+   "stabilityK": 0.45
   }
  },
  {
@@ -1796,7 +1895,8 @@
    "lat": 46.4205,
    "lon": 11.4269,
    "altitudeM": 1470,
-   "distanceKm": 12.45
+   "distanceKm": 12.45,
+   "stabilityK": 0.84
   }
  },
  {
@@ -1814,7 +1914,8 @@
    "lat": 46.7057,
    "lon": 10.5213,
    "altitudeM": 1310,
-   "distanceKm": 7.88
+   "distanceKm": 7.88,
+   "stabilityK": 0.98
   }
  },
  {
@@ -1832,7 +1933,8 @@
    "lat": 46.5417,
    "lon": 10.9898,
    "altitudeM": 1142,
-   "distanceKm": 1.4
+   "distanceKm": 1.4,
+   "stabilityK": null
   }
  },
  {
@@ -1850,7 +1952,8 @@
    "lat": 46.4065,
    "lon": 11.3111,
    "altitudeM": 226,
-   "distanceKm": 0.88
+   "distanceKm": 0.88,
+   "stabilityK": 0.72
   }
  },
  {
@@ -1868,7 +1971,8 @@
    "lat": 46.7431,
    "lon": 12.1289,
    "altitudeM": 1131,
-   "distanceKm": 7.78
+   "distanceKm": 7.78,
+   "stabilityK": 0.79
   }
  },
  {
@@ -1886,7 +1990,8 @@
    "lat": 46.885,
    "lon": 11.4386,
    "altitudeM": 943,
-   "distanceKm": 2.97
+   "distanceKm": 2.97,
+   "stabilityK": 0.05
   }
  },
  {
@@ -1904,7 +2009,8 @@
    "lat": 46.9003,
    "lon": 11.9474,
    "altitudeM": 851,
-   "distanceKm": 10.75
+   "distanceKm": 10.75,
+   "stabilityK": 1.28
   }
  },
  {
@@ -1922,7 +2028,8 @@
    "lat": 46.8353,
    "lon": 12.2427,
    "altitudeM": 1412,
-   "distanceKm": 2.92
+   "distanceKm": 2.92,
+   "stabilityK": 0.68
   }
  },
  {
@@ -1940,7 +2047,8 @@
    "lat": 46.8111,
    "lon": 11.7534,
    "altitudeM": 746,
-   "distanceKm": 2.38
+   "distanceKm": 2.38,
+   "stabilityK": 0.92
   }
  },
  {
@@ -1958,7 +2066,8 @@
    "lat": 46.731,
    "lon": 11.6451,
    "altitudeM": 585,
-   "distanceKm": 1.52
+   "distanceKm": 1.52,
+   "stabilityK": 0.9
   }
  },
  {
@@ -1971,12 +2080,13 @@
   "altitudeM": 1204,
   "district": 2,
   "station": {
-   "code": "82200MS",
-   "name": "Sarnthein",
-   "lat": 46.6406,
-   "lon": 11.3551,
+   "code": "82910MS",
+   "name": "Jenesien",
+   "lat": 46.5304,
+   "lon": 11.3319,
    "altitudeM": 970,
-   "distanceKm": 10.55
+   "distanceKm": 11.63,
+   "stabilityK": 0.73
   }
  },
  {
@@ -1989,12 +2099,13 @@
   "altitudeM": 1158,
   "district": 6,
   "station": {
-   "code": "43200MS",
-   "name": "Welsberg",
-   "lat": 46.7431,
-   "lon": 12.1289,
-   "altitudeM": 1131,
-   "distanceKm": 3.12
+   "code": "42700MS",
+   "name": "St. Veit in Prags",
+   "lat": 46.7119,
+   "lon": 12.1,
+   "altitudeM": 1285,
+   "distanceKm": 6.01,
+   "stabilityK": 0.42
   }
  },
  {
@@ -2012,7 +2123,8 @@
    "lat": 46.5951,
    "lon": 11.5291,
    "altitudeM": 490,
-   "distanceKm": 3.99
+   "distanceKm": 3.99,
+   "stabilityK": 0.98
   }
  },
  {
@@ -2030,7 +2142,8 @@
    "lat": 46.885,
    "lon": 11.4386,
    "altitudeM": 943,
-   "distanceKm": 0.85
+   "distanceKm": 0.85,
+   "stabilityK": 0.05
   }
  },
  {
@@ -2043,12 +2156,13 @@
   "altitudeM": 851,
   "district": 4,
   "station": {
-   "code": "39100MS",
-   "name": "Brixen - Vahrn",
-   "lat": 46.731,
-   "lon": 11.6451,
-   "altitudeM": 585,
-   "distanceKm": 7.73
+   "code": "75600MS",
+   "name": "Völs am Schlern",
+   "lat": 46.5134,
+   "lon": 11.506,
+   "altitudeM": 840,
+   "distanceKm": 18.59,
+   "stabilityK": 1.0
   }
  },
  {
@@ -2066,7 +2180,8 @@
    "lat": 46.6792,
    "lon": 11.8979,
    "altitudeM": 1150,
-   "distanceKm": 3.16
+   "distanceKm": 3.16,
+   "stabilityK": 0.0
   }
  },
  {
@@ -2084,7 +2199,8 @@
    "lat": 46.5417,
    "lon": 10.9898,
    "altitudeM": 1142,
-   "distanceKm": 9.72
+   "distanceKm": 9.72,
+   "stabilityK": 1.17
   }
  }
 ]
