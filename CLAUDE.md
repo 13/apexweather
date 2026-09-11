@@ -223,16 +223,30 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   since osmdroid's `TilesOverlay` has none of its own.
   **The timeline carries both halves: where the rain has been and where it is going.** The radar's
   last two hours are followed by **a day of forecast in two resolutions** — GeoSphere's INCA nowcast
-  for the two and a half hours it runs (1 km, quarter-hourly, radar-blended) and then AROME hourly
-  at 2,5 km out to twenty-four. The join is where INCA stops, and `NowcastMapper.mapOutlook` takes
-  `after` so the coarser run never draws over an hour the finer one covers. AROME's `rr_acc` is
-  **accumulated from the run's start**, so consecutive steps are differenced — undifferenced it
-  would paint the whole day's rain onto every hour of it. Its first step has nothing to difference
-  against and is dropped rather than taken whole. `MapUiState.timeline` then drops forecast steps
+  for the two and a half hours it runs (1 km, quarter-hourly, radar-blended) and then the **median of AROME's
+  ensemble** hourly at 2,5 km out to twenty-four. The join is where INCA stops, and
+  `NowcastMapper.mapOutlook` takes `after` so the coarser run never draws over an hour the finer one
+  covers. The ensemble median replaced the single deterministic run at exactly the same payload —
+  117 kB either way, which is the only reason it was a free choice. Measured against that run over
+  the eastern Dolomites on 2026-09-11: the median calls *more* cell-hours wet than the single run
+  (1137 against 730), so it is not the drier answer a median invites you to fear, and where the two
+  disagree the ensemble's ninetieth percentile sides with the single run nine times in ten — which
+  is what one realisation of a model is.
+  **In that dataset the rain is in `rain_*`, not `rr_*`.** Both claim `kg m-2`; `rr_p50` tops out at
+  0,008 over a box a day long where `rain_p50` reaches 7,9. A map drawn from `rr` shows no rain
+  ever, and this was nearly shipped that way. `rain_*` is per-step and wants no differencing, unlike
+  the deterministic run's `rr_acc` it replaced. `MapUiState.timeline` then drops forecast steps
   the radar has already watched, because INCA reaches back to its own reference time.
   The 2,5 km run rather than the 1 km one for the far hours is a measurement: over a place box a day
   of the kilometre grid is 488 kB and this is 117 kB, for a resolution still finer than the radar's
   at any zoom anyone uses. The kilometre is spent where it buys something, on the next two hours.
+  **Nothing better than RainViewer is available for the radar half**, and it was looked for: the
+  Italian civil-protection mosaic (`radar-api.protezionecivile.it`) would be ideal and answers 403
+  from behind Akamai even with a browser `Referer`; MeteoSwiss publishes a CC-BY radar product whose
+  bounding box stops at 10,49 °E, where this province starts at 10,30 and runs to 12,55, so it
+  covers the tip of the Vinschgau and nothing else; and the province's own Macaion radar still has
+  no published georeference. The next step for the forecast half, if it is ever wanted, is carrying
+  `rain_p90` beside the median (188 kB for the pair) to show where it could be much wetter.
   **A frame a day out cannot be labelled with the clock alone** — at eleven in the morning "10:00"
   reads as an hour ago — so the card uses `Format.dayTime`, which puts the short weekday in front on
   any day but the present one. The present on this timeline is the newest frame a radar actually

@@ -1508,9 +1508,13 @@ curl -sf 'https://tourism.opendatahub.com/v1/Weather/District/2?language=de' -o 
 # The two ensembles: ICON-D2 for the next two days, ECMWF's fifty members for the fortnight behind it.
 curl -sf 'https://ensemble-api.open-meteo.com/v1/ensemble?latitude=46.691&longitude=11.155&timezone=Europe%2FRome&forecast_days=2&models=icon_d2&hourly=temperature_2m' -o openmeteo_ensemble.json
 curl -sf 'https://ensemble-api.open-meteo.com/v1/ensemble?latitude=46.691&longitude=11.155&timezone=Europe%2FRome&forecast_days=15&models=ecmwf_ifs025&hourly=temperature_2m' -o openmeteo_ensemble_ecmwf.json
+# The map's rain forecast: INCA for the next hours, AROME's ensemble median for the rest of the day.
+# Record both over a box with rain in it — a dry box proves only that zeroes survive the trip.
+curl -sf 'https://dataset.api.hub.geosphere.at/v1/grid/forecast/nowcast-v1-15min-1km?parameters=rr&bbox=45.90,12.90,46.08,13.12&output_format=geojson' -o geosphere_nowcast.json
+curl -sf 'https://dataset.api.hub.geosphere.at/v1/grid/forecast/ensemble-v1-1h-2500m?parameters=rain_p50&bbox=45.60,11.20,45.78,11.42&output_format=geojson&end=2026-09-12T12:00' -o geosphere_outlook.json
 ls -la && python3 -c "import json,glob; [json.load(open(f)) for f in glob.glob('*.json')]; print('all valid JSON')"
 ```
-Expected: eight files, each > 1 KB, `all valid JSON`. (If an endpoint is down, retry later; do not hand-write fixtures.)
+Expected: ten files, each > 1 KB, `all valid JSON`. (If an endpoint is down, retry later; do not hand-write fixtures.)
 
 - [ ] **Step 2: Location constants and JSON helpers**
 

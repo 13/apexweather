@@ -71,43 +71,45 @@ class NowcastMapperTest {
 
     /**
      * INCA stops two and a half hours out and "will it rain this evening" is a map question too, so
-     * AROME carries the rest of the day at 2,5 km and an hour.
+     * AROME's ensemble carries the rest of the day at 2,5 km and an hour.
      */
     @Test
     fun `the outlook reaches a day ahead, hour by hour`() {
         val times = outlook.steps.map { it.time }
         assertEquals(times.sorted(), times)
-        assertEquals(Instant.parse("2026-09-12T08:00:00Z"), times.last())
         times.zipWithNext().forEach { (a, b) -> assertEquals(3600L, b.epochSecond - a.epochSecond) }
-        assertTrue("${times.size} steps is not a day", times.size >= 23)
+        assertTrue("${times.size} steps is not a day", times.size >= 24)
     }
 
     /**
-     * `rr_acc` is accumulated from the run's start. Drawn undifferenced it would paint the whole
-     * day's rain onto every hour of it, growing all afternoon and never stopping.
+     * The trap this nearly shipped on. `rr_*` and `rain_*` both claim `kg m-2` in this dataset and
+     * are not the same quantity at all — `rr_p50` tops out at 0,008 over a box a day long where
+     * `rain_p50` reaches 7,9, so a map drawn from the first shows no rain, ever.
      */
     @Test
-    fun `the accumulated series is differenced into each hour's own rain`() {
+    fun `the outlook reads the parameter that actually holds the rain`() {
         val wettest = outlook.steps.maxOf { step -> step.cells.maxOfOrNull { it.mmPerHour } ?: 0.0 }
-        // The fixture's largest single-hour step up is well under its 6 mm total accumulation.
-        assertTrue("$wettest looks like an accumulation, not an hour", wettest < 3.0)
-        assertTrue(wettest > 0.0)
+        assertEquals(7.86, wettest, 1e-6)
     }
 
-    /** The first step has nothing before it to difference against, so it is not guessed at. */
+    /** These are per-step already, unlike the deterministic run's accumulation. */
     @Test
-    fun `the first step of an accumulated series is dropped rather than taken whole`() {
-        assertTrue(outlook.steps.none { it.time == Instant.parse("2026-09-11T08:00:00Z") })
+    fun `the hourly steps are rates, not a running total`() {
+        val wettestCell = outlook.steps.mapNotNull { step ->
+            step.cells.maxByOrNull { it.mmPerHour }?.mmPerHour
+        }
+        assertTrue("an accumulation would only ever climb", wettestCell.zipWithNext().any { (a, b) -> b < a })
     }
 
     /** Where the finer forecast already covers an hour, the coarser one does not draw over it. */
     @Test
     fun `hours the nowcast already covers are left to it`() {
+        val after = outlook.steps[3].time
         val trimmed = NowcastMapper.mapOutlook(
             Fixtures.json.decodeFromString(NowcastResponse.serializer(), Fixtures.read("geosphere_outlook.json")),
-            after = Instant.parse("2026-09-11T14:00:00Z"),
+            after = after,
         )
-        assertTrue(trimmed.steps.all { it.time.isAfter(Instant.parse("2026-09-11T14:00:00Z")) })
+        assertTrue(trimmed.steps.all { it.time.isAfter(after) })
         assertTrue(trimmed.steps.size < outlook.steps.size)
     }
 

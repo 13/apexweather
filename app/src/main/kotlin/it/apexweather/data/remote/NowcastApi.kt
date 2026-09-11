@@ -39,22 +39,32 @@ interface NowcastApi {
     ): NowcastResponse
 
     /**
-     * The rest of the day, from AROME on the same grid service.
+     * The rest of the day, from AROME's **ensemble** on the same grid service.
      *
      * INCA stops two and a half hours out, and "will it rain this evening" is a map question too.
-     * This is the 2,5 km run rather than the 1 km one on purpose: over a box around the place the
-     * kilometre grid is 488 kB for a day and this is 117 kB, for a resolution still finer than the
-     * radar's own at the zooms anyone looks at. The near hours keep INCA's kilometre and its
-     * quarter hours, which is where resolution actually buys something.
+     * This is the 2,5 km run rather than the 1 km one: over a box around the place the kilometre
+     * grid is 488 kB for a day and this is 117 kB, for a resolution still finer than the radar's own
+     * at the zooms anyone looks at. The near hours keep INCA's kilometre and its quarter hours,
+     * which is where resolution actually buys something.
      *
-     * `rr_acc` is accumulated from the run's start, so consecutive steps are differenced — the same
-     * shape `GeoSphereMapper` already handles for the village.
+     * The **median of the ensemble** rather than the single deterministic run it replaced, at
+     * exactly the same payload — 117 kB either way, which is the only reason this was a free choice.
+     * Measured against that run over a box of the eastern Dolomites on 2026-09-11: the median calls
+     * *more* cell-hours wet than the single run does (1137 against 730), so it is not the drier
+     * answer one might fear from a median; where the two disagree, the ensemble's ninetieth
+     * percentile sides with the single run nine times out of ten, which is what one realisation of a
+     * model is — a member, and not usually the middle one.
+     *
+     * **`rain_*` is the precipitation here, not `rr_*`.** They both claim `kg m-2` and `rr_p50`
+     * tops out at 0,008 over a box a day long, against 7,9 for `rain_p50`; a map drawn from `rr`
+     * shows no rain ever, which is how this was nearly shipped. Unlike the deterministic run's
+     * `rr_acc` these are per-step and want no differencing.
      */
-    @GET("v1/grid/forecast/nwp-v1-1h-2500m")
+    @GET("v1/grid/forecast/ensemble-v1-1h-2500m")
     suspend fun outlook(
         @Query("bbox") bbox: String,
         @Query("end") end: String,
-        @Query("parameters") parameters: String = "rr_acc",
+        @Query("parameters") parameters: String = "rain_p50",
         @Query("output_format") outputFormat: String = "geojson",
     ): NowcastResponse
 
@@ -125,8 +135,13 @@ object NowcastMapper {
     /** Below this a cell is drawn as nothing rather than as the faintest possible blue. */
     const val MIN_MM_PER_HOUR = 0.1
 
-    /** `rr` is a sum over the step, and the steps are quarter hours. */
-    private const val STEPS_PER_HOUR = 4
+    /** INCA's parameter, a sum over its quarter-hour step. */
+    private const val NOWCAST_PARAMETER = "rr"
+
+    /** The ensemble's, a sum over its hour. Its `rr_*` is a different and far smaller quantity. */
+    private const val OUTLOOK_PARAMETER = "rain_p50"
+
+    private const val QUARTER_HOURS_PER_HOUR = 4
 
     /**
      * GeoSphere stamps times as `2026-09-11T08:00+00:00` — an offset with no seconds, which
@@ -142,45 +157,31 @@ object NowcastMapper {
         runCatching { OffsetDateTime.parse(text, TIME).toInstant() }.getOrNull()
 
     /**
-     * AROME's accumulated series, turned into the same per-step rates INCA gives.
+     * The ensemble's hourly median, in the same per-step rates INCA gives.
      *
      * [after] is the last hour the finer forecast already covers; steps at or before it are dropped
-     * rather than drawn twice. The first surviving step is differenced against the one before it in
-     * the response, so the hour's own rain is what is shown and not the run's total to date.
+     * rather than drawn twice.
      */
-    fun mapOutlook(resp: NowcastResponse, after: Instant?): PrecipNowcast {
+    fun mapOutlook(resp: NowcastResponse, after: Instant?): PrecipNowcast =
+        map(resp, parameter = OUTLOOK_PARAMETER, after = after)
+
+    fun map(resp: NowcastResponse): PrecipNowcast =
+        map(resp, parameter = NOWCAST_PARAMETER, after = null)
+
+    private fun map(resp: NowcastResponse, parameter: String, after: Instant?): PrecipNowcast {
         val issuedAt = parse(resp.referenceTime) ?: return PrecipNowcast.EMPTY
+        // INCA sums over a quarter hour; the hourly runs sum over an hour. Both are turned into the
+        // rate a colour scale and a reader can use.
+        val perHour = if (parameter == NOWCAST_PARAMETER) QUARTER_HOURS_PER_HOUR else 1
         val times = resp.timestamps.map(::parse)
         val steps = times.mapIndexedNotNull { i, time ->
             if (time == null) return@mapIndexedNotNull null
-            if (i == 0) return@mapIndexedNotNull null // nothing to difference against
             if (after != null && !time.isAfter(after)) return@mapIndexedNotNull null
             val cells = resp.features.mapNotNull { feature ->
                 val lon = feature.geometry.coordinates.getOrNull(0) ?: return@mapNotNull null
                 val lat = feature.geometry.coordinates.getOrNull(1) ?: return@mapNotNull null
-                val series = feature.properties.parameters["rr_acc"]?.data ?: return@mapNotNull null
-                val now = series.getOrNull(i) ?: return@mapNotNull null
-                val before = series.getOrNull(i - 1) ?: return@mapNotNull null
-                // An accumulation that goes backwards is a new run spliced into the series, not
-                // rain that un-fell.
-                val rate = (now - before).coerceAtLeast(0.0)
-                if (rate < MIN_MM_PER_HOUR) null else NowcastCell(lat, lon, rate)
-            }
-            NowcastStep(time, cells)
-        }
-        return PrecipNowcast(issuedAt, steps)
-    }
-
-    fun map(resp: NowcastResponse): PrecipNowcast {
-        val issuedAt = parse(resp.referenceTime) ?: return PrecipNowcast.EMPTY
-        val times = resp.timestamps.map(::parse)
-        val steps = times.mapIndexedNotNull { i, time ->
-            if (time == null) return@mapIndexedNotNull null
-            val cells = resp.features.mapNotNull { feature ->
-                val lon = feature.geometry.coordinates.getOrNull(0) ?: return@mapNotNull null
-                val lat = feature.geometry.coordinates.getOrNull(1) ?: return@mapNotNull null
-                val mm = feature.properties.parameters["rr"]?.data?.getOrNull(i) ?: return@mapNotNull null
-                val rate = mm * STEPS_PER_HOUR
+                val mm = feature.properties.parameters[parameter]?.data?.getOrNull(i) ?: return@mapNotNull null
+                val rate = mm * perHour
                 // A dry cell is left out rather than carried as a zero: over a box this size that is
                 // most of them on most days, and they would be drawn as nothing anyway.
                 if (rate < MIN_MM_PER_HOUR) null else NowcastCell(lat, lon, rate)
