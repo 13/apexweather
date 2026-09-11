@@ -97,23 +97,28 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
         // them, which is what the reader asked for and what the hero can carry.
         val tempStyle = MaterialTheme.typography.displayLarge
         val iconSize = with(LocalDensity.current) { (tempStyle.fontSize * 1.05f).toDp() }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = state.heroTempC?.let { Format.temp(it, formats) } ?: "–",
                 style = tempStyle,
                 color = Color.White,
                 // Without a weight a wide reading at a large font/display scale fills the row and the
-                // 56 dp icon is measured against zero width left over — it just disappears. The number
+                // icon is measured against zero width left over — it just disappears. The number
                 // yields space before the icon does, and fill = false keeps it from stretching short
                 // readings to fill the row.
                 modifier = Modifier.weight(1f, fill = false).testTag("hero_temp"),
             )
-            Icon(
-                painterResource(state.heroCondition.iconRes(state.phase)),
-                contentDescription = null,
-                tint = Color.fromArgb(state.palette.accent),
-                modifier = Modifier.size(iconSize).testTag("hero_condition_icon"),
-            )
+            // The icon is centred in what is left of the line, so the space between it and the
+            // number matches the space between it and the margin. A fixed gap cannot hold both
+            // equal: "-12°" is a far wider number than "8°", and the icon would move with it.
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Icon(
+                    painterResource(state.heroCondition.iconRes(state.phase)),
+                    contentDescription = null,
+                    tint = Color.fromArgb(state.palette.accent),
+                    modifier = Modifier.size(iconSize).testTag("hero_condition_icon"),
+                )
+            }
         }
         Text(state.heroCondition.label(), style = MaterialTheme.typography.headlineMedium, color = Color.White)
         Spacer(Modifier.height(6.dp))
