@@ -117,6 +117,8 @@ data class SiagStationRow(
     val dd: String? = null,
     val wMax: String? = null,
     val n: String? = null,
+    /** Global solar radiation in W/m2. The one thing on this row that is about the sky. */
+    val gs: String? = null,
     val lastUpdated: String? = null,
     /** Comma-decimal strings, as everything numeric from this endpoint is. */
     val latitude: String? = null,
@@ -232,6 +234,7 @@ object SiagMappers {
             gustKmh = msToKmh(row.wMax.siagDouble()),
             precipTodayMm = row.n.siagDouble(),
             pressureHpa = row.p.siagDouble(),
+            radiationWm2 = row.gs.siagDouble(),
         )
     }
 }

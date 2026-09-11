@@ -174,6 +174,16 @@ data class StationObservation(
      */
     val precipTodayMm: Double?,
     val pressureHpa: Double?,
+    /**
+     * Global solar radiation in watts per square metre — how much sun is actually reaching the
+     * ground, measured.
+     *
+     * SIAG publishes it as `gs` on the same row as everything else here, and 49 of the 57 stations
+     * report it. It is the only direct evidence the app has about the *sky* rather than the air:
+     * see [it.apexweather.domain.StationSun], which uses it to refuse a forecast of overcast while
+     * the sun is plainly out.
+     */
+    val radiationWm2: Double? = null,
 )
 
 sealed interface SourceStatus {

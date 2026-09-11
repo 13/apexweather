@@ -33,6 +33,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -102,81 +103,77 @@ class MapViewModelTest {
      */
     private val mainDispatcher = StandardTestDispatcher()
 
-    private lateinit var db: AppDatabase
-    private lateinit var scope: CoroutineScope
-    private lateinit var holder: WeatherStateHolder
     private val clock = MutableClock(t0)
     private val rainViewer = FakeRainViewer(t0)
 
     @Before fun setUp() {
         Dispatchers.setMain(mainDispatcher)
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        db = AppDatabase.inMemory(context)
-        val repository = WeatherRepository(
-            db.weatherDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(),
-            FakeMeteoAlarm(), FakeEnsemble(), Fixtures.json, clock,
-        )
-        scope = CoroutineScope(UnconfinedTestDispatcher())
-        val settings = SettingsRepository(context)
-        // The DataStore is shared between test classes under Robolectric; state the place rather
-        // than inheriting whichever one another test left behind.
-        runBlocking { settings.setPlace(DORF_TIROL.istat) }
-        holder = WeatherStateHolder(
-            repository, settings, PlaceCatalogue(context), WarningDismissals(context),
-            ConsensusBlender(SouthTyrol.ZONE), clock, scope,
-        )
     }
 
     @After fun tearDown() {
-        scope.cancel()
-        db.close()
         Dispatchers.resetMain()
     }
 
     /**
-     * Built through a [ViewModelStore] so the test can *clear* it, which is the only public way to
-     * cancel a `viewModelScope`.
+     * One test, with everything it builds torn down inside it.
      *
-     * Leaving it uncancelled is not harmless. The ViewModel goes on collecting the holder's state
-     * after the test body ends, and `tearDown` then closes the database under it — the exception
-     * that throws surfaces in whichever test the dispatcher happens to run next, as
-     * `UncaughtExceptionsBeforeTest`. It passed here every time and failed on CI, which is what a
-     * leak between tests looks like.
-     */
-    private fun store() = ViewModelStore()
-
-    private fun ViewModelStore.mapViewModel(): MapViewModel = ViewModelProvider(
-        this,
-        object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                MapViewModel(RadarRepository(rainViewer, clock), NowcastRepository(NoNowcast(), clock), holder) as T
-        },
-    )[MapViewModel::class.java]
-
-    /**
-     * A test with the loop stopped and the ViewModel cleared at the end.
+     * The database, the holder's scope and the ViewModel all used to be set up and torn down around
+     * the test by JUnit, which meant each of them outlived the `runTest` that drove it: the holder
+     * went on collecting while `tearDown` closed the database under it, and whatever that threw
+     * surfaced in the *next* test as `UncaughtExceptionsBeforeTest`. It passed locally and failed on
+     * CI, twice. Nothing here escapes the body now.
      *
-     * `runTest` will not finish while work is still scheduled on its clock, and the animation is a
-     * `while (true)` of delays — a test that leaves it running does not fail, it hangs.
+     * The ViewModel is built through a [ViewModelStore] because clearing one is the only public way
+     * to cancel a `viewModelScope`, and `runTest` will not finish while the animation — a
+     * `while (true)` of delays — is still scheduled on its clock. A test that leaves it running does
+     * not fail, it hangs.
      */
     private fun mapTest(
         frames: Int = 13,
         body: suspend kotlinx.coroutines.test.TestScope.(MapViewModel) -> Unit,
-    ) =
-        runTest(mainDispatcher.scheduler) {
-            rainViewer.frames = frames
-            val store = store()
-            val vm = store.mapViewModel()
+    ) = runTest(mainDispatcher.scheduler) {
+        rainViewer.frames = frames
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val db = AppDatabase.inMemory(context)
+        val scope = CoroutineScope(UnconfinedTestDispatcher())
+        val settings = SettingsRepository(context)
+        // The DataStore is shared between test classes under Robolectric; state the place rather
+        // than inheriting whichever one another test left behind.
+        runBlocking { settings.setPlace(DORF_TIROL.istat) }
+        val holder = WeatherStateHolder(
+            WeatherRepository(
+                db.weatherDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(),
+                FakeMeteoAlarm(), FakeEnsemble(), Fixtures.json, clock,
+            ),
+            settings, PlaceCatalogue(context), WarningDismissals(context),
+            ConsensusBlender(SouthTyrol.ZONE), clock, scope,
+        )
+        val store = ViewModelStore()
+        val vm = ViewModelProvider(
+            store,
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T = MapViewModel(
+                    RadarRepository(rainViewer, clock), NowcastRepository(NoNowcast(), clock), holder,
+                ) as T
+            },
+        )[MapViewModel::class.java]
+        runCurrent()
+        try {
+            body(vm)
+        } finally {
+            vm.pause()
+            store.clear()
             runCurrent()
-            try {
-                body(vm)
-            } finally {
-                vm.pause()
-                store.clear()
-                runCurrent()
-            }
+            // Cancel is a request, not an ending: the holder's collectors are still alive for an
+            // instant after it, and closing the database under one of them throws into a scope no
+            // test owns — which surfaces in whichever test runs next as
+            // UncaughtExceptionsBeforeTest. Wait for them.
+            scope.cancel()
+            runBlocking { scope.coroutineContext.job.join() }
+            db.close()
         }
+    }
 
     @Test
     fun `playing walks the timeline forward a frame at a time`() = mapTest { vm ->

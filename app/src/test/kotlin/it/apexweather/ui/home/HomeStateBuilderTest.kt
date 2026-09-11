@@ -258,6 +258,52 @@ class HomeStateBuilderTest {
         assertEquals(Condition.FOG, state.upcomingHours.first().condition)
     }
 
+    /**
+     * The afternoon of 2026-09-11: the app led with "Bedeckt" over Dorf Tirol while the sun was out
+     * of a nearly clear sky. Three of the six regional models called it overcast, two partly cloudy
+     * and one clear, and the consensus reported them faithfully — while the station a kilometre and
+     * a half away measured 834 W/m², which at that sun height is a cloudless sky.
+     *
+     * The hero and the strip's first column are the same hour and must not disagree.
+     */
+    @Test
+    fun `a station in full sun overrules a current hour voted overcast`() {
+        // 13:40 local, the reading's own timestamp, with the sun 47 degrees up.
+        val t0 = java.time.Instant.parse("2026-09-11T11:40:00Z")
+        fun saying(condition: Condition) = it.apexweather.domain.model.HourlyPoint(
+            time = t0, tempC = 22.0, cloudPct = if (condition == Condition.CLOUDY) 100 else 40,
+            condition = condition,
+        )
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(saying(Condition.CLOUDY))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(saying(Condition.CLOUDY))),
+            Source.DMI_HARMONIE to forecast(Source.DMI_HARMONIE, listOf(saying(Condition.CLOUDY))),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(saying(Condition.PARTLY_CLOUDY))),
+            Source.ICON_2I to forecast(Source.ICON_2I, listOf(saying(Condition.PARTLY_CLOUDY))),
+            Source.KNMI_HARMONIE to forecast(Source.KNMI_HARMONIE, listOf(saying(Condition.CLEAR))),
+        )
+        val consensus = ConsensusBlender().blend(f)
+        assertEquals("the models really did vote this", Condition.CLOUDY, consensus.hourly.first().condition)
+
+        val sunny = WeatherSnapshot.EMPTY.copy(
+            forecasts = f,
+            observation = StationObservation(
+                stationName = "Meran", time = t0, tempC = 24.4, humidityPct = 57, windKmh = 18.0,
+                windDir = "S", gustKmh = 45.4, precipTodayMm = 0.0, pressureHpa = 1014.5,
+                radiationWm2 = 834.0,
+            ),
+        )
+        val state = HomeStateBuilder.build(DORF_TIROL, sunny, AppSettings(), consensus, t0)
+        assertEquals(Condition.MOSTLY_CLEAR, state.heroCondition)
+        assertEquals(Condition.MOSTLY_CLEAR, state.upcomingHours.first().condition)
+
+        // And with the pyranometer in shade, or absent, the models keep the hour.
+        val shaded = sunny.copy(observation = sunny.observation!!.copy(radiationWm2 = 40.0))
+        assertEquals(Condition.CLOUDY, HomeStateBuilder.build(DORF_TIROL, shaded, AppSettings(), consensus, t0).heroCondition)
+        val blind = sunny.copy(observation = sunny.observation!!.copy(radiationWm2 = null))
+        assertEquals(Condition.CLOUDY, HomeStateBuilder.build(DORF_TIROL, blind, AppSettings(), consensus, t0).heroCondition)
+    }
+
     /** A dry station leaves the vote exactly as the models cast it. */
     @Test
     fun `without a saturated station one fog source does not carry the hour`() {

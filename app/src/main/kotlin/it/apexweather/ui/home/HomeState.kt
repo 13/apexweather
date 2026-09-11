@@ -12,6 +12,7 @@ import it.apexweather.domain.DailyAggregator
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.StationDownscale
 import it.apexweather.domain.StationFog
+import it.apexweather.domain.StationSun
 import it.apexweather.domain.model.Bulletin
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.ConsensusDay
@@ -148,7 +149,7 @@ object HomeStateBuilder {
         // this hour alone — which is why the hour is re-voted here rather than in the blender, where
         // it would colour all forty-eight. It cannot invent fog: something has to have forecast it.
         val current = rawCurrent?.let { h ->
-            val revoted = if (StationFog.impliesFog(snapshot.observation, now, h)) {
+            val voted = if (StationFog.impliesFog(snapshot.observation, now, h)) {
                 Condition.FOG
             } else {
                 ConsensusBlender.voteCondition(
@@ -157,6 +158,13 @@ object HomeStateBuilder {
                     stationSaturated = StationFog.saturated(snapshot.observation, now),
                 )
             }
+            // And then held to what the sunlight actually arriving allows. This runs last because
+            // it outranks the fog above it — a pyranometer reading 834 W/m² is not fog, whatever
+            // the humidity says — and because it can only ever lighten the answer, so it is safe to
+            // apply to whatever the lines before it settled on. See StationSun.
+            val revoted = snapshot.observation?.let { obs ->
+                place?.station?.let { st -> StationSun.corrected(voted, obs, st.lat, st.lon, now, h) }
+            } ?: voted
             if (revoted == h.condition) h else h.copy(condition = revoted)
         }
         // The strip's first column is this same hour, so it carries the re-vote too; the hero

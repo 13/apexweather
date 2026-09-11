@@ -390,6 +390,25 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   *means*: it used to be the **maximum**, which let the single most alarmist of ten models set the
   figure on the screen on its own. The quarter-hourly series still uses the median, because it answers
   *when* rather than *how much*.
+- **The station measures the sky, not only the air, and `StationSun` is where that is used.** On
+  2026-09-11 at 13:00 the app led with "Bedeckt" over Dorf Tirol while the sun was out of a nearly
+  clear sky — and it was not wrong about its sources: ICON-CH1, ICON-D2 and DMI HARMONIE all called
+  it overcast, two of them at 100 % cloud, against two partly cloudy and one clear. Three to two to
+  one, reported faithfully. The station a kilometre and a half away was reading **834 W/m²** at the
+  time, against about 750 for a cloudless sky at that sun height, and the app was throwing the
+  number away: `gs` sits on the same SIAG row as the temperature, **49 of the 57 stations report
+  it**, and nothing parsed it.
+  `SunPhaseCalculator.elevationDegrees` (NOAA's approximation) gives the sun's height, and the ratio
+  of measured to clear-sky radiation is what decides. Four rules, each load-bearing:
+  **it may only make the sky less cloudy, never more** — in these valleys a station loses the sun
+  behind a ridge long before the sky clouds over, and on that same clear afternoon the index ran
+  from 0,09 at Salurn to 1,19 at Ulten Weißbrunn, so a dark reading is shade at least as often as
+  cloud; **the current hour only**, as with fog; **dry hours only**, because a bright shower is
+  still a shower; and **it beats fog**, because 834 W/m² is not fog whatever the humidity says.
+  The thresholds are calibrated against that crude clear-sky model rather than against theory —
+  sunny stations sit at 1,06 to 1,19 rather than at 1,00, which is why `CLEAR_INDEX` is 0,80 — so
+  changing `ATMOSPHERIC_TRANSMITTANCE` means re-measuring them. It corrects **now, not the
+  forecast**: the 48-hour strip still says what the models say.
 - **Fog is the hardest condition to get on screen here, and three separate things blocked it.**
   `GeoSphereMapper.condition` had no FOG branch at all, so one of the ten sources could never vote
   for it — AROME publishes no visibility (nineteen parameters, none of them one), so saturation

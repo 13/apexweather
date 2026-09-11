@@ -290,7 +290,7 @@ class WeatherRepositoryTest {
     @Test
     fun `a refresh files what the models say about the hours still to come`() = runTest {
         // Inside the recorded station series, so the run really does reach twelve hours ahead.
-        clock.now = Instant.parse("2026-09-09T08:00:00Z")
+        clock.now = Instant.parse("2026-09-11T06:00:00Z")
         repo.refresh(DORF_TIROL, "de")
         val history = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first()
         val thisHour = clock.now.truncatedTo(java.time.temporal.ChronoUnit.HOURS)
@@ -307,7 +307,7 @@ class WeatherRepositoryTest {
      */
     @Test
     fun `refreshing again in the same hour keeps what was written twelve hours ago`() = runTest {
-        clock.now = Instant.parse("2026-09-09T08:00:00Z")
+        clock.now = Instant.parse("2026-09-11T06:00:00Z")
         repo.refresh(DORF_TIROL, "de")
         val before = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first()
         val target = clock.now.truncatedTo(java.time.temporal.ChronoUnit.HOURS).plusSeconds(12 * 3600)

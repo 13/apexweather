@@ -1502,6 +1502,8 @@ mkdir -p app/src/test/resources/fixtures && cd app/src/test/resources/fixtures
 curl -sf 'https://api.open-meteo.com/v1/forecast?latitude=46.691&longitude=11.155&timezone=Europe%2FRome&forecast_days=7&models=meteoswiss_icon_ch1,meteoswiss_icon_ch2,italia_meteo_arpae_icon_2i,icon_d2,ecmwf_ifs025&hourly=temperature_2m,apparent_temperature,precipitation,precipitation_probability,weather_code,cloud_cover,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,sunrise,sunset' -o openmeteo.json
 curl -sf 'https://dataset.api.hub.geosphere.at/v1/timeseries/forecast/nwp-v1-1h-2500m?lat_lon=46.691,11.155&parameters=t2m,rr_acc,snow_acc,rh2m,u10m,v10m,ugust,vgust,tcc,sp,cape' -o geosphere.json
 curl -sf 'https://api-weather.services.siag.it/api/v2/municipality/MunicipalityBulletin/021101' -o siag_kmos.json
+# The station rows carry gs (global radiation), which StationSun reads: re-record this and
+# openmeteo_station.json together, or the observation's hour falls outside the model series.
 curl -sf 'https://api-weather.services.siag.it/api/v2/station?categoryId=1&visibility=11' -o siag_stations.json
 curl -sf 'https://tourism.opendatahub.com/v1/Weather?language=de' -o odh_weather_de.json
 curl -sf 'https://tourism.opendatahub.com/v1/Weather/District/2?language=de' -o odh_district2_de.json

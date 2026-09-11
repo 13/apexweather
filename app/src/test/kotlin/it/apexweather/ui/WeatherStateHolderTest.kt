@@ -21,6 +21,7 @@ import it.apexweather.domain.model.Source
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -76,7 +77,10 @@ class WeatherStateHolderTest {
     }
 
     @After fun tearDown() {
+        // Cancel is a request, not an ending. Closing the database while a collector is still
+        // alive throws into a scope no test owns, and that lands on whichever test runs next.
         scope.cancel()
+        runBlocking { scope.coroutineContext.job.join() }
         db.close()
     }
 
