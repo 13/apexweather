@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -28,8 +30,6 @@ import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.SourceColors
 import java.time.Instant
-import kotlin.math.ceil
-import kotlin.math.floor
 import kotlin.math.roundToInt
 
 /**
@@ -63,10 +63,12 @@ fun MultiLineChart(
 
     val values = series.values.flatten().map { it.value } + consensus.map { it.value }
     val all = values + band.flatMap { listOf(it.min, it.max) }
-    val lo = if (all.isEmpty()) 0.0 else if (nonNegative) floor(all.min()).coerceAtLeast(0.0) else floor(all.min() - 1)
-    val hi = if (all.isEmpty()) 1.0 else ceil(all.max() + 1).coerceAtLeast(lo + 2)
-    val steps = 4
-    val yLabels = remember(lo, hi, unitLabel) { (0..steps).map { s -> "${(lo + (hi - lo) * s / steps).toInt()}$unitLabel" } }
+    // The axis picks its own step from a ladder of round numbers, so no two ticks ever read the
+    // same — which is what a day with no rain in it used to draw.
+    val axis = remember(all, nonNegative) { ChartAxis.of(all, nonNegative) }
+    val lo = axis.lo
+    val hi = axis.hi
+    val yLabels = remember(axis, unitLabel, formats) { axis.ticks().map { "${axis.label(it, formats)}$unitLabel" } }
 
     // A canvas of lines says nothing to a screen reader, so the chart carries its own summary:
     // what is plotted, over how long, across what range, and how many models are in it.
@@ -126,10 +128,9 @@ fun MultiLineChart(
         ) {
             if (all.isEmpty()) return@Canvas
 
-            for (s in 0..steps) {
-                val v = lo + (hi - lo) * s / steps
+            axis.ticks().forEachIndexed { i, v ->
                 drawLine(Color.White.copy(alpha = 0.10f), Offset(geometry.left, geometry.y(v)), Offset(geometry.right, geometry.y(v)), strokeWidth = 1f)
-                drawContext.canvas.nativeCanvas.drawText(yLabels[s], 4f, geometry.y(v) + 10f, labelPaint)
+                drawContext.canvas.nativeCanvas.drawText(yLabels[i], 4f, geometry.y(v) + 10f, labelPaint)
             }
 
             var t = window.from
@@ -165,7 +166,11 @@ fun MultiLineChart(
             }
             if (consensus.size >= 2) {
                 val p = Path().apply { moveTo(geometry.x(consensus[0].time), geometry.y(consensus[0].value)); consensus.drop(1).forEach { lineTo(geometry.x(it.time), geometry.y(it.value)) } }
-                drawPath(p, SourceColors.consensus, style = Stroke(width = 5f))
+                // The median is the line the reader came for, and white on its own loses against ten
+                // pale source lines crossing it. A dark halo underneath separates it from whatever it
+                // runs over, and round joins stop the corners fraying at an hour of heavy rain.
+                drawPath(p, Color.Black.copy(alpha = 0.45f), style = Stroke(width = 10f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawPath(p, SourceColors.consensus, style = Stroke(width = 6f, cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
 
             if (selectedHour != null && geometry.contains(selectedHour)) {
@@ -177,6 +182,7 @@ fun MultiLineChart(
                     }
                 }
                 consensus.firstOrNull { it.time == selectedHour }?.let {
+                    drawCircle(Color.Black.copy(alpha = 0.45f), radius = 10f, center = Offset(cx, geometry.y(it.value)))
                     drawCircle(SourceColors.consensus, radius = 7f, center = Offset(cx, geometry.y(it.value)))
                 }
             }
