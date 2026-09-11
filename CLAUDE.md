@@ -136,6 +136,14 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   weather station's coordinates and altitude. The second call exists only so the station's live
   reading can be carried up the hill — see `domain/StationDownscale.kt`.
 - `data/WeatherRepository` fetches all sources in a `supervisorScope`, writes each into Room independently, and keeps old JSON when a source fails (`SourceStatus.Failed` carries `lastIssuedAt`). UI always renders whatever is cached.
+- **`refresh` coalesces, and that belongs there rather than in any caller.** Several things are
+  entitled to ask — the resume hook above the tabs, the hourly worker, the widget's button — and on
+  a **first launch two arrive together**, because `WorkManager` runs a newly enqueued periodic job
+  immediately and it lands on the cold-start refresh. Measured on a fresh install: every upstream
+  fetched exactly twice. `StaleRefresher` has a flag of its own but the worker does not go through
+  it and cannot see it, so the second caller now waits on the repository's mutex and is handed the
+  first one's result. An ordinary relaunch with a fresh cache still makes **zero** requests — that
+  is the 30-minute rule, and it was never the problem.
 - Staleness thresholds live on `Source.staleAfterHours`: regional models 6 h, SIAG KMOS 16 h (two runs
   a day), ECMWF 12 h; the bulletin goes stale after 24 h, warnings after 6 h and a station observation
   after 90 min.

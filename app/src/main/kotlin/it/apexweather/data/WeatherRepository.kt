@@ -37,6 +37,8 @@ import it.apexweather.domain.LeadBucket
 import it.apexweather.domain.StationSample
 import it.apexweather.domain.SouthTyrol
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -168,6 +170,41 @@ class WeatherRepository @Inject constructor(
         }
 
     /**
+     * Fetches every source for [place], or joins the fetch already running.
+     *
+     * There is more than one thing in this app entitled to ask for a refresh — the resume hook above
+     * the tabs, the hourly worker, the widget's button — and on a first launch two of them arrive at
+     * once: `WorkManager` runs a newly enqueued periodic job immediately, which lands on top of the
+     * cold-start refresh. Measured on a fresh install, every single upstream was fetched exactly
+     * twice. `StaleRefresher` has a flag of its own, but the worker does not go through it and could
+     * not see it.
+     *
+     * So the coalescing lives here, where every caller passes. The second caller waits on the mutex
+     * for the first to finish and is then handed its result, rather than starting the whole thing
+     * again — which is both what it wanted and what it would have got.
+     */
+    suspend fun refresh(place: Place, language: String): RefreshResult = refreshMutex.withLock {
+        val key = "${place.istat}|$language"
+        val finishedAt = lastRefreshAt
+        val previous = lastRefreshResult
+        if (key == lastRefreshKey && previous != null && finishedAt != null &&
+            Duration.between(finishedAt, clock.instant()) < COALESCE_WITHIN
+        ) {
+            return@withLock previous
+        }
+        val result = fetchEverything(place, language)
+        lastRefreshKey = key
+        lastRefreshAt = clock.instant()
+        lastRefreshResult = result
+        result
+    }
+
+    private val refreshMutex = Mutex()
+    private var lastRefreshKey: String? = null
+    private var lastRefreshAt: Instant? = null
+    private var lastRefreshResult: RefreshResult? = null
+
+    /**
      * Fetches every source in parallel; a failure in one never affects the others.
      *
      * Explicitly off the caller's dispatcher: the UI calls this from `viewModelScope`, i.e. the main
@@ -175,7 +212,7 @@ class WeatherRepository @Inject constructor(
      * on the caller's — the five Open-Meteo model mappings, and seven JSON encodings of ~168 hourly
      * points each. On the main thread that is visible jank on launch and on every pull to refresh.
      */
-    suspend fun refresh(place: Place, language: String): RefreshResult = withContext(Dispatchers.Default) {
+    private suspend fun fetchEverything(place: Place, language: String): RefreshResult = withContext(Dispatchers.Default) {
         val now = clock.instant()
         // The blocks below run in parallel on whatever threads the network continuations resume on,
         // so the shared bookkeeping has to be synchronised.
@@ -454,6 +491,16 @@ class WeatherRepository @Inject constructor(
     }
 
     companion object {
+        /**
+         * How long a just-finished refresh answers for the next caller asking the same thing.
+         *
+         * Only long enough to absorb a duplicate that was already queued behind the first — the
+         * second caller has usually been waiting on the mutex for the whole fetch, so by the time it
+         * looks, no time has passed at all. Short enough that a reader who pulls to refresh, waits,
+         * and pulls again gets a real fetch.
+         */
+        private val COALESCE_WITHIN: Duration = Duration.ofSeconds(10)
+
         /** One retry, not three: the worker runs again in an hour and nothing here is urgent. */
         private const val NETWORK_RETRIES = 1
         private const val RETRY_DELAY_MS = 3_000L

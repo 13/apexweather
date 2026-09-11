@@ -67,10 +67,15 @@ class StaleRefresher @Inject constructor(
     }
 
     private suspend fun run() {
-        // The app scope outlives every screen, so two tabs resuming at once would otherwise start
-        // two refreshes of the same ten models.
-        if (_refreshing.value) return
-        _refreshing.value = true
+        // One refresh at a time, claimed atomically.
+        //
+        // The app scope outlives every screen and runs on `Dispatchers.Default`, so reading this
+        // flag and then setting it — two operations — let two callers on two threads both see
+        // `false` and both proceed. That race is real but it is *not* what made a first launch
+        // fetch everything twice; `WeatherRepository.refresh` explains that one, and coalescing
+        // there is what fixed it. This is the smaller guard, kept because it is still wrong the
+        // other way.
+        if (!_refreshing.compareAndSet(expect = false, update = true)) return
         try {
             val cached = holder.awaitCached()
             val place = cached.place ?: return

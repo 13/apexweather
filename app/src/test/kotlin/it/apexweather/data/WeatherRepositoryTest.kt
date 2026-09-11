@@ -21,6 +21,7 @@ import it.apexweather.domain.model.Source
 import it.apexweather.domain.DORF_TIROL
 import it.apexweather.domain.STERZING
 import it.apexweather.domain.model.SourceStatus
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -123,6 +124,41 @@ class WeatherRepositoryTest {
 
         repo.refresh(STERZING, "de")
         assertEquals("${STERZING.lat},${STERZING.lon}", geoSphere.askedFor)
+    }
+
+    /**
+     * Two callers asking at once get one fetch, not two.
+     *
+     * More than one thing here is entitled to ask — the resume hook above the tabs, the hourly
+     * worker, the widget's button — and on a first launch two of them arrive together, because
+     * WorkManager runs a newly enqueued periodic job straight away on top of the cold-start refresh.
+     * Measured on a fresh install before this: every upstream fetched exactly twice.
+     */
+    @Test
+    fun `two refreshes at once make one set of requests`() = runTest {
+        val first = async { repo.refresh(DORF_TIROL, "de") }
+        val second = async { repo.refresh(DORF_TIROL, "de") }
+        val results = listOf(first.await(), second.await())
+        assertEquals(1, openMeteo.forecastCalls)
+        assertEquals(results[0], results[1])
+    }
+
+    /** And once the moment has passed, asking again really asks again. */
+    @Test
+    fun `a later refresh is not answered from the last one`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        assertEquals(1, openMeteo.forecastCalls)
+        clock.now = clock.now.plus(Duration.ofMinutes(1))
+        repo.refresh(DORF_TIROL, "de")
+        assertEquals(2, openMeteo.forecastCalls)
+    }
+
+    /** A different place is a different question, however close together the two are asked. */
+    @Test
+    fun `another place is never answered with this one's refresh`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        repo.refresh(STERZING, "de")
+        assertEquals(2, openMeteo.forecastCalls)
     }
 
     @Test
