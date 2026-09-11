@@ -229,7 +229,12 @@ private fun RadarMap(state: MapUiState, modifier: Modifier = Modifier) {
                     map.overlays.add(
                         Marker(map).apply {
                             position = point
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            // A ring, centred on the place, rather than osmdroid's stock green pin
+                            // with a pointing hand in it: a pin covers the ground it points at, and
+                            // which valley the village sits in is half of what this map is for.
+                            icon = androidx.core.content.ContextCompat.getDrawable(map.context, R.drawable.ic_map_place)
+                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                            title = null
                             // osmdroid pops an empty speech bubble on a tap otherwise; the place
                             // name is already on the home screen and there is nothing to say here.
                             infoWindow = null

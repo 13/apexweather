@@ -196,7 +196,19 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   OSM tile policy's **no pre-emptive fetching** no longer binds the basemap, so `FLAG_NO_PREVENTIVE`
   is off there too — but there is still no download-for-offline here and there must not be one.
   The service is WMTS; its `EPSG_3857` matrix set is ordinary Web Mercator with 256 px tiles, so row
-  and column are y and x and only the **zero-padded two-digit zoom** has to be written out.
+  and column are y and x. Use the short per-layer path
+  (`/mapproxy/p_bz-BaseMap/wmts/<Layer>/EPSG_3857/{z}/{x}/{y}.jpeg`), which is what the province's
+  own meteo portal uses and takes a plain zoom; the long `root/wmts/<workspace>:<layer>/…` form
+  returns identical bytes but wants the zoom **zero-padded to two digits**, which is a trap at zoom 7.
+  The place is marked with a ring rather than osmdroid's stock green pin-with-a-hand: a pin covers
+  the ground it points at, and which valley the village sits in is half of what this map is for.
+  **The province's own radar is not used, and cannot be without guessing.** It is better data —
+  Monte Macaion, 120 km, fifteen frames five minutes apart against RainViewer's thirteen at ten, and
+  `api/v2/radar/weatherHD` gives each frame an exact time in its `Last-Modified` header. But it is
+  published as a 1000x1000 PNG to be laid over a matching background picture, and **nobody publishes
+  its bounds** — not the JSON or XML, not the open-data record, not the province's own new meteo
+  portal, which does not put it on a map either. Georeferencing it would mean inventing a bounding
+  box, and a wrong one puts rain over the wrong valley.
   **The map may not leave the province.** `setScrollableAreaLimitDouble` holds it inside
   `SouthTyrol.NORTH/SOUTH/WEST/EAST`: outside those lines the basemap has nothing to draw and the
   radar is somebody else's weather.

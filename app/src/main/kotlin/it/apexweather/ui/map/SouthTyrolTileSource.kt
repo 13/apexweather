@@ -3,7 +3,6 @@ package it.apexweather.ui.map
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.tileprovider.tilesource.TileSourcePolicy
 import org.osmdroid.util.MapTileIndex
-import java.util.Locale
 
 /**
  * The province's own map, shaded from the province's own elevation model.
@@ -25,7 +24,9 @@ import java.util.Locale
  *
  * The service is WMTS rather than XYZ, but its EPSG_3857 matrix set is the ordinary Web Mercator
  * one — top-left corner at −20037508, 256 px tiles — so a tile's row and column are its y and x,
- * and only the zero-padded two-digit zoom has to be written out.
+ * and this short per-layer path serves them as a plain z/x/y. That is the form the province's own
+ * meteo portal uses for the same tiles; the long `root/wmts/<workspace>:<layer>/…` form returns the
+ * identical bytes but wants the zoom zero-padded to two digits, which is a trap at zoom 7.
  */
 class SouthTyrolTileSource : OnlineTileSourceBase(
     "southtyrol-meteo-dark",
@@ -33,21 +34,21 @@ class SouthTyrolTileSource : OnlineTileSourceBase(
     MAX_ZOOM,
     TILE_SIZE,
     ".jpeg",
-    arrayOf("https://geoservices.buergernetz.bz.it/mapproxy/root/wmts/p_bz-BaseMap:Basemap-Meteo-Dark/EPSG_3857/"),
+    arrayOf("https://geoservices.buergernetz.bz.it/mapproxy/p_bz-BaseMap/wmts/Basemap-Meteo-Dark/EPSG_3857/"),
     "© Autonome Provinz Bozen – Südtirol",
     // FLAG_NO_BULK because nothing here ever mass-downloads. Not FLAG_NO_PREVENTIVE: that exists to
     // honour the OSM tile policy, and this is not OSM's tile server.
     TileSourcePolicy(4, TileSourcePolicy.FLAG_NO_BULK),
 ) {
-    override fun getTileURLString(pMapTileIndex: Long): String = baseUrl + String.format(
-        // Locale.ROOT because this is a URL. Numbers a reader sees go through ui/common/Format.kt;
-        // a tile path is not one of them, and a locale with its own digits would break it.
-        Locale.ROOT,
-        "%02d/%d/%d.jpeg",
-        MapTileIndex.getZoom(pMapTileIndex),
-        MapTileIndex.getX(pMapTileIndex),
-        MapTileIndex.getY(pMapTileIndex),
-    )
+    override fun getTileURLString(pMapTileIndex: Long): String = buildString {
+        append(baseUrl)
+        append(MapTileIndex.getZoom(pMapTileIndex))
+        append('/')
+        append(MapTileIndex.getX(pMapTileIndex))
+        append('/')
+        append(MapTileIndex.getY(pMapTileIndex))
+        append(".jpeg")
+    }
 
     companion object {
         const val TILE_SIZE = 256

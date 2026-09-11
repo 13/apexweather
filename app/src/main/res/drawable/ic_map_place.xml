@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Where the reader's place is, on the radar map.
+
+  osmdroid's own default is a green pin with a pointing hand in it, which is a stock asset from the
+  library and reads as a bug on a grey relief map. This is a ring rather than a pin: a pin covers
+  the ground it points at, and on this map the ground — which valley the village sits in — is half
+  of what the reader came to see.
+
+  The amber is the app's primary; the white ring and the dark halo are what keep it visible over
+  both a pale ridge and a shadowed valley floor, and over heavy rain drawn on top of either.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- A dark halo, so the ring does not vanish against a pale hillshade. -->
+    <path
+        android:fillColor="#660B1020"
+        android:pathData="M12,12m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,12m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0" />
+    <path
+        android:fillColor="#FF0B1020"
+        android:pathData="M12,12m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+    <path
+        android:fillColor="#FFFFD166"
+        android:pathData="M12,12m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0" />
+</vector>
