@@ -91,12 +91,12 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
         // icon carries no content description: the word for the condition is directly underneath,
         // and describing the icon as well would have a screen reader say the weather twice.
         //
-        // Its size comes from the temperature's own type rather than a constant, so the two stay
-        // the same height at every font scale. The factor is the two fills multiplied out: the
-        // generated icons ink 0.875 of their box (see tools/svg2vector.py) and a digit's cap is
-        // about 0.7 of its font size.
+        // Its size comes from the temperature's own type rather than a constant, so the two stay in
+        // proportion at every font scale. A factor of 0.8 put the icon's ink at exactly the digits'
+        // cap height, which read as timid beside a 57 sp number; at 1.05 it stands a little above
+        // them, which is what the reader asked for and what the hero can carry.
         val tempStyle = MaterialTheme.typography.displayLarge
-        val iconSize = with(LocalDensity.current) { (tempStyle.fontSize * 0.8f).toDp() }
+        val iconSize = with(LocalDensity.current) { (tempStyle.fontSize * 1.05f).toDp() }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
                 text = state.heroTempC?.let { Format.temp(it, formats) } ?: "–",

@@ -201,6 +201,18 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
 - Nothing that runs on a device may assert a German string: CI's emulators are **en-US**. That covers
   the instrumented tests and `tools/release-smoke.sh` alike, and it has now caught both. Resolve the
   string from the resources the code itself uses, or match a spelling every language shares.
+- **The sky is held to a contrast floor, and a card may only darken.** Every word on the home
+  screen is white, most of it drawn straight onto the gradient, so a light sky is a legibility bug:
+  the dawn sky under broken cloud ended at rgb(228, 160, 122), which carries white text at 2,2:1.
+  `SkyContrast.darkenForWhiteText` scales every stop down until it reaches 4,5:1, scaling all three
+  channels by one factor so the hue survives — a sunrise stays a sunrise — and `SkyContrastTest`
+  walks every condition, phase and rain rate so a palette added later cannot reintroduce it.
+  `GlassCard` then paints **black**, not the white wash it used to: a white card lifted the
+  background back above the floor the palette had just been held to and put text on it at 3,9:1.
+  Black keeps the guarantee, because a card can then only make a passing sky darker.
+- **There are no cloud particles.** Broken cloud used to drift a handful of pale ovals across the
+  sky; they read as smudges behind the text rather than as weather, and the icon and the word beside
+  the temperature already say it is cloudy. `ParticleKind` has no CLOUDS member — do not add one.
 - Source colours are in `ui/common/SourceColors.kt`; SIAG letter codes in `domain/SiagCodes.kt`.
 - Warnings can be waved away: swipe the card or use the cross in the sheet. Dismissals are keyed by
   identifier **and** level, so an upgrade cannot inherit the silence of the milder warning, and are
