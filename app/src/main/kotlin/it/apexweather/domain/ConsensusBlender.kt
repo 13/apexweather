@@ -13,7 +13,11 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
 
@@ -178,6 +182,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         val gusts = values.mapNotNull { it.gustKmh }
         val winds = values.mapNotNull { it.windKmh }
         val freezing = values.mapNotNull { it.freezingLevelM }
+        val humidity = values.mapNotNull { it.humidityPct }
 
         return ConsensusHour(
             time = time,
@@ -189,10 +194,13 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             precipProb = precipProb,
             windKmh = winds.takeIf { it.isNotEmpty() }?.let(::median),
             // Deliberately the maximum rather than the median every other quantity uses: a gust is a
-            // peak, and one nobody was warned about is worse than one that did not arrive. Precipitation
-            // probability is a maximum for the same reason. Both are decisions about what "consensus"
-            // means here, not oversights; change them only on purpose.
+            // peak, and one nobody was warned about is worse than one that did not arrive. This is
+            // now the only maximum left here — the precipitation probability was one too, and is
+            // the mean for the reason given above it. A decision about what "consensus" means,
+            // not an oversight; change it only on purpose.
             gustKmh = gusts.maxOrNull(),
+            windDirDeg = meanDirectionDeg(values.mapNotNull { it.windDirDeg }),
+            humidityPct = humidity.takeIf { it.isNotEmpty() }?.let { median(it.map(Int::toDouble)).roundToInt() },
             freezingLevelM = freezing.takeIf { it.isNotEmpty() }?.let(::median),
             ensembleHalfWidthC = ensembleHalfWidth,
             condition = voteCondition(values.map { it.condition }, precip, cloudPct = values.mapNotNull { it.cloudPct }),
@@ -208,6 +216,34 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
 
         /** How much of that a day of lead time is worth; see `fullDisagreementAt`. */
         const val FULL_DISAGREEMENT_GROWTH_C_PER_DAY = 0.6
+
+        /**
+         * How much the models have to agree on a direction before one is worth printing.
+         *
+         * The resultant length of the unit vectors: 1 where every model points the same way, 0
+         * where they cancel exactly. A half is roughly a spread of a right angle either side of the
+         * mean — enough to say "from the north-west", not enough to be the mean of models pointing
+         * up and down the valley at once. Unlike every other quantity here, the mean of two opposite
+         * answers is not somewhere between them; it is nowhere, and the honest output is nothing.
+         */
+        private const val MIN_DIRECTION_AGREEMENT = 0.5
+
+        /**
+         * The direction the models agree the wind comes from, or null where they do not.
+         *
+         * An angle has no median and cannot be averaged arithmetically — 350° and 10° average to
+         * 180°, the exact opposite of the answer. Each model's bearing becomes a unit vector, the
+         * vectors are summed, and the direction of the sum is the answer; the *length* of the sum
+         * is how much they agreed, which is what [MIN_DIRECTION_AGREEMENT] is read against.
+         */
+        fun meanDirectionDeg(degrees: List<Int>): Int? {
+            if (degrees.isEmpty()) return null
+            val radians = degrees.map { Math.toRadians(it.toDouble()) }
+            val x = radians.sumOf(::cos) / radians.size
+            val y = radians.sumOf(::sin) / radians.size
+            if (sqrt(x * x + y * y) < MIN_DIRECTION_AGREEMENT) return null
+            return (((Math.toDegrees(atan2(y, x)) + 360.0) % 360.0).roundToInt()) % 360
+        }
 
         fun median(xs: List<Double>): Double {
             val s = xs.sorted()

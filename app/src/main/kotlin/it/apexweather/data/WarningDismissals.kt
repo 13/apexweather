@@ -56,10 +56,11 @@ class WarningDismissals @Inject constructor(@ApplicationContext private val cont
         private val KEY = stringSetPreferencesKey("dismissed")
 
         /**
-         * Identifier and level together. The feed does not change a warning's level in place today —
-         * an upgrade arrives as its own entry beside the old one — but if it ever did, keying on both
-         * means the upgrade un-dismisses itself instead of inheriting the silence.
+         * Identifier and level together — [Warning.noticeKey], which the notifications key on too.
+         * The feed does not change a warning's level in place today; an upgrade arrives as its own
+         * entry beside the old one. But if it ever did, keying on both means the upgrade
+         * un-dismisses itself instead of inheriting the silence.
          */
-        fun key(warning: Warning): String = "${warning.identifier}|${warning.level.name}"
+        fun key(warning: Warning): String = warning.noticeKey
     }
 }

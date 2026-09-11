@@ -8,6 +8,8 @@ import it.apexweather.domain.ROME
 import it.apexweather.domain.forecast
 import it.apexweather.domain.hour
 import it.apexweather.domain.point
+import it.apexweather.data.remote.StationReference
+import it.apexweather.domain.model.ConsensusForecast
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.WeatherSnapshot
@@ -34,6 +36,19 @@ class CompareStateBuilderTest {
         assertEquals(hour(2), s.series.getValue(Source.ICON_CH1).first().time)
         assertTrue(s.series.getValue(Source.ECMWF).size <= 72)
         assertEquals(hour(2), s.consensusLine.first().time)
+    }
+
+    /** The header row and the cells under it read the same list, so they cannot disagree. */
+    @Test
+    fun `the chosen sources come out in declaration order`() {
+        val s = CompareStateBuilder.build(
+            snapshot,
+            AppSettings(compareSources = setOf(Source.ECMWF, Source.ICON_CH1, Source.ICON_D2)),
+            consensus,
+            hour(0),
+        )
+        assertEquals(listOf(Source.ICON_CH1, Source.ICON_D2, Source.ECMWF), s.selectedInOrder)
+        assertEquals(s.selected, s.selectedInOrder.toSet())
     }
 
     @Test
@@ -123,5 +138,69 @@ class CompareStateBuilderTest {
         val a = CompareStateBuilder.build(snapshot, AppSettings(), consensus, hour(2))
         val b = CompareStateBuilder.build(snapshot, AppSettings(), consensus, hour(2).plusSeconds(90))
         assertEquals(a, b)
+    }
+}
+
+/**
+ * A model answering perfectly and never being checked against the thermometer looks exactly like
+ * one that is: the same green dot and the same fresh timestamp. Eight of the ten models arrive in
+ * the Open-Meteo station request; GeoSphere AROME needs a second one, which is not a `Source` and
+ * therefore cannot show up in `HomeUiState.silentSources` — so if it starts failing, the only
+ * symptom is the hero temperature being quietly worse. This is what says so.
+ */
+class StationRecordTest {
+
+    private val forecasts = mapOf(
+        Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0))),
+        Source.GEOSPHERE_AROME to forecast(Source.GEOSPHERE_AROME, listOf(point(0, 11.0))),
+        Source.SIAG_KMOS to forecast(Source.SIAG_KMOS, listOf(point(0, 12.0))),
+    )
+
+    private fun snapshot(vararg checked: Source) = WeatherSnapshot.EMPTY.copy(
+        forecasts = forecasts,
+        status = forecasts.keys.associateWith { SourceStatus.Ok(hour(0)) },
+        stationReference = StationReference(
+            fetchedAt = hour(0),
+            elevationM = 330.0,
+            bySource = checked.associate { it.name to mapOf(hour(0).epochSecond to 10.0) },
+        ),
+    )
+
+    @Test
+    fun `a source the station request did not carry is named`() {
+        val s = snapshot(Source.ICON_D2)
+        assertEquals(listOf(Source.GEOSPHERE_AROME), s.sourcesWithoutStationRecord)
+    }
+
+    /** KMOS is addressed by municipality and can never be checked. That is not a fault. */
+    @Test
+    fun `the one that can never be checked is never accused`() {
+        val s = snapshot(Source.ICON_D2, Source.GEOSPHERE_AROME)
+        assertTrue(s.sourcesWithoutStationRecord.isEmpty())
+    }
+
+    /** During the first refresh every source is absent, and none of them is broken. */
+    @Test
+    fun `an empty reference accuses nobody`() {
+        assertTrue(snapshot().sourcesWithoutStationRecord.isEmpty())
+        assertTrue(WeatherSnapshot.EMPTY.copy(forecasts = forecasts).sourcesWithoutStationRecord.isEmpty())
+    }
+
+    /** A place with no station near enough to speak for it corrects nobody, and says nothing. */
+    @Test
+    fun `a place without a station says nothing about anyone`() {
+        val s = WeatherSnapshot.EMPTY.copy(forecasts = forecasts, stationReference = null)
+        assertTrue(s.sourcesWithoutStationRecord.isEmpty())
+    }
+
+    @Test
+    fun `the compare state carries it, and knows the place has a station at all`() {
+        val s = CompareStateBuilder.build(snapshot(Source.ICON_D2), AppSettings(), ConsensusForecast.EMPTY, hour(0))
+        assertEquals(listOf(Source.GEOSPHERE_AROME), s.withoutStationRecord)
+        assertTrue(s.hasStationRecord)
+
+        val none = CompareStateBuilder.build(WeatherSnapshot.EMPTY, AppSettings(), ConsensusForecast.EMPTY, hour(0))
+        assertTrue(none.withoutStationRecord.isEmpty())
+        assertFalse(none.hasStationRecord)
     }
 }

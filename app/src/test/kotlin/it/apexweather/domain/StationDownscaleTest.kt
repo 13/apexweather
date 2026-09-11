@@ -51,7 +51,7 @@ class StationDownscaleTest {
     @Test
     fun `the reading is moved by exactly what the models put between the two points`() {
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 12.4), reference(offsetFromVillage = 1.9), consensus, now = hour(2), heightDifferenceM = dz,
+            observation(hour(2), 12.4), reference(offsetFromVillage = 1.9), forecasts, consensus, now = hour(2), heightDifferenceM = dz,
         )
         assertEquals(10.5, t!!, 1e-9)
     }
@@ -65,7 +65,7 @@ class StationDownscaleTest {
     @Test
     fun `a valley-floor anomaly is only partly carried up the hill`() {
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 8.3), reference(offsetFromVillage = 1.7), consensus, now = hour(2), heightDifferenceM = dz,
+            observation(hour(2), 8.3), reference(offsetFromVillage = 1.7), forecasts, consensus, now = hour(2), heightDifferenceM = dz,
         )
         // models: village 10,0, station 11,7; the thermometer is 3,4 K below what they say the
         // station should read. Carrying all of it up would say 6,6; 36,7 % of it is shared at the
@@ -84,7 +84,7 @@ class StationDownscaleTest {
     fun `the moved reading never leaves what its two sources say`() {
         // models: village 10,0, station 11,5 (a gap of -1,5); thermometer 10,05, just above both.
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 10.05), reference(offsetFromVillage = 1.5), consensus, now = hour(2), heightDifferenceM = dz,
+            observation(hour(2), 10.05), reference(offsetFromVillage = 1.5), forecasts, consensus, now = hour(2), heightDifferenceM = dz,
         )!!
         // Pulled back to the nearer end of the bracket, which here is the models' own village value.
         assertTrue("$t is colder than both the thermometer and the forecast", t >= 10.0)
@@ -97,7 +97,7 @@ class StationDownscaleTest {
     fun `a correction inside the bracket is left alone`() {
         // models: village 10,0, station 12,0; thermometer 12,4 — the village is genuinely colder.
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 12.4), reference(offsetFromVillage = 2.0), consensus, now = hour(2), heightDifferenceM = dz,
+            observation(hour(2), 12.4), reference(offsetFromVillage = 2.0), forecasts, consensus, now = hour(2), heightDifferenceM = dz,
         )!!
         assertEquals(10.4, t, 1e-9)
     }
@@ -106,7 +106,7 @@ class StationDownscaleTest {
     @Test
     fun `a station the models agree with is carried up in full`() {
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 11.7), reference(offsetFromVillage = 1.7), consensus, now = hour(2), heightDifferenceM = dz,
+            observation(hour(2), 11.7), reference(offsetFromVillage = 1.7), forecasts, consensus, now = hour(2), heightDifferenceM = dz,
         )
         assertEquals(10.0, t!!, 1e-9)
     }
@@ -115,7 +115,7 @@ class StationDownscaleTest {
     @Test
     fun `an inversion moves the reading upwards, not down`() {
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 7.0), reference(offsetFromVillage = -3.0), consensus, now = hour(2), heightDifferenceM = dz,
+            observation(hour(2), 7.0), reference(offsetFromVillage = -3.0), forecasts, consensus, now = hour(2), heightDifferenceM = dz,
         )
         assertEquals(10.0, t!!, 1e-9)
     }
@@ -123,25 +123,25 @@ class StationDownscaleTest {
     /** Beyond a few degrees this is no longer a height difference but a broken input. */
     @Test
     fun `an implausible difference is refused rather than applied`() {
-        assertNull(StationDownscale.offsetAt(hour(2), reference(offsetFromVillage = 20.0), consensus, now = hour(2), heightDifferenceM = dz))
+        assertNull(StationDownscale.offsetAt(hour(2), reference(offsetFromVillage = 20.0), forecasts, now = hour(2), heightDifferenceM = dz))
     }
 
     @Test
     fun `a reference from yesterday no longer describes today's air`() {
         val old = reference(1.9, fetchedAt = hour(0).minusSeconds(24 * 3600))
-        assertNull(StationDownscale.offsetAt(hour(2), old, consensus, now = hour(2), heightDifferenceM = dz))
+        assertNull(StationDownscale.offsetAt(hour(2), old, forecasts, now = hour(2), heightDifferenceM = dz))
     }
 
     @Test
     fun `no reference and no observed temperature both mean no correction`() {
-        assertNull(StationDownscale.offsetAt(hour(2), null, consensus, now = hour(2), heightDifferenceM = dz))
-        assertNull(StationDownscale.villageTemperature(observation(hour(2), null), reference(1.9), consensus, hour(2), dz))
+        assertNull(StationDownscale.offsetAt(hour(2), null, forecasts, now = hour(2), heightDifferenceM = dz))
+        assertNull(StationDownscale.villageTemperature(observation(hour(2), null), reference(1.9), forecasts, consensus, hour(2), dz))
     }
 
     /** An hour the reference does not cover cannot be corrected, and is not guessed at. */
     @Test
     fun `an hour outside the reference is left alone`() {
-        assertNull(StationDownscale.offsetAt(hour(100), reference(1.9), consensus, now = hour(2), heightDifferenceM = dz))
+        assertNull(StationDownscale.offsetAt(hour(100), reference(1.9), forecasts, now = hour(2), heightDifferenceM = dz))
     }
 
     /**
@@ -159,12 +159,74 @@ class StationDownscaleTest {
         // up to it is -5.
         assertEquals(
             -5.0,
-            StationDownscale.offsetAt(hour(2), steep, consensus, now = hour(2), heightDifferenceM = 400)!!,
+            StationDownscale.offsetAt(hour(2), steep, forecasts, now = hour(2), heightDifferenceM = 400)!!,
             1e-9,
         )
         assertNull(
             "a station at the village's own altitude cannot be five degrees away from it",
-            StationDownscale.offsetAt(hour(2), steep, consensus, now = hour(2), heightDifferenceM = 0),
+            StationDownscale.offsetAt(hour(2), steep, forecasts, now = hour(2), heightDifferenceM = 0),
+        )
+    }
+
+    /**
+     * The hill is measured model by model, not by subtracting two medians taken over different
+     * models.
+     *
+     * Here every one of the four runs says the same thing about the hill: the station is 1,9 K
+     * warmer than the village. But the village median and the station median are not taken over the
+     * same four. [ConsensusForecast] drops both globals the moment two regional sources are present,
+     * while [StationReference] is the Open-Meteo call and holds everything it returns — so the
+     * village side read 10,0 (the two regionals) and the station side 16,9 (the median of two
+     * regionals at 11,9 and two globals at 21,9). Subtracting those gave -6,9 K, which is not a
+     * height difference, and the guard below then refused the whole correction: the hero silently
+     * dropped back to the consensus on a day nothing was wrong.
+     *
+     * Pairing each model with itself gives -1,9 four times over, which is what the models said.
+     */
+    @Test
+    fun `the offset is each model against itself, not one median minus another`() {
+        val hot = forecasts + mapOf(
+            Source.ECMWF to forecast(Source.ECMWF, (0 until 24).map { point(it, 20.0) }),
+            Source.ECMWF_AIFS to forecast(Source.ECMWF_AIFS, (0 until 24).map { point(it, 20.0) }),
+        )
+        val atStation = StationReference(
+            fetchedAt = hour(0),
+            elevationM = 330.0,
+            bySource = hot.mapValues { (_, f) ->
+                f.hourly.associate { it.time.epochSecond to it.tempC + 1.9 }
+            }.mapKeys { it.key.name },
+        )
+        assertEquals(
+            -1.9,
+            StationDownscale.offsetAt(hour(2), atStation, hot, now = hour(2), heightDifferenceM = dz)!!,
+            1e-9,
+        )
+    }
+
+    /**
+     * And a model's own habit cancels instead of being reported as the height of the hill.
+     *
+     * [BiasCorrector] subtracts a per-model habit from the village consensus and nothing from the
+     * station reference, which has no thermometer to measure a habit against. Subtracting the two
+     * put up to three degrees of that correction into the offset and quoted it to the reader as a
+     * lapse rate. The same model on both ends of the subtraction cannot do that.
+     */
+    @Test
+    fun `a model's bias correction does not leak into the height offset`() {
+        val bias = ModelBias(
+            mapOf(
+                Source.ICON_CH1 to DayPart.entries.associateWith { LeadBucket.entries.associateWith { 2.5 } },
+                Source.ICON_D2 to DayPart.entries.associateWith { LeadBucket.entries.associateWith { 2.5 } },
+            ),
+        )
+        val corrected = blender.blend(forecasts, bias, now = hour(0))
+        // The correction really is in the consensus: 10,0 less a 2,5 K warm habit.
+        assertEquals(7.5, corrected.hourly.first { it.time == hour(2) }.tempC, 1e-9)
+        // And not in the offset, which is still the 1,9 K the models put between the two points.
+        assertEquals(
+            -1.9,
+            StationDownscale.offsetAt(hour(2), reference(offsetFromVillage = 1.9), forecasts, now = hour(2), heightDifferenceM = dz)!!,
+            1e-9,
         )
     }
 
@@ -174,7 +236,7 @@ class StationDownscaleTest {
         val gentle = reference(offsetFromVillage = 1.5)
         assertEquals(
             -1.5,
-            StationDownscale.offsetAt(hour(2), gentle, consensus, now = hour(2), heightDifferenceM = 0)!!,
+            StationDownscale.offsetAt(hour(2), gentle, forecasts, now = hour(2), heightDifferenceM = 0)!!,
             1e-9,
         )
     }

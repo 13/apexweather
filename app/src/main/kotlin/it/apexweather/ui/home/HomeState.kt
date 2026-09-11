@@ -145,7 +145,7 @@ object HomeStateBuilder {
         // moved, so the two altitudes go in with it.
         val heightDifferenceM = place?.station?.let { place.altitudeM - it.altitudeM }
         val heroFromStation = if (heightDifferenceM == null) null else obs?.let {
-            StationDownscale.villageTemperature(it, snapshot.stationReference, consensus, now, heightDifferenceM)
+            StationDownscale.villageTemperature(it, snapshot.stationReference, snapshot.forecastsForBlend, consensus, now, heightDifferenceM)
         }
         // What the screen says it moved the reading by has to be what it actually moved it by. The
         // models' own village-minus-station gap is only part of that now — a large station anomaly

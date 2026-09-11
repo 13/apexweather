@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import it.apexweather.R
+import it.apexweather.domain.CompassPoint
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.ConsensusHour
 import it.apexweather.ui.common.Format
@@ -42,6 +43,7 @@ import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.SourceColors
 import it.apexweather.ui.common.iconRes
 import it.apexweather.ui.common.label
+import it.apexweather.ui.common.label as compassLabel
 import it.apexweather.ui.theme.fromArgb
 
 /** Shown where a model publishes no value at all, so absence never reads as zero. */
@@ -125,15 +127,35 @@ fun HourDetail(hour: ConsensusHour, state: HomeUiState, onClose: () -> Unit = {}
                     tag = "hour_stat_precip",
                 )
             )
+            // The direction belongs beside the speed rather than in a tile of its own: "aus NW" is
+            // not a quantity, it is what the speed means. Absent where the models point every way at
+            // once — see ConsensusBlender.meanDirectionDeg — and the speed still stands alone then.
+            val speed = hour.windKmh?.let { Format.wind(it, unit, formats) }
+            val direction = hour.windDirDeg?.let { CompassPoint.of(it).compassLabel() }
             add(
                 Stat(
                     label = stringResource(R.string.stat_wind),
-                    value = hour.windKmh?.let { Format.wind(it, unit, formats) } ?: MISSING,
+                    value = when {
+                        speed == null -> MISSING
+                        direction == null -> speed
+                        else -> stringResource(R.string.wind_with_dir, speed, direction)
+                    },
                     sub = hour.gustKmh?.let { stringResource(R.string.stat_gust, Format.wind(it, unit, formats)) },
                     tag = "hour_stat_wind",
                     subTag = "hour_stat_gust",
                 )
             )
+            // The models have published this all along and nothing read it. In a valley it is half
+            // of what "twenty-eight degrees" feels like, and it is what the fog rules are decided on.
+            hour.humidityPct?.let {
+                add(
+                    Stat(
+                        stringResource(R.string.stat_humidity),
+                        stringResource(R.string.unit_percent, it),
+                        tag = "hour_stat_humidity",
+                    )
+                )
+            }
         }
         stats.chunked(2).forEach { row ->
             // The longest labels ("Precipitazioni") need a gutter against a half-width column, or

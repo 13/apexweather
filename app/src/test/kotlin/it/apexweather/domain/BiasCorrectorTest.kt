@@ -80,6 +80,21 @@ class BiasCorrectorTest {
         assertNull(biasAt(samplesAt(hour = 14, days = 12, error = 9.0), hour = 14))
     }
 
+    /**
+     * A large habit is still a habit. It used to be discarded along with the broken input, which
+     * meant the worst model on the list was the one left alone — and put a cliff in the middle of
+     * the range, where 2,9 K was corrected in full and 3,1 K not at all.
+     */
+    @Test
+    fun `a large error is clamped rather than refused`() {
+        assertEquals(BiasCorrector.MAX_BIAS_C, biasAt(samplesAt(hour = 14, days = 12, error = 4.5), hour = 14)!!, 1e-9)
+    }
+
+    @Test
+    fun `a large cold error is clamped the same way`() {
+        assertEquals(-BiasCorrector.MAX_BIAS_C, biasAt(samplesAt(hour = 14, days = 12, error = -4.5), hour = 14)!!, 1e-9)
+    }
+
     @Test
     fun `hours outside the window are not counted`() {
         val old = (1..12).map { i ->

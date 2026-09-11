@@ -96,8 +96,8 @@ class UpdateRepository @Inject constructor(
 
     /**
      * Streams the APK into the cache directory, reporting progress against the asset's declared
-     * size and hashing as it goes. A file that does not match the release's checksum is deleted
-     * rather than offered.
+     * size and hashing as it goes. A file that is shorter than the release says it is, or that does
+     * not match its checksum, is deleted rather than offered.
      */
     fun download(update: UpdateCheck.Available): Flow<DownloadProgress> = flow {
         val target = File(cacheDir, update.asset.name)
@@ -150,6 +150,20 @@ class UpdateRepository @Inject constructor(
                 return@flow
             }
             emit(DownloadProgress.Running(written, total))
+
+            // A connection dropped mid-stream produces a short file, not an error, and a short APK
+            // is exactly what must never reach PackageInstaller. The checksum below catches it —
+            // but only when the release published one, and `digestVerified` exists precisely
+            // because sometimes it does not.
+            //
+            // `total > 0` because the asset's size is a defaulted field: a release that declares
+            // none must still be installable, and treating "no declared length" as "zero bytes
+            // expected" would fail every download instead of the truncated ones.
+            if (total > 0 && written != total) {
+                target.delete()
+                emit(DownloadProgress.Failed(UpdateFailure.NETWORK))
+                return@flow
+            }
         }
 
         val expected = update.asset.sha256

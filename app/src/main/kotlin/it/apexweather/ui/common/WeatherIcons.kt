@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import it.apexweather.R
 import it.apexweather.domain.SunPhase
+import it.apexweather.domain.CompassPoint
 import it.apexweather.domain.model.Condition
 
 /**
@@ -70,3 +71,22 @@ fun Condition.labelRes(): Int = when (this) {
     Condition.HEAVY_SNOW -> R.string.cond_heavy_snow
     Condition.THUNDERSTORM -> R.string.cond_thunderstorm
 }
+
+/**
+ * The compass point's own abbreviation in the reader's language, which is not the same set of
+ * letters in each: German writes O for Ost where Italian writes O for Ovest, the opposite side of
+ * the compass.
+ */
+@Composable
+fun CompassPoint.label(): String = stringResource(
+    when (this) {
+        CompassPoint.N -> R.string.compass_n
+        CompassPoint.NE -> R.string.compass_ne
+        CompassPoint.E -> R.string.compass_e
+        CompassPoint.SE -> R.string.compass_se
+        CompassPoint.S -> R.string.compass_s
+        CompassPoint.SW -> R.string.compass_sw
+        CompassPoint.W -> R.string.compass_w
+        CompassPoint.NW -> R.string.compass_nw
+    },
+)

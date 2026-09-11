@@ -57,12 +57,34 @@ data class DayRow(val date: LocalDate, val consensus: DayCell, val cells: Map<So
 data class CompareUiState(
     val loading: Boolean = true,
     val variable: CompareVariable = CompareVariable.TEMPERATURE,
+    /** Membership only — "is this chip on". The order the columns are drawn in is [selectedInOrder]. */
     val selected: Set<Source> = Source.entries.toSet(),
+    /**
+     * The same sources, already in declaration order.
+     *
+     * Sorted once here rather than at every use. The table sorted them *inside* its day-row loop,
+     * so the same ten-element sort ran fourteen times per recomposition to produce the same answer,
+     * and the column headers sorted an eleventh time to line up with it. Ordering the columns is
+     * the state's business anyway: the header row and the cells beneath it have to agree, and two
+     * separate sorts is one more place for them to stop agreeing.
+     */
+    val selectedInOrder: List<Source> = Source.entries.toList(),
     val series: Map<Source, List<SeriesPoint>> = emptyMap(),
     val consensusLine: List<SeriesPoint> = emptyList(),
     val band: List<BandPoint> = emptyList(),
     val dayRows: List<DayRow> = emptyList(),
     val statuses: Map<Source, SourceStatus> = emptyMap(),
+    /**
+     * Models with no record at the weather station, and therefore no bias correction — see
+     * [WeatherSnapshot.sourcesWithoutStationRecord]. Empty is the normal state and the card says
+     * nothing then.
+     */
+    val withoutStationRecord: List<Source> = emptyList(),
+    /**
+     * Whether this place has a station at all, which is what decides between "nobody is checked
+     * here" and "KMOS cannot be checked anywhere". Both are facts rather than faults.
+     */
+    val hasStationRecord: Boolean = false,
     val settings: AppSettings = AppSettings(),
     val window: CompareWindow = CompareWindow(Instant.EPOCH, 72, DaySelection.Sweep),
     /**
@@ -135,8 +157,11 @@ object CompareStateBuilder {
         }
         return CompareUiState(
             loading = false, variable = settings.compareVariable, selected = settings.compareSources,
+            selectedInOrder = settings.compareSources.sortedBy { it.ordinal },
             series = series, consensusLine = consensusLine, band = band, dayRows = dayRows,
             statuses = snapshot.status, settings = settings,
+            withoutStationRecord = snapshot.sourcesWithoutStationRecord,
+            hasStationRecord = !snapshot.stationReference?.bySource.isNullOrEmpty(),
             window = window, now = now.truncatedTo(ChronoUnit.HOURS),
         )
     }

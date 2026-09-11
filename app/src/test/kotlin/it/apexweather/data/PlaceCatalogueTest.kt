@@ -105,6 +105,19 @@ class PlaceCatalogueTest {
         assertTrue(catalogue.search("zzzzz", Locale.GERMAN).isEmpty())
     }
 
+    /**
+     * The folded names are built once and kept, so a second search must give exactly what the first
+     * did — including one that runs after the by-code index has been built, since both hang off the
+     * same lazily read asset.
+     */
+    @Test
+    fun `searching twice gives the same answer, and so does searching after a lookup`() = runTest {
+        val first = catalogue.search("mer", Locale.GERMAN).map { it.istat }
+        assertNotNull(catalogue.byIstat("021101"))
+        assertEquals(first, catalogue.search("mer", Locale.GERMAN).map { it.istat })
+        assertTrue(first.isNotEmpty())
+    }
+
     /** Alphabetical the way the reader's language is alphabetical, not the way ASCII is. */
     @Test
     fun `an empty query returns everything, in the reader's own order`() = runTest {

@@ -125,6 +125,20 @@ class NotificationDeciderTest {
         assertTrue(out.none { it is WeatherNotification.RainStarting })
     }
 
+    /**
+     * The threshold is read against the **mean** probability across the models now, not the maximum
+     * it was picked for. A third of ten models calling it likely is the same evidence the blender
+     * uses to call an hour wet at all, and it is a heads-up rather than a promise.
+     */
+    @Test
+    fun `a third of the models seeing the shower is enough`() {
+        val out = NotificationDecider.decide(
+            state(upcoming = listOf(consensusHour(morning.plusSeconds(3600), mm = 1.4, prob = 30))),
+            allOn, NotifyMemory(), morning, zone, "Dorf Tirol",
+        )
+        assertTrue(out.any { it is WeatherNotification.RainStarting })
+    }
+
     /** It is already raining: the reader can see that out of the window. */
     @Test
     fun `no announcement while it is already raining`() {
@@ -154,19 +168,44 @@ class NotificationDeciderTest {
     fun `every warning not yet announced goes out`() {
         val out = NotificationDecider.decide(
             state(warnings = listOf(warning("a", WarningLevel.RED), warning("b"))),
-            allOn, NotifyMemory(notifiedWarningIds = setOf("b")), morning, zone, "Dorf Tirol",
+            allOn, NotifyMemory(notifiedWarningKeys = setOf("b|ORANGE")), morning, zone, "Dorf Tirol",
         )
         val severe = out.filterIsInstance<WeatherNotification.Severe>()
         assertEquals(listOf("a"), severe.map { it.warning.identifier })
+    }
+
+    /**
+     * The one case keying on the identifier alone got wrong. A warning that is upgraded in place is
+     * the thing the reader most needs to hear about, and it was the only thing that could never be
+     * announced: the yellow one had already spoken for the id.
+     */
+    @Test
+    fun `a warning upgraded under the same identifier is announced again`() {
+        val out = NotificationDecider.decide(
+            state(warnings = listOf(warning("a", WarningLevel.RED))),
+            allOn, NotifyMemory(notifiedWarningKeys = setOf("a|YELLOW")), morning, zone, "Dorf Tirol",
+        )
+        val severe = out.filterIsInstance<WeatherNotification.Severe>()
+        assertEquals(listOf(WarningLevel.RED), severe.map { it.warning.level })
+    }
+
+    /** And the same one, at the same level, still only goes out once. */
+    @Test
+    fun `a warning already announced at this level stays quiet`() {
+        val out = NotificationDecider.decide(
+            state(warnings = listOf(warning("a", WarningLevel.RED))),
+            allOn, NotifyMemory(notifiedWarningKeys = setOf("a|RED")), morning, zone, "Dorf Tirol",
+        )
+        assertTrue(out.none { it is WeatherNotification.Severe })
     }
 
     /** Ids of warnings that are over are forgotten, so the set cannot grow without bound. */
     @Test
     fun `expired warnings drop out of the memory`() {
         val posted = listOf(WeatherNotification.Severe(warning("new")))
-        val memory = NotifyMemory(notifiedWarningIds = setOf("old", "still-running"))
-        val next = NotificationDecider.remember(memory, posted, activeWarningIds = setOf("new", "still-running"))
-        assertEquals(setOf("new", "still-running"), next.notifiedWarningIds)
+        val memory = NotifyMemory(notifiedWarningKeys = setOf("old|ORANGE", "still-running|ORANGE"))
+        val next = NotificationDecider.remember(memory, posted, activeWarningKeys = setOf("new|ORANGE", "still-running|ORANGE"))
+        assertEquals(setOf("new|ORANGE", "still-running|ORANGE"), next.notifiedWarningKeys)
     }
 
     @Test
@@ -176,7 +215,7 @@ class NotificationDeciderTest {
             WeatherNotification.Summary("Dorf Tirol", today, Condition.RAIN, 11.0, 21.0, 4.0),
             WeatherNotification.RainStarting(consensusHour(onset, mm = 1.4, prob = 70), onset),
         )
-        val next = NotificationDecider.remember(NotifyMemory(), posted, activeWarningIds = emptySet())
+        val next = NotificationDecider.remember(NotifyMemory(), posted, activeWarningKeys = emptySet())
         assertEquals(today, next.lastSummaryDate)
         assertEquals(onset, next.lastRainOnset)
     }

@@ -2,6 +2,8 @@ package it.apexweather.domain
 
 import it.apexweather.data.remote.StationReference
 import it.apexweather.domain.model.ConsensusForecast
+import it.apexweather.domain.model.Source
+import it.apexweather.domain.model.SourceForecast
 import it.apexweather.domain.model.StationObservation
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -94,12 +96,13 @@ object StationDownscale {
     fun villageTemperature(
         observation: StationObservation,
         reference: StationReference?,
+        village: Map<Source, SourceForecast>,
         consensus: ConsensusForecast,
         now: Instant,
         heightDifferenceM: Int,
     ): Double? {
         val observed = observation.tempC ?: return null
-        val offset = offsetAt(observation.time, reference, consensus, now, heightDifferenceM) ?: return null
+        val offset = offsetAt(observation.time, reference, village, now, heightDifferenceM) ?: return null
         val anomaly = stationAnomaly(observation.time, observed, reference, now)
         // The village the models draw, plus as much of the thermometer's disagreement with them as
         // is likely to be shared 270 m up the hill. At full trust this is exactly observed + offset,
@@ -145,22 +148,51 @@ object StationDownscale {
     }
 
     /**
-     * Village minus station, as the models see it at [time]. Null when either side is missing or the
-     * two disagree by more than a height difference could explain.
+     * Village minus station, as the models see it at [time] — **each model against itself**, then the
+     * median of those differences. Null when there is no model with a value at both points, or when
+     * the answer is bigger than a height difference could explain.
+     *
+     * Asking each model about the hill and taking the median of the answers is not the same
+     * arithmetic as taking the median at each point and subtracting, and the difference was a real
+     * error on the app's most-read number. Subtracting two medians compared two quantities that
+     * were never the same kind of thing:
+     *
+     * - **Different models.** The village side came from [ConsensusForecast], whose hourly values
+     *   are a median over the *regional* sources only once two of them are present — SIAG KMOS and
+     *   GeoSphere AROME in, both ECMWF runs out. The station side is [StationReference], which is
+     *   the Open-Meteo call and therefore holds the eight Open-Meteo models, globals included and
+     *   the two regionals absent. Whatever those two populations disagree about was being reported
+     *   as the height of the hill.
+     * - **Corrected against uncorrected.** The consensus has [BiasCorrector]'s per-model habit
+     *   subtracted; the station reference has nothing subtracted, because nobody measures a habit at
+     *   a point the app has no thermometer for. So the correction — up to three degrees of it —
+     *   landed in the offset and was quoted to the reader as a lapse rate.
+     *
+     * Pairing each model with itself makes both go away: the models are the same on both sides by
+     * construction, and a habit a model has here it has at both points, so it cancels in the
+     * subtraction rather than being carried into it.
+     *
+     * [village] is the same set of runs the blend used — a run that has gone stale is kept out of
+     * this exactly as it is kept out of the consensus.
      */
     fun offsetAt(
         time: Instant,
         reference: StationReference?,
-        consensus: ConsensusForecast,
+        village: Map<Source, SourceForecast>,
         now: Instant,
         heightDifferenceM: Int,
     ): Double? {
         if (reference == null) return null
         if (ChronoUnit.HOURS.between(reference.fetchedAt, now) > REFERENCE_MAX_AGE_HOURS) return null
         val hour = time.truncatedTo(ChronoUnit.HOURS)
-        val atStation = reference.tempAt(hour) ?: return null
-        val atVillage = consensus.hourly.firstOrNull { it.time == hour }?.tempC ?: return null
-        val offset = atVillage - atStation
+        // One model's own view of the hill, for every model that has both ends of it.
+        val perModel = reference.at(hour).mapNotNull { (source, stationC) ->
+            village[source]?.hourly
+                ?.firstOrNull { it.time.truncatedTo(ChronoUnit.HOURS) == hour }
+                ?.tempC?.minus(stationC)
+        }
+        if (perModel.isEmpty()) return null
+        val offset = ConsensusBlender.median(perModel)
         return if (abs(offset) > maxAdjustment(heightDifferenceM)) null else offset
     }
 }

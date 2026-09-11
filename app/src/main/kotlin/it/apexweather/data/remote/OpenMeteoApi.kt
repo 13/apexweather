@@ -205,6 +205,25 @@ data class StationReference(
 
     /** The median across the models, which is the statistic the village consensus uses too. */
     fun tempAt(t: Instant): Double? = at(t).values.takeIf { it.isNotEmpty() }?.let { ConsensusBlender.median(it.toList()) }
+
+    /**
+     * The same series with [source]'s own hourly temperatures at the station added or replaced.
+     *
+     * This exists for one source. Eight of the ten models arrive in a single Open-Meteo call that
+     * takes coordinates, so asking them about the station instead of the village costs one request.
+     * GeoSphere AROME does not come through Open-Meteo, but it does take arbitrary coordinates, so
+     * it can be asked the same question separately — and it has to be, because a source with no
+     * row in `station_history` is a source [it.apexweather.domain.BiasCorrector] can never correct.
+     * SIAG KMOS is the one that genuinely cannot: it is addressed by municipality, and there is no
+     * municipality whose forecast is a forecast for the thermometer.
+     */
+    fun plus(source: Source, hourly: List<HourlyPoint>): StationReference = copy(
+        bySource = bySource + (
+            source.name to hourly.associate {
+                it.time.truncatedTo(java.time.temporal.ChronoUnit.HOURS).epochSecond to it.tempC
+            }
+            ),
+    )
 }
 
 object OpenMeteoStationMapper {

@@ -93,6 +93,39 @@ class SettingsRepositoryTest {
     }
 
     /**
+     * What is stored is the set switched **off**, so a model added to the app later is on for
+     * everyone rather than hidden from everyone who had ever touched this screen.
+     *
+     * A `Source` cannot be added inside a test, so the property is asserted where it lives: an
+     * eleventh model is a name that no stored set contains, and the mapping has to show it.
+     */
+    @Test
+    fun `a model the stored preference has never heard of is shown`() {
+        val hidingOne = setOf(Source.ICON_D2.name)
+        assertEquals(Source.entries.toSet() - Source.ICON_D2, SettingsRepository.visibleSources(hidingOne))
+        // Which is what an eleventh model would be: absent from the stored set, and therefore on.
+        assertTrue(SettingsRepository.hiddenSources(hidingOne).size == 1)
+    }
+
+    /** A name from a build that had a model this one does not hides nothing and crashes nothing. */
+    @Test
+    fun `a stored name that is no longer a model is dropped`() {
+        assertEquals(Source.entries.toSet(), SettingsRepository.visibleSources(setOf("A_MODEL_FROM_THE_PAST")))
+        assertEquals(emptySet<Source>(), SettingsRepository.hiddenSources(setOf("A_MODEL_FROM_THE_PAST")))
+        assertEquals(Source.entries.toSet(), SettingsRepository.visibleSources(null))
+    }
+
+    /**
+     * And a set written by a build that stored the *visible* sources is simply not read: the key is
+     * a new one. A reader who had hidden something sees everything again once, which is the safe
+     * direction — the other would hide everything they had left on.
+     */
+    @Test
+    fun `nothing stored means everything is shown`() = runTest {
+        assertEquals(Source.entries.toSet(), repo.settings.first().compareSources)
+    }
+
+    /**
      * The DataStore behind this repo is shared between test methods, so nothing below may assume an
      * empty recent list — only that the list behaves correctly relative to what it was.
      */

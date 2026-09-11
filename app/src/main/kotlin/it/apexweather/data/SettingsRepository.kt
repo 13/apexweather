@@ -73,7 +73,15 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val language = stringPreferencesKey("language")
         val windUnit = stringPreferencesKey("wind_unit")
         val animations = booleanPreferencesKey("animations")
-        val compareSources = stringSetPreferencesKey("compare_sources")
+        // The sources the reader has switched **off**, not the ones left on.
+        //
+        // Storing the visible set froze the list at whatever existed when they last touched it: add
+        // an eleventh model and everybody who had ever toggled anything had it permanently hidden,
+        // with nothing on screen to hint that it was there. Storing the exclusions means the
+        // default is always "everything, including whatever is new". The key is a new one, so a set
+        // written by an older build is forgotten rather than read backwards — which costs a reader
+        // who had hidden something one visit to this screen, and reads as everything being on.
+        val hiddenCompareSources = stringSetPreferencesKey("compare_hidden_sources")
         val compareVariable = stringPreferencesKey("compare_variable")
         val notifySummary = booleanPreferencesKey("notify_summary")
         val notifySummaryHour = intPreferencesKey("notify_summary_hour")
@@ -92,8 +100,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             language = p[Keys.language]?.let { runCatching { LanguageSetting.valueOf(it) }.getOrNull() } ?: LanguageSetting.SYSTEM,
             windUnit = p[Keys.windUnit]?.let { runCatching { WindUnit.valueOf(it) }.getOrNull() } ?: WindUnit.KMH,
             animations = p[Keys.animations] ?: true,
-            compareSources = p[Keys.compareSources]?.mapNotNull { runCatching { Source.valueOf(it) }.getOrNull() }?.toSet()
-                ?: Source.entries.toSet(),
+            compareSources = visibleSources(p[Keys.hiddenCompareSources]),
             compareVariable = p[Keys.compareVariable]?.let { runCatching { CompareVariable.valueOf(it) }.getOrNull() }
                 ?: CompareVariable.TEMPERATURE,
             notifySummary = p[Keys.notifySummary] ?: false,
@@ -110,7 +117,9 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     suspend fun setLanguage(v: LanguageSetting) = context.settingsStore.edit { it[Keys.language] = v.name }
     suspend fun setWindUnit(v: WindUnit) = context.settingsStore.edit { it[Keys.windUnit] = v.name }
     suspend fun setAnimations(v: Boolean) = context.settingsStore.edit { it[Keys.animations] = v }
-    suspend fun setCompareSources(v: Set<Source>) = context.settingsStore.edit { it[Keys.compareSources] = v.map { s -> s.name }.toSet() }
+    suspend fun setCompareSources(v: Set<Source>) = context.settingsStore.edit {
+        it[Keys.hiddenCompareSources] = (Source.entries.toSet() - v).map { s -> s.name }.toSet()
+    }
     suspend fun setCompareVariable(v: CompareVariable) = context.settingsStore.edit { it[Keys.compareVariable] = v.name }
     suspend fun setNotifySummary(v: Boolean) = context.settingsStore.edit { it[Keys.notifySummary] = v }
     suspend fun setNotifySummaryHour(v: Int) = context.settingsStore.edit { it[Keys.notifySummaryHour] = v.coerceIn(0, 23) }
@@ -134,15 +143,33 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             .joinToString(",")
     }
 
-    private companion object {
+    internal companion object {
         /** How many places the cache keeps, and therefore how many are worth remembering. */
         const val RECENT_PLACES = 3
+
+        /**
+         * The sources switched off, read from what is stored.
+         *
+         * A stored name that no longer matches a [Source] is dropped rather than kept, so a model
+         * removed from the app stops hiding anything — and, the direction that matters, a model
+         * *added* to the app is in nobody's stored set and is therefore shown to everybody.
+         */
+        fun hiddenSources(stored: Set<String>?): Set<Source> =
+            stored?.mapNotNull { runCatching { Source.valueOf(it) }.getOrNull() }?.toSet().orEmpty()
+
+        /** And what the screen shows, which is everything else. */
+        fun visibleSources(stored: Set<String>?): Set<Source> = Source.entries.toSet() - hiddenSources(stored)
     }
 
     suspend fun toggleCompareSource(source: Source) = context.settingsStore.edit { prefs ->
-        val current = prefs[Keys.compareSources]?.mapNotNull { runCatching { Source.valueOf(it) }.getOrNull() }?.toSet()
-            ?: Source.entries.toSet()
-        val updated = if (source in current) current - source else current + source
-        prefs[Keys.compareSources] = updated.map { it.name }.toSet()
+        val hidden = hiddenSources(prefs)
+        val updated = if (source in hidden) hidden - source else hidden + source
+        prefs[Keys.hiddenCompareSources] = updated.map { it.name }.toSet()
     }
+
+    /**
+     * A name that no longer matches a [Source] is dropped rather than kept: a model removed from
+     * the app must not go on hiding anything, and cannot hide itself.
+     */
+    private fun hiddenSources(p: Preferences): Set<Source> = hiddenSources(p[Keys.hiddenCompareSources])
 }

@@ -100,7 +100,7 @@ class RefreshWorker @AssistedInject constructor(
         // Only what actually reached the reader is remembered, so a notification Android dropped is
         // tried again on the next refresh rather than silently counted as delivered.
         if (posted.isNotEmpty()) {
-            notifyStore.write(NotificationDecider.remember(memory, posted, home.warnings.map { it.identifier }.toSet()))
+            notifyStore.write(NotificationDecider.remember(memory, posted, home.warnings.map { it.noticeKey }.toSet()))
         }
     }
 

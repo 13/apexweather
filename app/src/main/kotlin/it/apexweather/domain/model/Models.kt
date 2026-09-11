@@ -26,6 +26,19 @@ enum class Source(val displayName: String, val regional: Boolean) {
     val hasRunTime: Boolean get() = this == SIAG_KMOS || this == GEOSPHERE_AROME
 
     /**
+     * Whether this model can be asked what the temperature is *at the weather station*, which is
+     * the only way `station_history` can be filled and therefore the only way
+     * [it.apexweather.domain.BiasCorrector] can ever correct it.
+     *
+     * True of nine of the ten: the eight Open-Meteo models take coordinates in the request that
+     * already exists, and GeoSphere AROME takes coordinates in a second one. [SIAG_KMOS] is the
+     * exception and always will be — it is addressed by ISTAT code, and there is no municipality
+     * whose forecast is a forecast for a thermometer. Its absence from the record is a fact about
+     * the upstream; any other source's absence is something broken.
+     */
+    val checkableAtStation: Boolean get() = this != SIAG_KMOS
+
+    /**
      * Hours after the model run at which a cached forecast counts as stale — which is the age at
      * which the app stops *believing* it, not the age at which it becomes old.
      *
@@ -180,6 +193,18 @@ data class Warning(
 ) {
     fun isActiveAt(now: Instant): Boolean = !now.isAfter(expires)
     fun hasStartedAt(now: Instant): Boolean = !now.isBefore(onset)
+
+    /**
+     * Identity for "has the reader already been dealt with this one" — identifier **and** level.
+     *
+     * A warning whose level changes under the same identifier is a different thing to be told: an
+     * upgrade from yellow to red must not inherit the silence of the milder warning it replaces.
+     * It lives on the warning rather than in either store because both of them have to agree about
+     * it — the dismissal on the card and the notification that goes out are the same question asked
+     * twice, and they were keyed differently until now: dismissals on identifier and level,
+     * notifications on the identifier alone, so an upgrade arrived silently.
+     */
+    val noticeKey: String get() = "$identifier|${level.name}"
 }
 
 @Serializable
@@ -253,6 +278,40 @@ data class WeatherSnapshot(
      */
     val forecastsForBlend: Map<Source, SourceForecast>
         get() = forecasts.filterKeys { status[it] is SourceStatus.Ok }.takeIf { it.isNotEmpty() } ?: forecasts
+
+    /**
+     * Sources that ought to have a record at the weather station and do not — which is to say, the
+     * models this app is quietly no longer correcting.
+     *
+     * The record is `station_history`, and it can only hold what was asked about the thermometer's
+     * own coordinates. Eight of the ten arrive in the Open-Meteo station request; GeoSphere AROME
+     * needs a second request of its own, and **that request can fail for months without anything
+     * saying so** — it is not a [Source] in its own right, so `HomeUiState.silentSources` cannot
+     * see it, the consensus still has all ten models in it, and the only symptom is the hero
+     * temperature being slightly worse than it could be. That is the same shape of silence the
+     * village's own AROME call had for months, and the reason this exists.
+     *
+     * Three guards, so the list accuses only where there is something to accuse:
+     *
+     * - Nothing at all where the place has no station. A place with no thermometer near enough to
+     *   speak for it corrects nobody, and that is already said elsewhere.
+     * - Nothing until the reference holds *something*, because during the first refresh every
+     *   source is absent and none of them is broken.
+     * - [Source.checkableAtStation] only, so SIAG KMOS never appears here. It cannot be checked by
+     *   construction; being told so once belongs in a footnote, not in a fault list.
+     */
+    val sourcesWithoutStationRecord: List<Source>
+        get() {
+            val checked = stationReference?.bySource?.keys
+                ?.mapNotNull { runCatching { Source.valueOf(it) }.getOrNull() }
+                ?.toSet()
+                .orEmpty()
+            if (checked.isEmpty()) return emptyList()
+            return forecasts.keys
+                .filter { it.checkableAtStation && it !in checked }
+                .sortedBy { it.ordinal }
+        }
+
     companion object {
         val EMPTY = WeatherSnapshot(
             forecasts = emptyMap(), bulletin = null, observation = null, warnings = emptyList(),
@@ -275,6 +334,15 @@ data class ConsensusHour(
     val windKmh: Double?,
     /** Highest gust any contributing model publishes, not the median; see ConsensusBlender. */
     val gustKmh: Double?,
+    /**
+     * Where the wind comes from, as a circular mean over the models that publish one — and null
+     * where they do not agree enough for a direction to mean anything. See
+     * [ConsensusBlender.meanDirectionDeg]: an angle cannot be averaged the way a temperature can,
+     * and eight models pointing at eight different quarters have no mean worth printing.
+     */
+    val windDirDeg: Int? = null,
+    /** Median relative humidity across the models that publish one. */
+    val humidityPct: Int? = null,
     /** Median 0 °C isotherm across the models that publish one, in metres. */
     val freezingLevelM: Double?,
     /**

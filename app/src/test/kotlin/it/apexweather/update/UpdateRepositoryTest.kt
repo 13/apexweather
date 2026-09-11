@@ -39,10 +39,15 @@ class UpdateRepositoryTest {
         override suspend fun latestRelease(repo: String): GitHubRelease = answer()
     }
 
-    private fun release(tag: String, digest: String? = "sha256:x", withApk: Boolean = true) = GitHubRelease(
+    private fun release(
+        tag: String,
+        digest: String? = "sha256:x",
+        withApk: Boolean = true,
+        size: Long = payload.size.toLong(),
+    ) = GitHubRelease(
         tagName = tag,
         htmlUrl = "https://github.com/13/apexweather/releases/tag/$tag",
-        assets = if (withApk) listOf(GitHubAsset("ApexWeather.apk", payload.size.toLong(), "https://example.invalid/a.apk", digest)) else emptyList(),
+        assets = if (withApk) listOf(GitHubAsset("ApexWeather.apk", size, "https://example.invalid/a.apk", digest)) else emptyList(),
     )
 
     private fun repository(api: GitHubApi, http: OkHttpClient = httpServing()) = UpdateRepository(api, http, context)
@@ -108,6 +113,28 @@ class UpdateRepositoryTest {
         val available = repository.check("0.2.0") as UpdateCheck.Available
         val done = repository.download(available).toList().last() as DownloadProgress.Done
         assertFalse(done.digestVerified)
+    }
+
+    /**
+     * The case the checksum cannot cover. A connection dropped mid-stream is not an error — the
+     * stream simply ends — and a release that published no digest has nothing else to catch it, so
+     * a truncated APK would have gone to PackageInstaller.
+     */
+    @Test fun `a download shorter than the release says it is fails and the file is deleted`() = runTest {
+        val repository = repository(FakeGitHub { release("v0.3.0", digest = null, size = payload.size + 4096L) })
+        val available = repository.check("0.2.0") as UpdateCheck.Available
+        val progress = repository.download(available).toList()
+
+        assertEquals(DownloadProgress.Failed(UpdateFailure.NETWORK), progress.last())
+        assertTrue("the short file must not be left behind: ${cacheFiles()}", cacheFiles().isEmpty())
+    }
+
+    /** A release that declares no size at all must still install; zero is "unknown", not "empty". */
+    @Test fun `an asset with no declared size is not treated as a truncated one`() = runTest {
+        val repository = repository(FakeGitHub { release("v0.3.0", digest = null, size = 0) })
+        val available = repository.check("0.2.0") as UpdateCheck.Available
+        val done = repository.download(available).toList().last() as DownloadProgress.Done
+        assertArrayEquals(payload, done.file.readBytes())
     }
 
     @Test fun `a download that cannot reach the server fails`() = runTest {

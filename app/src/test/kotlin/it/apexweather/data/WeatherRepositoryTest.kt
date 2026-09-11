@@ -134,6 +134,50 @@ class WeatherRepositoryTest {
     }
 
     /**
+     * And about the station's, separately, because that is the only way AROME can ever be
+     * bias-corrected.
+     *
+     * `station_history` holds what a model said about the thermometer's own coordinates, and the
+     * Open-Meteo call that fills it carries eight of the ten sources. The other two were therefore
+     * the two [it.apexweather.domain.BiasCorrector] could never touch — and they are the two
+     * regional non-ICON runs the consensus leans on hardest. AROME takes arbitrary coordinates, so
+     * this closes one of them; SIAG KMOS is addressed by municipality and cannot be closed at all.
+     */
+    @Test
+    fun `geosphere is asked about the station as well, for the temperature alone`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        val station = requireNotNull(DORF_TIROL.station)
+        assertEquals("${station.lat},${station.lon}", geoSphere.askedForStation)
+        assertNotEquals(geoSphere.askedFor, geoSphere.askedForStation)
+        assertEquals(listOf("t2m"), geoSphere.asked.filter { it.first == geoSphere.askedForStation }.map { it.second })
+    }
+
+    /** And it lands in the reference series the history is written from. */
+    @Test
+    fun `the station reference carries AROME beside the open-meteo models`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        val reference = requireNotNull(repo.snapshot(DORF_TIROL, "de").first().stationReference)
+        assertTrue(
+            "AROME is missing from ${reference.bySource.keys}",
+            Source.GEOSPHERE_AROME.name in reference.bySource,
+        )
+        assertTrue("and so are the Open-Meteo models", Source.ICON_D2.name in reference.bySource)
+    }
+
+    /**
+     * The two station calls fail independently. Losing AROME must not cost the eight models the
+     * hero temperature is corrected with, which is what writing the reference over would have done.
+     */
+    @Test
+    fun `a failed AROME station call leaves the open-meteo reference alone`() = runTest {
+        geoSphere.fail = true
+        repo.refresh(DORF_TIROL, "de")
+        val reference = requireNotNull(repo.snapshot(DORF_TIROL, "de").first().stationReference)
+        assertTrue(Source.ICON_D2.name in reference.bySource)
+        assertFalse(Source.GEOSPHERE_AROME.name in reference.bySource)
+    }
+
+    /**
      * Two callers asking at once get one fetch, not two.
      *
      * More than one thing here is entitled to ask — the resume hook above the tabs, the hourly
@@ -189,6 +233,8 @@ class WeatherRepositoryTest {
         repo.refresh(STERZING, "de")
         assertEquals(STERZING.lat to STERZING.lon, openMeteo.forecastAt)
         assertNull(openMeteo.stationAt)
+        // Nor the second half of it: AROME is asked about the station only where there is one.
+        assertNull(geoSphere.askedForStation)
     }
 
     @Test
@@ -197,7 +243,8 @@ class WeatherRepositoryTest {
         geoSphere.fail = true
         clock.now = clock.now.plus(Duration.ofMinutes(30))
         val result = repo.refresh(DORF_TIROL, "de")
-        assertEquals(setOf("GEOSPHERE_AROME"), result.failed.keys)
+        // Both GeoSphere calls fail together here, since it is the one upstream that is down.
+        assertEquals(setOf("GEOSPHERE_AROME", "GEOSPHERE_AROME_STATION"), result.failed.keys)
         val s = repo.snapshot(DORF_TIROL, "de").first()
         assertTrue(s.forecasts.containsKey(Source.GEOSPHERE_AROME))
         val st = s.status.getValue(Source.GEOSPHERE_AROME)

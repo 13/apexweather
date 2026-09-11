@@ -150,7 +150,7 @@ fun CompareContent(
                     Row {
                         Text("", Modifier.width(52.dp))
                         Text(stringResource(R.string.consensus), Modifier.width(84.dp), style = MaterialTheme.typography.labelSmall, color = Color.White)
-                        state.selected.sortedBy { it.ordinal }.forEach { s -> Text(s.displayName.substringAfter(' ').take(9), Modifier.width(84.dp), style = MaterialTheme.typography.labelSmall, color = SourceColors.of(s)) }
+                        state.selectedInOrder.forEach { s -> Text(s.displayName.substringAfter(' ').take(9), Modifier.width(84.dp), style = MaterialTheme.typography.labelSmall, color = SourceColors.of(s)) }
                     }
                     state.dayRows.forEach { row ->
                         // IntrinsicSize.Max so a missing source's one-line placeholder does not leave
@@ -158,7 +158,7 @@ fun CompareContent(
                         Row(Modifier.padding(vertical = 6.dp).height(IntrinsicSize.Max), verticalAlignment = Alignment.CenterVertically) {
                             Text(Format.weekday(row.date, formats), Modifier.width(52.dp), style = MaterialTheme.typography.bodyMedium, color = Color.White)
                             DayCellText(row.consensus, deviation = 0.0, bold = true, sourceName = stringResource(R.string.consensus), date = Format.weekday(row.date, formats))
-                            state.selected.sortedBy { it.ordinal }.forEach { s ->
+                            state.selectedInOrder.forEach { s ->
                                 val c = row.cells[s]
                                 if (c == null) MissingCell(s.displayName, Format.weekday(row.date, formats))
                                 else DayCellText(c, deviation = abs(c.maxC - row.consensus.maxC), bold = false, sourceName = s.displayName, date = Format.weekday(row.date, formats))
@@ -181,6 +181,36 @@ fun CompareContent(
                         }
                         Text(statusText(s, st, state.now, formats), style = MaterialTheme.typography.labelSmall, color = statusColor(st))
                     }
+                }
+                // A model answering perfectly and never being checked against the thermometer looks
+                // exactly like one that is: same green dot, same fresh timestamp. The only symptom
+                // of the station half failing is a number being quietly worse, which is the shape of
+                // silence this app is not supposed to have — so it is said here, where the rest of
+                // the per-source truth already lives.
+                if (state.withoutStationRecord.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        stringResource(
+                            R.string.compare_no_station_record,
+                            state.withoutStationRecord.joinToString(", ") { it.displayName },
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        // The same amber a stale source is written in: this is the app failing to
+                        // check itself, not weather worth warning anybody about.
+                        color = statusColor(SourceStatus.Stale(java.time.Instant.EPOCH)),
+                        modifier = Modifier.testTag("no_station_record"),
+                    )
+                }
+                // And the one that can never be checked says so once, quietly, so its permanent
+                // absence from the list above is not read as the same fault.
+                if (state.hasStationRecord) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.compare_never_checkable),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.55f),
+                        modifier = Modifier.testTag("never_checkable"),
+                    )
                 }
             }
         }
@@ -272,7 +302,7 @@ private fun ChartReadout(state: CompareUiState, selectedHour: Instant?, unitLabe
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            state.selected.sortedBy { it.ordinal }.forEach { source ->
+            state.selectedInOrder.forEach { source ->
                 val value = state.series[source]?.firstOrNull { it.time == hour }?.value
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(8.dp).clip(CircleShape).background(SourceColors.of(source)))

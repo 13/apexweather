@@ -32,26 +32,53 @@ class PlaceCatalogue @Inject constructor(
         }
     }
 
+    /**
+     * Every place's three names, already folded both ways a reader might type them.
+     *
+     * Built once with the catalogue rather than per query. Folding is a `Normalizer.normalize` and
+     * a regex replace each, so doing it at search time was 116 places x 3 names x 2 forms of that
+     * work for every keystroke, to fold the same 348 strings to the same 348 answers every time.
+     * The names come out of a bundled asset and never change.
+     */
+    private val haystacks: Map<String, List<String>> by lazy {
+        loaded.associate { place ->
+            place.istat to listOf(place.nameDe, place.nameIt, place.nameEn).flatMap(::variants).distinct()
+        }
+    }
+
+    /** The same list by ISTAT code, because [byIstat] is asked far more often than it is obvious. */
+    private val byCode: Map<String, Place> by lazy { loaded.associateBy { it.istat } }
+
     /** Parsing 37 kB is quick, but it is still file I/O, so it never happens on the main thread. */
     suspend fun all(): List<Place> = withContext(Dispatchers.IO) { loaded }
 
-    suspend fun byIstat(istat: String): Place? = all().firstOrNull { it.istat == istat }
+    suspend fun byIstat(istat: String): Place? = withContext(Dispatchers.IO) { byCode[istat] }
 
     /**
      * Matches any of the three names, ignoring case and diacritics, so "meran" finds both Meran and
      * Merano. An empty query is every place, in the reader's own alphabetical order.
+     *
+     * The whole of it runs off the main thread, not only the asset read. The sort is a `Collator`
+     * over 116 places and the filter walks their folded names; that is a keystroke's worth of work
+     * on whatever thread the caller is on, and the caller is a ViewModel, whose scope is the main
+     * one. Every other piece of per-emission work in this app is explicitly moved off it.
      */
     suspend fun search(query: String, locale: Locale): List<Place> {
+        // Through `all`, so the very first search still reads the asset on the IO dispatcher rather
+        // than dragging file I/O onto Default with the sort.
+        val catalogue = all()
+        return withContext(Dispatchers.Default) { matching(catalogue, query, locale) }
+    }
+
+    private fun matching(catalogue: List<Place>, query: String, locale: Locale): List<Place> {
         // A Collator, not a fold: alphabetical order is the reader's language's business, and
         // German and Italian do not agree about where an accented letter belongs.
         val collator = Collator.getInstance(locale).apply { strength = Collator.PRIMARY }
-        val places = all().sortedWith(compareBy(collator) { it.name(locale) })
+        val places = catalogue.sortedWith(compareBy(collator) { it.name(locale) })
         val needles = variants(query)
         if (needles.all { it.isEmpty() }) return places
         return places.filter { place ->
-            listOf(place.nameDe, place.nameIt, place.nameEn).any { name ->
-                variants(name).any { hay -> needles.any { hay.contains(it) } }
-            }
+            haystacks[place.istat].orEmpty().any { hay -> needles.any { hay.contains(it) } }
         }
     }
 

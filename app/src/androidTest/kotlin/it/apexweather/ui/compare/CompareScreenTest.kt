@@ -41,6 +41,41 @@ class CompareScreenTest {
     private fun scrollTo(tag: String) =
         rule.onNodeWithTag("compare_list").performScrollToNode(hasTestTag(tag))
 
+    /**
+     * A model answering perfectly and never being checked against the thermometer looks exactly
+     * like one that is — same green dot, same fresh timestamp. The station half of the AROME fetch
+     * is not a `Source`, so nothing else on any screen can report it.
+     */
+    @Test
+    fun aSourceWithNoStationRecordIsNamed() {
+        val broken = state.copy(
+            withoutStationRecord = listOf(Source.GEOSPHERE_AROME),
+            hasStationRecord = true,
+        )
+        rule.setContent { ApexTheme { CompareContent(broken, {}, {}) } }
+        scrollTo("no_station_record")
+        rule.onNodeWithTag("no_station_record").assertIsDisplayed()
+        rule.onNodeWithTag("never_checkable").assertIsDisplayed()
+    }
+
+    /** The healthy state says only the permanent fact, and accuses nobody. */
+    @Test
+    fun nothingIsNamedWhenEveryCheckableSourceHasARecord() {
+        rule.setContent { ApexTheme { CompareContent(state.copy(hasStationRecord = true), {}, {}) } }
+        scrollTo("status_list")
+        rule.onNodeWithTag("no_station_record").assertDoesNotExist()
+        rule.onNodeWithTag("never_checkable").assertIsDisplayed()
+    }
+
+    /** And a place with no station near enough to speak for it says neither thing. */
+    @Test
+    fun aPlaceWithoutAStationSaysNothingAboutChecking() {
+        rule.setContent { ApexTheme { CompareContent(state, {}, {}) } }
+        scrollTo("status_list")
+        rule.onNodeWithTag("no_station_record").assertDoesNotExist()
+        rule.onNodeWithTag("never_checkable").assertDoesNotExist()
+    }
+
     @Test
     fun chartTableAndStatusRender() {
         rule.setContent { ApexTheme { CompareContent(state, {}, {}) } }

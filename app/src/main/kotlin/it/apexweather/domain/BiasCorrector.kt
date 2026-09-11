@@ -119,8 +119,13 @@ data class ModelBias(
  * - It needs [MIN_SAMPLES] hours *in that cell* before it says anything at all. Two hours of
  *   agreement is luck. The price of splitting is that a cell takes about a day to fill rather than
  *   six hours; the alternative is a correction that is confidently the wrong sign twice a day.
- * - It is clamped to [MAX_BIAS_C]. Beyond that the input is broken, not biased, and the honest
- *   response is to leave the forecast alone rather than to move it a long way on bad evidence.
+ * - It is clamped to [MAX_BIAS_C], and refused outright beyond [IMPLAUSIBLE_BIAS_C]. Those are two
+ *   different statements. Three degrees is the most the app is willing to move a forecast on this
+ *   evidence, so a model measured four degrees warm is moved three — it used to be moved *none*,
+ *   which handed the worst model on the list the gentlest treatment and put a cliff in the middle
+ *   of the range: 2,9 K corrected in full, 3,1 K not at all. Past six degrees the reading is no
+ *   longer a habit but a broken input — a mismatched station, a unit, a model returning nonsense —
+ *   and there the honest response really is to leave the forecast alone.
  * - It still fades, but only past where the record reaches: full strength to
  *   [FULL_STRENGTH_HOURS] and nothing by [NO_STRENGTH_HOURS].
  */
@@ -132,8 +137,19 @@ object BiasCorrector {
      */
     const val MIN_SAMPLES = 6
 
-    /** Beyond this the input is broken rather than biased. */
+    /** The most the app will move a forecast on this evidence. A larger habit is clamped to it. */
     const val MAX_BIAS_C = 3.0
+
+    /**
+     * And the size past which it is no longer a habit at all.
+     *
+     * [ConsensusBlender.FULL_DISAGREEMENT_C]: the span at which the app already says the models are
+     * telling the reader nothing about the current hour. A *mean* error that big, sustained over
+     * six hours of one part of the day, is not a model running warm in this valley; it is a
+     * mismatched station, a unit, or a model returning nonsense, and nothing useful is subtracted
+     * from a forecast on the strength of it.
+     */
+    const val IMPLAUSIBLE_BIAS_C = 6.0
 
     /**
      * As far ahead as the app has actually checked its models, and the point past which the
@@ -171,7 +187,9 @@ object BiasCorrector {
                         val errors = inPart.mapNotNull { s -> s.predictedC[lead]?.get(source)?.minus(s.observedC) }
                         if (errors.size < MIN_SAMPLES) return@mapNotNull null
                         val mean = errors.average()
-                        if (abs(mean) > MAX_BIAS_C) null else lead to mean
+                        // Refused where it is not a habit; clamped where it is a large one.
+                        if (abs(mean) > IMPLAUSIBLE_BIAS_C) null
+                        else lead to mean.coerceIn(-MAX_BIAS_C, MAX_BIAS_C)
                     }.toMap()
                     if (leads.isEmpty()) null else part to leads
                 }.toMap()

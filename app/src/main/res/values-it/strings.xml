@@ -37,6 +37,16 @@
     <string name="stat_feels">Percepita</string>
     <string name="stat_precip">Precipitazioni</string>
     <string name="stat_wind">Vento</string>
+    <string name="stat_humidity">Umidità</string>
+    <!-- Eight compass points, in each language's own abbreviations: German O for Ost, Italian O for Ovest. -->
+    <string name="compass_n">N</string>
+    <string name="compass_ne">NE</string>
+    <string name="compass_e">E</string>
+    <string name="compass_se">SE</string>
+    <string name="compass_s">S</string>
+    <string name="compass_sw">SO</string>
+    <string name="compass_w">O</string>
+    <string name="compass_nw">NO</string>
     <string name="stat_gust">Raffiche %1$s</string>
     <string name="stat_chance">%1$d %%</string>
     <string name="col_model">Modello</string>
@@ -49,6 +59,8 @@
     <string name="compare_title">Confronto fonti</string>
     <string name="compare_table">VALORI GIORNALIERI PER FONTE (MIN / MAX, PRECIPITAZIONI)</string>
     <string name="compare_status">STATO FONTI</string>
+    <string name="compare_no_station_record">Nessun confronto con la stazione: %1$s. Questi modelli al momento non vengono verificati sul termometro e quindi nemmeno corretti.</string>
+    <string name="compare_never_checkable">SIAG KMOS è interrogato per comune e non può essere verificato su una stazione.</string>
     <string name="consensus">Consenso</string>
     <string name="var_temperature">Temperatura</string>
     <string name="var_precipitation">Precipitazioni</string>
@@ -187,7 +199,7 @@
     <string name="station_humidity">Umidità</string>
     <string name="station_pressure">Pressione</string>
     <string name="station_precip">Precipitazioni oggi</string>
-    <string name="station_wind_with_dir">%1$s da %2$s</string>
+    <string name="wind_with_dir">%1$s da %2$s</string>
     <string name="unit_percent">%1$d %%</string>
     <string name="unit_hpa">%1$s hPa</string>
 

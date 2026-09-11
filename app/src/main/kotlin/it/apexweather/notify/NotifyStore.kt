@@ -42,7 +42,7 @@ class NotifyStore @Inject constructor(@ApplicationContext private val context: C
                 // the cost of getting that wrong is one duplicate notification, never a crash.
                 lastSummaryDate = p[Keys.lastSummaryDate]?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
                 lastRainOnset = p[Keys.lastRainOnsetMs]?.let(Instant::ofEpochMilli),
-                notifiedWarningIds = p[Keys.notifiedWarnings].orEmpty(),
+                notifiedWarningKeys = p[Keys.notifiedWarnings].orEmpty(),
             )
         }
         .first()
@@ -51,7 +51,7 @@ class NotifyStore @Inject constructor(@ApplicationContext private val context: C
         context.notifyStore.edit { p ->
             memory.lastSummaryDate?.let { p[Keys.lastSummaryDate] = it.toString() } ?: p.remove(Keys.lastSummaryDate)
             memory.lastRainOnset?.let { p[Keys.lastRainOnsetMs] = it.toEpochMilli() } ?: p.remove(Keys.lastRainOnsetMs)
-            p[Keys.notifiedWarnings] = memory.notifiedWarningIds
+            p[Keys.notifiedWarnings] = memory.notifiedWarningKeys
         }
     }
 }

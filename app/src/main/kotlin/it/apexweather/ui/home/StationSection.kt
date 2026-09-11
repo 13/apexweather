@@ -53,7 +53,7 @@ fun StationSection(
         station.tempC?.let { add(R.string.station_temp to Format.tempDecimal(it, formats)) }
         station.windKmh?.let { w ->
             val wind = Format.wind(w, windUnit, formats)
-            add(R.string.station_wind to (station.windDir?.let { stringResource(R.string.station_wind_with_dir, wind, it) } ?: wind))
+            add(R.string.station_wind to (station.windDir?.let { stringResource(R.string.wind_with_dir, wind, it) } ?: wind))
         }
         station.gustKmh?.let { add(R.string.station_gust to Format.wind(it, windUnit, formats)) }
         station.humidityPct?.let { add(R.string.station_humidity to stringResource(R.string.unit_percent, it)) }

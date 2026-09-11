@@ -44,7 +44,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
@@ -66,6 +69,7 @@ data class RefreshResult(val succeeded: List<String>, val failed: Map<String, St
     val allFailed: Boolean get() = succeeded.isEmpty() && failed.isNotEmpty()
 }
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @Singleton
 class WeatherRepository @Inject constructor(
     private val dao: WeatherDao,
@@ -88,10 +92,19 @@ class WeatherRepository @Inject constructor(
     )
 
     fun snapshot(place: Place, language: String): Flow<WeatherSnapshot> {
-        val historySince = clock.instant().minus(BiasCorrector.WINDOW).epochSecond
+        // The window's edge moves with the clock, and this flow does not end.
+        //
+        // `WeatherStateHolder` is app-scoped and subscribes once, so a bound computed here would be
+        // fixed for as long as the process lives — after two days it would mean "seven days before
+        // the app started", which is nine days of rows. Nothing broke, because `prune` deletes past
+        // the same window on every refresh; the query simply asked for more than it should and
+        // relied on the writer to have already thrown it away. Asking for the window that is
+        // current when the row is read needs no such agreement, and the `distinctUntilChanged`
+        // keeps the extra query cheap: the bound only changes when the hour does.
         val sidecars = combine(
             dao.warnings(), dao.stationReference(place.istat),
-            history.history(place.istat, historySince), dao.ensemble(place.istat), ::Sidecars,
+            historyWindow().flatMapLatest { since -> history.history(place.istat, since) },
+            dao.ensemble(place.istat), ::Sidecars,
         )
         return combine(
             dao.forecasts(place.istat), dao.bulletin(place.district, language),
@@ -161,6 +174,19 @@ class WeatherRepository @Inject constructor(
             )
         }
     }
+
+    /**
+     * The earliest hour worth reading back, re-evaluated as the clock moves.
+     *
+     * Truncated to the hour and de-duplicated, because [BiasCorrector] groups by the hour anyway and
+     * a bound that changed every second would re-query Room every second for the same rows.
+     */
+    private fun historyWindow(): Flow<Long> = flow {
+        while (true) {
+            emit(clock.instant().truncatedTo(ChronoUnit.HOURS).minus(BiasCorrector.WINDOW).epochSecond)
+            delay(HISTORY_WINDOW_TICK_MS)
+        }
+    }.distinctUntilChanged()
 
     /** Cached JSON can outlive a model change; a row that no longer decodes is reported, never fatal. */
     private fun <T> decode(what: String, serializer: KSerializer<T>, text: String): T? =
@@ -321,10 +347,43 @@ class WeatherRepository @Inject constructor(
                         val ref = attempt("OPEN_METEO_STATION") {
                             OpenMeteoStationMapper.map(openMeteo.stationForecast(station.lat, station.lon, station.altitudeM), now)
                         }
+                        // The ninth model at the station, and the reason this is a second call.
+                        //
+                        // `station_history` can only hold what the app has asked about the
+                        // thermometer's own coordinates, and everything above arrives in the one
+                        // Open-Meteo request — which carries eight of the ten sources. The two it
+                        // does not carry were therefore the two BiasCorrector could never correct,
+                        // and they are the two regional non-ICON runs the blend leans on hardest.
+                        // GeoSphere AROME takes arbitrary coordinates, so the station is exactly as
+                        // askable as the village; SIAG KMOS is addressed by municipality and there
+                        // is no municipality that is a forecast for a thermometer, so it stays
+                        // uncorrected and that is a fact about the upstream rather than an omission.
+                        //
+                        // `t2m` alone: this series exists to be compared with a temperature.
+                        val aromeAtStation = attempt("GEOSPHERE_AROME_STATION") {
+                            GeoSphereMapper.map(geoSphere.forecast("${station.lat},${station.lon}", parameters = "t2m"), now)
+                        }
                         val prev = dao.stationReferenceOnce(place.istat)
+                        // Merged onto what is already stored rather than written over it. The two
+                        // calls fail independently, and a reference holding the Open-Meteo eight is
+                        // worth keeping when AROME is missing — and the other way round.
+                        val base = ref
+                            ?: prev?.json?.let { decode("station reference", StationReference.serializer(), it) }
+                        val merged = base?.let { b ->
+                            if (aromeAtStation != null) b.plus(Source.GEOSPHERE_AROME, aromeAtStation.hourly) else b
+                        }
                         dao.upsertStationReference(
-                            if (ref != null) StationReferenceEntity(place.istat, json.encodeToString(StationReference.serializer(), ref), now.toEpochMilli(), null, null)
-                            else StationReferenceEntity(place.istat, prev?.json, prev?.fetchedAtMs, failed["OPEN_METEO_STATION"], now.toEpochMilli())
+                            // The row's freshness is the Open-Meteo call's: it carries eight of the
+                            // nine models, and a stale base with a fresh AROME laid on top is still
+                            // a stale base. StationDownscale reads that timestamp to decide whether
+                            // the series still describes today's air.
+                            if (ref != null) StationReferenceEntity(
+                                place.istat, json.encodeToString(StationReference.serializer(), merged ?: ref), now.toEpochMilli(), null, null,
+                            ) else StationReferenceEntity(
+                                place.istat,
+                                merged?.let { json.encodeToString(StationReference.serializer(), it) } ?: prev?.json,
+                                prev?.fetchedAtMs, failed["OPEN_METEO_STATION"], now.toEpochMilli(),
+                            )
                         )
                     }
                 }
@@ -505,6 +564,13 @@ class WeatherRepository @Inject constructor(
          * and pulls again gets a real fetch.
          */
         private val COALESCE_WITHIN: Duration = Duration.ofSeconds(10)
+
+        /**
+         * How often the history window's lower bound is re-read. Well inside an hour, so the bound
+         * follows the clock promptly, and de-duplicated above so a tick that changes nothing costs
+         * nothing.
+         */
+        private const val HISTORY_WINDOW_TICK_MS = 5 * 60_000L
 
         /** One retry, not three: the worker runs again in an hour and nothing here is urgent. */
         private const val NETWORK_RETRIES = 1

@@ -15,7 +15,8 @@ data class NotifyMemory(
     val lastSummaryDate: LocalDate? = null,
     /** The hour a rain notification was posted for, not the time it was posted. */
     val lastRainOnset: Instant? = null,
-    val notifiedWarningIds: Set<String> = emptySet(),
+    /** [Warning.noticeKey]s, not bare identifiers: an upgraded warning is a new thing to be told. */
+    val notifiedWarningKeys: Set<String> = emptySet(),
 )
 
 /** Something worth interrupting the reader for. */
@@ -48,8 +49,25 @@ object NotificationDecider {
     /** How far ahead a rain notification looks. Beyond this it is a forecast, not a heads-up. */
     val RAIN_LOOKAHEAD: Duration = Duration.ofHours(3)
 
-    /** Below these a shower is not worth a notification. */
-    private const val RAIN_MIN_PROB = 50
+    /**
+     * Below these a shower is not worth a notification.
+     *
+     * [RAIN_MIN_PROB] is read against a number that has changed meaning since it was picked.
+     * `ConsensusHour.precipProb` used to be the **maximum** across the models, so fifty meant "one
+     * model of ten thinks it likely" — the single most alarmist run could fire this on its own. It
+     * is the **mean** now, which is what a probability across equally good models actually is, and
+     * fifty against that means five or six of ten calling it likely within the next three hours.
+     * Left unchanged, the same constant quietly turned a heads-up into something that almost never
+     * arrives.
+     *
+     * Thirty, because that is the app's own existing threshold for "wet enough to say so" expressed
+     * as a probability: `ConsensusBlender.WET_SHARE_DENOMINATOR` calls an hour wet when a third of
+     * the models put water in the sky, and a third of them at ninety per cent against the rest at
+     * zero averages to thirty. The asymmetry is deliberate and runs the same way as every other one
+     * in this app — being rained on unwarned is worse than carrying a jacket that was not needed —
+     * and [RAIN_MIN_MM] still has to be met by the same hour, so this is never a trace shower.
+     */
+    private const val RAIN_MIN_PROB = 30
     private const val RAIN_MIN_MM = 0.2
 
     /**
@@ -74,7 +92,10 @@ object NotificationDecider {
         summary(state, settings, memory, now, zone, placeName)?.let(::add)
         rain(state, settings, memory, now)?.let(::add)
         if (settings.notifyWarnings) {
-            state.warnings.filter { it.identifier !in memory.notifiedWarningIds }.forEach { add(WeatherNotification.Severe(it)) }
+            // By [Warning.noticeKey] rather than the identifier: MeteoAlarm issuing a red warning
+            // under the identifier of the yellow one it replaces would otherwise never be announced,
+            // which is exactly the case the card's own dismissals have always keyed against.
+            state.warnings.filter { it.noticeKey !in memory.notifiedWarningKeys }.forEach { add(WeatherNotification.Severe(it)) }
         }
     }
 
@@ -118,13 +139,13 @@ object NotificationDecider {
     }
 
     /** The memory to store after [posted] went out, given what was remembered before. */
-    fun remember(memory: NotifyMemory, posted: List<WeatherNotification>, activeWarningIds: Set<String>): NotifyMemory =
+    fun remember(memory: NotifyMemory, posted: List<WeatherNotification>, activeWarningKeys: Set<String>): NotifyMemory =
         NotifyMemory(
             lastSummaryDate = posted.filterIsInstance<WeatherNotification.Summary>().firstOrNull()?.date ?: memory.lastSummaryDate,
             lastRainOnset = posted.filterIsInstance<WeatherNotification.RainStarting>().firstOrNull()?.hour?.time ?: memory.lastRainOnset,
-            // Ids of warnings that have expired are dropped, so the set cannot grow without bound and
-            // a warning re-issued under a new id is still announced.
-            notifiedWarningIds = (memory.notifiedWarningIds + posted.filterIsInstance<WeatherNotification.Severe>().map { it.warning.identifier })
-                .intersect(activeWarningIds),
+            // Keys of warnings that have expired are dropped, so the set cannot grow without bound
+            // and a warning re-issued under a new id is still announced.
+            notifiedWarningKeys = (memory.notifiedWarningKeys + posted.filterIsInstance<WeatherNotification.Severe>().map { it.warning.noticeKey })
+                .intersect(activeWarningKeys),
         )
 }

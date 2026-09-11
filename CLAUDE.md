@@ -55,7 +55,12 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   who knows the valleys might reasonably disagree.
 - `data/PlaceCatalogue` reads that asset once, off the main thread. Search folds case and diacritics
   both ways a reader might type an umlaut ("molten" and "moelten" both find Mölten); ordering is left
-  to a `Collator`, because alphabetical order is the reader's language's business.
+  to a `Collator`, because alphabetical order is the reader's language's business. **The whole of
+  `search` is off the main thread, not only the asset read**, and the folded names are built once
+  with the catalogue rather than per query: only the file I/O was moved before, so a `Collator` sort
+  of 116 places and 348 `Normalizer` calls ran on the caller's thread for every keystroke — and the
+  caller is `PlacePickerViewModel`, whose scope is the main one. Every other piece of per-emission
+  work in this app is explicitly moved off it; this was the exception.
 - The cache is keyed by place — except the bulletin, keyed by its district because one document
   serves every municipality in the valley, and the warnings, which are regional. The last three
   places are kept. `WeatherRepository.evictAllBut` is deliberately *not* part of `refresh`: a refresh
@@ -79,8 +84,11 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   database and was thrown away by every version bump, twice. A change to that one table has to be
   migrated, and the day that feels inconvenient is the day the separation is doing its job). Over days that
   difference becomes each model's habit here, and it is subtracted before the blend. Three guards,
-  each because a correction on thin evidence does harm: at least six hours *in the cell*, never more
-  than 3 K, and faded from 15 h of lead time to nothing by 24 h.
+  each because a correction on thin evidence does harm: at least six hours *in the cell*; **clamped
+  to 3 K and refused only past 6 K**, which are two different statements — three degrees is the most
+  the app will move a forecast, so a model measured four degrees warm is moved three, where it used
+  to be moved *none* and the worst model on the list got the gentlest treatment; and faded from 15 h
+  of lead time to nothing by 24 h.
 - **The habit is measured per part of the day and per lead time, and both axes exist because the
   single average cancels.** A model that runs +2 K every afternoon and −2 K every night has a mean
   error of zero and used to be reported as the best model on the list — which is the error shape a
@@ -135,9 +143,18 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   source set reads `src/test/resources` so both share the fixture. Italy's smallest published area
   is the whole of Trentino-Alto Adige (`EMMA_ID:IT002`), so a warning is regional, never the
   village's, and the card says so.
-- Open-Meteo is called twice: once for the village (14 days, 5 models) and once, tiny, for the
-  weather station's coordinates and altitude. The second call exists only so the station's live
-  reading can be carried up the hill — see `domain/StationDownscale.kt`.
+- **Two upstreams are asked about the station as well as the village, and for two different
+  reasons.** Open-Meteo's second call is tiny and exists so the station's live reading can be
+  carried up the hill — see `domain/StationDownscale.kt`. GeoSphere's second call (`t2m` alone, at
+  the station's coordinates) exists so AROME has a row in `station_history` at all. That table can
+  only hold what the app asked about the thermometer's own coordinates, and the Open-Meteo request
+  carries eight of the ten sources — so **the other two were the two `BiasCorrector` could never
+  correct**, and they are the two regional non-ICON runs the blend leans on hardest. AROME takes
+  arbitrary coordinates, so it is as askable at the station as at the village; SIAG KMOS is
+  addressed by municipality and there is no municipality that is a forecast for a thermometer, so it
+  stays uncorrected and that is a fact about the upstream rather than an omission.
+  `StationReference.plus` merges the second answer onto the first, and the two fail independently:
+  losing AROME must not cost the eight models the hero temperature is corrected with.
 - `data/WeatherRepository` fetches all sources in a `supervisorScope`, writes each into Room independently, and keeps old JSON when a source fails (`SourceStatus.Failed` carries `lastIssuedAt`). UI always renders whatever is cached.
 - **`refresh` coalesces, and that belongs there rather than in any caller.** Several things are
   entitled to ask — the resume hook above the tabs, the hourly worker, the widget's button — and on
@@ -165,6 +182,15 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   confident. The rule is narrow on purpose: `Failed` **and** never having delivered anything, and
   only once some refresh has succeeded — a source that failed this minute but has yesterday's data is
   having a bad minute, and the very first fetch accuses nobody.
+- **A source that answers but is no longer being checked against the thermometer is named too**
+  (`WeatherSnapshot.sourcesWithoutStationRecord`, on the comparison screen). It is the same silence
+  one level down: AROME's *station* call is not a `Source`, so `silentSources` cannot see it, the
+  consensus still has all ten models in it and every dot stays green — and the only symptom of it
+  failing is the hero temperature being quietly worse, because that model stops accumulating
+  `station_history` and `BiasCorrector` stops correcting it. Same three guards as above: nothing
+  where the place has no station, nothing until the reference holds something, and
+  `Source.checkableAtStation` only, so SIAG KMOS never appears in the fault list — it is addressed
+  by municipality and can never be checked, which the card says once, quietly, in its own line.
 - `WeatherSnapshot.forecastsForBlend` is what the blender gets, not `forecasts`: a stale run stays
   visible per source with its age beside it, and is kept out of the number the app leads with. If
   every run is stale they are all used and the offline banner carries the message instead.
@@ -188,7 +214,16 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   1.9 K colder across a two-day run (0.3 K overnight, 2.7 K on a clear afternoon), so the raw reading
   was a systematic warm bias on the app's most-read number. The correction is the models' own
   village-minus-station difference for that hour, not a lapse-rate constant, because the sign flips
-  on an inversion night. Where it cannot be computed the consensus wins, since it is already at the
+  on an inversion night. **It is measured model by model and then medianed, never as one median
+  minus another.** Subtracting two medians compared quantities that were never the same kind of
+  thing: the village side came from `ConsensusForecast`, which drops both globals the moment two
+  regional sources are present *and* has `BiasCorrector` subtracted, while the station side is the
+  Open-Meteo call, which holds the globals, lacks the two regionals and has nothing subtracted. The
+  offset therefore carried both the population difference and up to three degrees of bias
+  correction, and reported the sum to the reader as the height of the hill. Measured live on
+  2026-09-11 at 19:00 the two arithmetics gave -1,7 K and -2,3 K for the same hour. Pairing each
+  model with itself makes both go away: the models are the same on both sides by construction, and a
+  habit a model has here it has at both points, so it cancels in the subtraction. Where it cannot be computed the consensus wins, since it is already at the
   village's height; the raw reading is the last resort. A moved reading always says so on screen.
 - The day list runs 14 days. Only the two ECMWF runs — IFS and AIFS — reach past about day five, so
   those days carry `sourceCount == 2` and their uncertainty comes from ECMWF's ensemble rather than
@@ -201,6 +236,13 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   `WeatherNotifier` only turns a decision into a platform notification; `NotifyStore` remembers what
   went out. `RefreshWorker` calls them after each refresh, reading the cache rather than the refresh
   result so an offline hour still behaves. Three channels, all off until switched on.
+  **The rain threshold is read against a number that changed meaning under it.** `RAIN_MIN_PROB` was
+  picked when `ConsensusHour.precipProb` was the maximum across the models, where fifty meant "one
+  model of ten thinks it likely"; it is the mean now, where fifty means five or six of them do, and
+  the same constant had quietly turned a heads-up into something that almost never arrives. Thirty,
+  because that is `WET_SHARE_DENOMINATOR` expressed as a probability — a third of the models at
+  ninety per cent against the rest at zero averages to thirty — and the asymmetry runs the same way
+  as every other one here.
 - ViewModels blend on `Dispatchers.Default` (`flowOn` before `stateIn`), so the consensus never runs on the main thread.
 - Background refresh: `work/RefreshWorker` (Hilt worker, hourly, network constraint) → repository → `ApexWidget().updateAll`. `RefreshScheduler.refreshNow` is the one-shot version, used by the settings sheet and the widget's refresh button.
 - `ui/map/` is the radar tab and is self-contained the way `update/` and `notify/` are. Frames come
@@ -388,9 +430,26 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   sky; they read as smudges behind the text rather than as weather, and the icon and the word beside
   the temperature already say it is cloudy. `ParticleKind` has no CLOUDS member — do not add one.
 - Source colours are in `ui/common/SourceColors.kt`; SIAG letter codes in `domain/SiagCodes.kt`.
+- **The compare screen stores which sources are switched *off*, never which are on**
+  (`compare_hidden_sources`). Storing the visible set froze the list at whatever existed the last
+  time the reader touched it: add an eleventh model and everybody who had ever toggled anything had
+  it permanently hidden, with nothing on screen to hint it was there. Exclusions make the default
+  "everything, including whatever is new", and a stored name that is no longer a `Source` is dropped
+  rather than kept. The key is a new one, so a set written by an older build is forgotten rather
+  than read backwards — which costs a reader who had hidden something one visit, in the safe
+  direction. `CompareUiState.selectedInOrder` carries the column order, because the header row and
+  the cells beneath it have to agree and two separate sorts is one more place for them not to.
+- **The in-app updater checks the length as well as the checksum.** A connection dropped mid-stream
+  is not an error — the stream simply ends — and `GitHubAsset.sha256` is nullable, which is why
+  `digestVerified` exists at all; on a release that published no digest a truncated APK would have
+  gone to `PackageInstaller`. A declared size of zero means "unknown", not "empty", and must still
+  install.
 - Warnings can be waved away: swipe the card or use the cross in the sheet. Dismissals are keyed by
-  identifier **and** level, so an upgrade cannot inherit the silence of the milder warning, and are
-  pruned to what is in force after each refresh.
+  identifier **and** level (`Warning.noticeKey`), so an upgrade cannot inherit the silence of the
+  milder warning, and are pruned to what is in force after each refresh. **The notifications key on
+  the same string**, and did not until now: they remembered bare identifiers, so a warning upgraded
+  in place from yellow to red — the one a reader most needs — was the only one that could never be
+  announced. The key lives on `Warning` because both stores have to agree about it.
 - Weather icons are Meteocons' monochrome style, generated from the SVGs committed in
   `tools/meteocons/` by `tools/svg2vector.py`, mapped once in `ui/common/WeatherIcons.kt` and used by
   both the app and the widget. Regenerate deliberately and look at the icons before committing.
@@ -536,5 +595,13 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   grid of labelled tiles rather than one interpolated sentence: five quantities in a line of prose
   could not be scanned and left no room for the gust, which `ConsensusHour` had carried unshown. A
   tile whose value no model publishes is left out; wind alone keeps its dash, because "no model
-  publishes wind for this hour" is a fact about the hour. The per-source table's cells drop their
+  publishes wind for this hour" is a fact about the hour. Wind carries its direction beside the
+  speed ("12 km/h aus N") rather than in a tile, because a direction is not a quantity but what the
+  speed means; humidity has a tile of its own. Both had been parsed, cached and never read. The
+  direction is a **circular mean** (`ConsensusBlender.meanDirectionDeg`), not a median — 350° and
+  10° average arithmetically to 180°, the opposite of the answer — and it is **absent where the
+  models disagree too much**, because the mean of two opposite bearings is nowhere rather than
+  between them. `domain/Compass.kt` names eight points and no more: sixteen would report a precision
+  eight model runs do not have. The abbreviations are per language and are not the same letters —
+  German O is Ost, Italian O is Ovest. The per-source table's cells drop their
   units into the column headers, which is what `Format.mmValue` and `Format.windValue` exist for.
