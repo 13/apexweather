@@ -16,6 +16,11 @@
     <string name="feels_like">Gefühlt %1$s</string>
     <string name="now_from_station">Jetzt: Station %1$s, %2$s</string>
     <string name="updated_at">Aktualisiert %1$s</string>
+    <string name="source_silent_one">Quelle antwortet nicht: %1$s</string>
+    <plurals name="source_silent_many">
+        <item quantity="one">%1$d Quelle antwortet nicht</item>
+        <item quantity="other">%1$d Quellen antworten nicht</item>
+    </plurals>
     <string name="section_hourly">NÄCHSTE 48 STUNDEN</string>
     <string name="precip_legend">Niederschlag in mm · darunter die Wahrscheinlichkeit</string>
     <string name="close">Schließen</string>
@@ -65,6 +70,7 @@
     <string name="map_recenter">Zurück zum Ort</string>
     <string name="map_kind_radar">Radar</string>
     <string name="map_kind_forecast">Vorhersage</string>
+    <string name="map_kind_outlook">Ausblick</string>
     <string name="map_legend_light">leicht</string>
     <string name="map_legend_heavy">stark</string>
     <string name="map_radar_unavailable">Radarbilder nicht erreichbar</string>

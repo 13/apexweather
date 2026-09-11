@@ -6,6 +6,7 @@ import it.apexweather.data.local.ObservationEntity
 import it.apexweather.data.local.RefreshMetaEntity
 import it.apexweather.data.local.SourceForecastEntity
 import it.apexweather.data.local.EnsembleEntity
+import it.apexweather.data.local.StationHistoryDao
 import it.apexweather.data.local.StationHistoryEntity
 import it.apexweather.data.local.StationReferenceEntity
 import it.apexweather.data.local.WarningsEntity
@@ -68,6 +69,7 @@ data class RefreshResult(val succeeded: List<String>, val failed: Map<String, St
 @Singleton
 class WeatherRepository @Inject constructor(
     private val dao: WeatherDao,
+    private val history: StationHistoryDao,
     private val openMeteo: OpenMeteoApi,
     private val geoSphere: GeoSphereApi,
     private val siag: SiagApi,
@@ -89,7 +91,7 @@ class WeatherRepository @Inject constructor(
         val historySince = clock.instant().minus(BiasCorrector.WINDOW).epochSecond
         val sidecars = combine(
             dao.warnings(), dao.stationReference(place.istat),
-            dao.stationHistory(place.istat, historySince), dao.ensemble(place.istat), ::Sidecars,
+            history.history(place.istat, historySince), dao.ensemble(place.istat), ::Sidecars,
         )
         return combine(
             dao.forecasts(place.istat), dao.bulletin(place.district, language),
@@ -427,7 +429,7 @@ class WeatherRepository @Inject constructor(
                 if (atHour.isEmpty()) it else it + (LeadBucket.NOW.name to atHour)
             }
         }
-        dao.pruneStationHistory(now.minus(BiasCorrector.WINDOW).epochSecond)
+        history.prune(now.minus(BiasCorrector.WINDOW).epochSecond)
     }
 
     /**
@@ -440,9 +442,9 @@ class WeatherRepository @Inject constructor(
         observed: Double? = null,
         change: (Map<String, Map<String, Double>>) -> Map<String, Map<String, Double>>,
     ) {
-        val existing = dao.stationHistoryAt(place.istat, hour.epochSecond)
+        val existing = history.at(place.istat, hour.epochSecond)
         val stored = existing?.modelsJson?.let { decode("station history", LEAD_MODEL_TEMPS, it) }.orEmpty()
-        dao.upsertStationHistory(
+        history.upsert(
             StationHistoryEntity(
                 place = place.istat,
                 hourEpoch = hour.epochSecond,
@@ -463,6 +465,9 @@ class WeatherRepository @Inject constructor(
     suspend fun evictAllBut(keepPlaces: List<String>, keepDistricts: List<Int>) {
         if (keepPlaces.isEmpty() || keepDistricts.isEmpty()) return
         dao.evict(keepPlaces, keepDistricts)
+        // The history lives in its own database now but is kept to the same places as the caches:
+        // a place the reader has left is a place whose models nobody is checking any more.
+        history.evict(keepPlaces)
     }
 
     private suspend fun previousSuccessMs(place: Place): Long? = dao.metaOnce(place.istat)?.lastSuccessMs

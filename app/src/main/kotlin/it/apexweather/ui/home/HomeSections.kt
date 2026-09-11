@@ -156,6 +156,23 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
         state.updatedAt?.let {
             Text(stringResource(R.string.updated_at, Format.timestamp(it, SouthTyrol.ZONE, state.now, formats)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
         }
+        // A source that never answers is otherwise invisible: the consensus simply has one model
+        // fewer and says nothing about it. Named where there is one, counted where there are more,
+        // and in the same quiet type as the rest of this block — it is a fact about the forecast,
+        // not an alarm.
+        if (state.silentSources.isNotEmpty()) {
+            val text = if (state.silentSources.size == 1) {
+                stringResource(R.string.source_silent_one, state.silentSources.single().displayName)
+            } else {
+                pluralStringResource(R.plurals.source_silent_many, state.silentSources.size, state.silentSources.size)
+            }
+            Text(
+                text,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFFFD166).copy(alpha = 0.85f),
+                modifier = Modifier.testTag("silent_sources"),
+            )
+        }
     }
 }
 

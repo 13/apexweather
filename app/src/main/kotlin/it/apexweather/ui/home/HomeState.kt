@@ -20,6 +20,7 @@ import it.apexweather.domain.model.ConsensusForecast
 import it.apexweather.domain.model.ConsensusHour
 import it.apexweather.domain.model.DailyPoint
 import it.apexweather.domain.model.Source
+import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.StationObservation
 import it.apexweather.domain.model.Warning
 import it.apexweather.domain.model.WeatherSnapshot
@@ -72,6 +73,15 @@ data class HomeUiState(
     val bulletin: Bulletin? = null,
     val updatedAt: Instant? = null,
     val offline: Boolean = false,
+    /**
+     * Sources that have never managed to deliver anything, while the app as a whole is working.
+     *
+     * GeoSphere AROME answered HTTP 400 to every request for months and the only place that said so
+     * was four scrolls down the comparison screen. The consensus quietly went from ten models to
+     * nine and the agreement badge looked exactly as confident as before — which is the one thing
+     * this app is not supposed to do.
+     */
+    val silentSources: List<Source> = emptyList(),
     val settings: AppSettings = AppSettings(),
 ) {
     /**
@@ -201,6 +211,12 @@ object HomeStateBuilder {
             bulletin = snapshot.bulletin,
             updatedAt = snapshot.lastSuccessfulRefresh,
             offline = snapshot.lastRefreshFailed,
+            // Only once something has worked at least once: during the very first fetch every
+            // source has yet to deliver, and that is not the same as being broken.
+            silentSources = if (snapshot.lastSuccessfulRefresh == null) emptyList() else {
+                snapshot.status.filterValues { it is SourceStatus.Failed && it.lastIssuedAt == null }
+                    .keys.sortedBy { it.ordinal }
+            },
             settings = settings,
         )
     }

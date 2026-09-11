@@ -8,6 +8,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import it.apexweather.BuildConfig
 import it.apexweather.data.local.AppDatabase
+import it.apexweather.data.local.HistoryDatabase
+import it.apexweather.data.local.StationHistoryDao
 import it.apexweather.data.local.WeatherDao
 import it.apexweather.data.remote.EnsembleApi
 import it.apexweather.data.remote.GeoSphereApi
@@ -73,6 +75,8 @@ object AppModule {
 
     @Provides @Singleton fun database(@ApplicationContext ctx: Context): AppDatabase = AppDatabase.build(ctx)
     @Provides fun dao(db: AppDatabase): WeatherDao = db.weatherDao()
+    @Provides @Singleton fun historyDatabase(@ApplicationContext ctx: Context): HistoryDatabase = HistoryDatabase.build(ctx)
+    @Provides fun historyDao(db: HistoryDatabase): StationHistoryDao = db.stationHistoryDao()
     @Provides @Singleton fun clock(): Clock = Clock.systemUTC()
 
     @Provides @Singleton @ApplicationScope

@@ -25,10 +25,36 @@ enum class Source(val displayName: String, val regional: Boolean) {
      * run time, so for those sources the timestamp is only when we fetched the data. */
     val hasRunTime: Boolean get() = this == SIAG_KMOS || this == GEOSPHERE_AROME
 
-    /** Hours after the model run at which a cached forecast counts as stale. KMOS runs only twice a day
-     * (02:00 and 14:00 local), so its threshold is the 12 h cadence plus margin for the publication delay. */
+    /**
+     * Hours after the model run at which a cached forecast counts as stale — which is the age at
+     * which the app stops *believing* it, not the age at which it becomes old.
+     *
+     * Staleness has to answer "has the publisher stopped publishing", and for the two sources that
+     * report a real run time the answer is never the run's age alone: both are old the moment you
+     * can first see them. So each threshold is **cadence + observed publication lag + margin**, and
+     * both numbers below were measured rather than assumed.
+     *
+     * [GEOSPHERE_AROME] runs three-hourly — its own metadata lists the available reference times —
+     * and publishes late enough that at 15:22 UTC on 2026-09-11 the newest run on offer was 09:00,
+     * six hours and twenty-four minutes old, with the 12:00 run not yet out three and a half hours
+     * after its nominal time. The newest run's age therefore swings up to about six and a half
+     * hours, and the old six-hour threshold cut it off at the top of that swing: **the app's only
+     * non-ICON regional model was being dropped from the consensus for part of every three-hour
+     * cycle**, silently, while the comparison screen showed it greyed as "veraltet".
+     *
+     * [SIAG_KMOS] is worse. It runs at 02:00 and 14:00 local, and on the same day its 02:00 run
+     * carried a `fileCreationDate` of 13:00 — an eleven-hour lag — so the newest run available at
+     * any moment is between eleven and twenty-three hours old. Sixteen hours excluded the province's
+     * own forecast for something like seven hours a day.
+     *
+     * The eight Open-Meteo models are unaffected either way: [hasRunTime] is false for them, so
+     * their timestamp is the fetch and they cannot go stale while fetching works.
+     */
     val staleAfterHours: Int get() = when (this) {
-        SIAG_KMOS -> 16
+        // 12 h cadence, 11 h lag, margin for one late file.
+        SIAG_KMOS -> 26
+        // 3 h cadence, up to ~6,5 h until the newest run is superseded, margin for one skipped run.
+        GEOSPHERE_AROME -> 10
         ECMWF, ECMWF_AIFS -> 12
         else -> 6
     }

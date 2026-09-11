@@ -15,6 +15,7 @@ import it.apexweather.data.MutableClock
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
 import it.apexweather.data.local.AppDatabase
+import it.apexweather.data.local.HistoryDatabase
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Source
@@ -51,6 +52,7 @@ import java.util.Locale
 class WeatherStateHolderTest {
 
     private lateinit var db: AppDatabase
+    private lateinit var history: HistoryDatabase
     private lateinit var repository: WeatherRepository
     private lateinit var scope: CoroutineScope
     private lateinit var settings: SettingsRepository
@@ -59,8 +61,9 @@ class WeatherStateHolderTest {
     @Before fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         db = AppDatabase.inMemory(context)
+        history = HistoryDatabase.inMemory(context)
         repository = WeatherRepository(
-            db.weatherDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(), FakeMeteoAlarm(), FakeEnsemble(),
+            db.weatherDao(), history.stationHistoryDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(), FakeMeteoAlarm(), FakeEnsemble(),
             Fixtures.json, MutableClock(Instant.parse("2026-09-08T14:00:00Z")),
         )
         scope = CoroutineScope(UnconfinedTestDispatcher())
@@ -82,6 +85,7 @@ class WeatherStateHolderTest {
         scope.cancel()
         runBlocking { scope.coroutineContext.job.join() }
         db.close()
+        history.close()
     }
 
     /**

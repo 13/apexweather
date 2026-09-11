@@ -14,6 +14,7 @@ import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.ConsensusForecast
 import it.apexweather.domain.model.DailyPoint
 import it.apexweather.domain.model.Source
+import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.StationObservation
 import it.apexweather.domain.model.WeatherSnapshot
 import org.junit.Assert.assertEquals
@@ -326,6 +327,52 @@ class HomeStateBuilderTest {
         )
         val state = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), ConsensusBlender().blend(f), t0)
         assertEquals(Condition.CLOUDY, state.heroCondition)
+    }
+
+    /**
+     * A source that never answers has to be visible somewhere the reader looks.
+     *
+     * GeoSphere AROME returned HTTP 400 to every request for months. The consensus went from ten
+     * models to nine, the agreement badge stayed exactly as confident, and the only place that said
+     * anything was four scrolls down the comparison screen.
+     */
+    @Test
+    fun `a source that has never delivered is named`() {
+        val broken = WeatherSnapshot.EMPTY.copy(
+            lastSuccessfulRefresh = hour(0),
+            status = mapOf(
+                Source.ICON_D2 to SourceStatus.Ok(hour(0)),
+                Source.GEOSPHERE_AROME to SourceStatus.Failed("HTTP 400", lastIssuedAt = null),
+            ),
+        )
+        val state = HomeStateBuilder.build(DORF_TIROL, broken, AppSettings(), consensus, hour(0))
+        assertEquals(listOf(Source.GEOSPHERE_AROME), state.silentSources)
+    }
+
+    /** One that failed this time but has data from last time is having a bad minute, not dying. */
+    @Test
+    fun `a source with cached data is not called silent`() {
+        val flaky = WeatherSnapshot.EMPTY.copy(
+            lastSuccessfulRefresh = hour(0),
+            status = mapOf(Source.ICON_D2 to SourceStatus.Failed("timeout", lastIssuedAt = hour(0))),
+        )
+        assertEquals(
+            emptyList<Source>(),
+            HomeStateBuilder.build(DORF_TIROL, flaky, AppSettings(), consensus, hour(0)).silentSources,
+        )
+    }
+
+    /** And nothing is called silent before anything has ever worked. */
+    @Test
+    fun `the very first fetch accuses nobody`() {
+        val firstRun = WeatherSnapshot.EMPTY.copy(
+            lastSuccessfulRefresh = null,
+            status = mapOf(Source.GEOSPHERE_AROME to SourceStatus.Failed("HTTP 400", lastIssuedAt = null)),
+        )
+        assertEquals(
+            emptyList<Source>(),
+            HomeStateBuilder.build(DORF_TIROL, firstRun, AppSettings(), consensus, hour(0)).silentSources,
+        )
     }
 
 }

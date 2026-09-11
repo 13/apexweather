@@ -16,6 +16,11 @@
     <string name="feels_like">Feels like %1$s</string>
     <string name="now_from_station">Now: station %1$s, %2$s</string>
     <string name="updated_at">Updated %1$s</string>
+    <string name="source_silent_one">A source is not answering: %1$s</string>
+    <plurals name="source_silent_many">
+        <item quantity="one">%1$d source is not answering</item>
+        <item quantity="other">%1$d sources are not answering</item>
+    </plurals>
     <string name="section_hourly">NEXT 48 HOURS</string>
     <string name="precip_legend">Precipitation in mm · probability below</string>
     <string name="close">Close</string>
@@ -65,6 +70,7 @@
     <string name="map_recenter">Back to the place</string>
     <string name="map_kind_radar">Radar</string>
     <string name="map_kind_forecast">Forecast</string>
+    <string name="map_kind_outlook">Outlook</string>
     <string name="map_legend_light">light</string>
     <string name="map_legend_heavy">heavy</string>
     <string name="map_radar_unavailable">Radar images unavailable</string>

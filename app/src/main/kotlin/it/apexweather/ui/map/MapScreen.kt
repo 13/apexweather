@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.apexweather.BuildConfig
 import it.apexweather.R
+import it.apexweather.data.remote.NowcastKind
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.GlassCard
@@ -182,7 +183,7 @@ private fun Timeline(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int)
                 style = MaterialTheme.typography.titleMedium, color = Color.White,
                 modifier = Modifier.testTag("map_frame_time"),
             )
-            FrameKindChip(state.showingForecast)
+            FrameKindChip(state.frame)
         }
         if (state.frames.size > 1) {
             Slider(
@@ -199,9 +200,22 @@ private fun Timeline(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int)
     }
 }
 
-/** Whether this frame was seen or is expected, said in a word rather than left to the colours. */
+/**
+ * Whether this frame was seen or is expected, said in a word rather than left to the colours.
+ *
+ * Three words, not two. The forecast half of the timeline is not one thing: the first two and a
+ * half hours are INCA at a kilometre and a quarter hour with radar folded in, and everything after
+ * that is AROME's ensemble at 2,5 km and a whole hour. The squares visibly grow at the join, and a
+ * reader who is not told why will read it as the weather getting vaguer rather than the forecast.
+ */
 @Composable
-private fun FrameKindChip(forecast: Boolean) {
+private fun FrameKindChip(frame: MapFrame?) {
+    val label = when {
+        frame is MapFrame.Forecast && frame.step.kind == NowcastKind.OUTLOOK -> R.string.map_kind_outlook
+        frame is MapFrame.Forecast -> R.string.map_kind_forecast
+        else -> R.string.map_kind_radar
+    }
+    val forecast = frame is MapFrame.Forecast
     val colour = if (forecast) MaterialTheme.colorScheme.primary else Color(0xFF9CC9FF)
     Row(
         Modifier.clip(CircleShape).background(colour.copy(alpha = 0.18f))
@@ -210,10 +224,7 @@ private fun FrameKindChip(forecast: Boolean) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(Modifier.size(7.dp).clip(CircleShape).background(colour))
-        Text(
-            stringResource(if (forecast) R.string.map_kind_forecast else R.string.map_kind_radar),
-            style = MaterialTheme.typography.labelSmall, color = Color.White,
-        )
+        Text(stringResource(label), style = MaterialTheme.typography.labelSmall, color = Color.White)
     }
 }
 

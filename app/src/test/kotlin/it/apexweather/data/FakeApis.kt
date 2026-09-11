@@ -29,6 +29,17 @@ import kotlin.coroutines.cancellation.CancellationException
  * The five upstreams, answered from the recorded fixtures. Shared by the repository tests and by
  * anything else that needs a repository backed by real payloads rather than hand-written ones.
  */
+/**
+ * Open-Meteo, and what it was asked about.
+ *
+ * The coordinates are recorded because a fake that ignores its arguments cannot fail for the reason
+ * that matters — which is not hypothetical here. GeoSphere spent months being sent an
+ * un-interpolated Kotlin template instead of a latitude and answering HTTP 400, and every test
+ * passed throughout, because its fake handed back the fixture whatever it was given. These two
+ * calls are the pair most worth watching: the village's own forecast and the station's, which
+ * `StationDownscale` compares against each other. Swap them and the hero temperature is quietly
+ * wrong; nothing else would notice.
+ */
 internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
     /** How many times the forecast call was made, so a retry can be told from a single attempt. */
     var forecastCalls: Int = 0
@@ -36,11 +47,19 @@ internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
     /** Fails this many times and then succeeds, for testing the retry. */
     var failuresBeforeSuccess: Int = 0
 
+    /** The village's coordinates, as last asked for. */
+    var forecastAt: Pair<Double, Double>? = null
+
+    /** The station's coordinates and the elevation given with them. */
+    var stationAt: Triple<Double, Double, Int>? = null
+
     open override suspend fun forecast(
         latitude: Double, longitude: Double, timezone: String, forecastDays: Int,
         models: String, hourly: String, daily: String, minutely: String, minutelySteps: Int,
     ): OpenMeteoResponse {
         forecastCalls++
+        forecastAt = latitude to longitude
+        requirePlausible(latitude, longitude)
         if (failuresBeforeSuccess >= forecastCalls) throw IOException("connection reset")
         if (fail) throw IOException("open-meteo down")
         // The recording of the request the app actually makes today: fourteen days, eight models,
@@ -53,8 +72,17 @@ internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
         latitude: Double, longitude: Double, elevation: Int, timezone: String,
         pastDays: Int, forecastDays: Int, models: String, hourly: String,
     ): OpenMeteoStationResponse {
+        stationAt = Triple(latitude, longitude, elevation)
+        requirePlausible(latitude, longitude)
         if (fail) throw IOException("open-meteo down")
         return Fixtures.json.decodeFromString(OpenMeteoStationResponse.serializer(), Fixtures.read("openmeteo_station.json"))
+    }
+
+    /** Somewhere in this province, which is the only place this app ever asks about. */
+    private fun requirePlausible(latitude: Double, longitude: Double) {
+        require(latitude in 45.0..49.0 && longitude in 9.0..14.0) {
+            "asked about ($latitude, $longitude), which is not in or near South Tyrol"
+        }
     }
 }
 

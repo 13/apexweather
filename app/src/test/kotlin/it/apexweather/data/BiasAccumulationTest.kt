@@ -3,6 +3,7 @@ package it.apexweather.data
 import androidx.test.core.app.ApplicationProvider
 import it.apexweather.Fixtures
 import it.apexweather.data.local.AppDatabase
+import it.apexweather.data.local.HistoryDatabase
 import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.OpenMeteoMapper
 import it.apexweather.data.remote.OpenMeteoResponse
@@ -182,18 +183,23 @@ class BiasAccumulationTest {
     }
 
     private lateinit var db: AppDatabase
+    private lateinit var history: HistoryDatabase
     private val clock = MutableClock(Instant.parse("2026-09-08T00:00:00Z"))
     private lateinit var repo: WeatherRepository
 
     @Before fun setUp() {
         db = AppDatabase.inMemory(ApplicationProvider.getApplicationContext())
+        history = HistoryDatabase.inMemory(ApplicationProvider.getApplicationContext())
         repo = WeatherRepository(
-            db.weatherDao(), Models(), NoGeoSphere(), Station(),
+            db.weatherDao(), history.stationHistoryDao(), Models(), NoGeoSphere(), Station(),
             NoOdh(), NoMeteoAlarm(), NoEnsemble(), Fixtures.json, clock,
         )
     }
 
-    @After fun tearDown() = db.close()
+    @After fun tearDown() {
+        db.close()
+        history.close()
+    }
 
     @Test
     fun `two days of hourly refreshes teach the corrector the habit it was given`() = runTest(timeout = 5.minutes) {

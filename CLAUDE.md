@@ -74,7 +74,10 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   ECMWF AIFS because a machine-learned model fails differently from a physics one.
 - **`BiasCorrector` is the accuracy lever.** Every hour the app writes down what the station read and
   what each model said it would read (`station_history` — the one table that is **not** a cache;
-  nobody publishes what a model said yesterday about an hour that has since happened). Over days that
+  nobody publishes what a model said yesterday about an hour that has since happened, which is why it
+  lives in its **own database**, `HistoryDatabase`, with no destructive fallback: it sat in the cache
+  database and was thrown away by every version bump, twice. A change to that one table has to be
+  migrated, and the day that feels inconvenient is the day the separation is doing its job). Over days that
   difference becomes each model's habit here, and it is subtracted before the blend. Three guards,
   each because a correction on thin evidence does harm: at least six hours *in the cell*, never more
   than 3 K, and faded from 15 h of lead time to nothing by 24 h.
@@ -144,9 +147,24 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   it and cannot see it, so the second caller now waits on the repository's mutex and is handed the
   first one's result. An ordinary relaunch with a fresh cache still makes **zero** requests — that
   is the 30-minute rule, and it was never the problem.
-- Staleness thresholds live on `Source.staleAfterHours`: regional models 6 h, SIAG KMOS 16 h (two runs
-  a day), ECMWF 12 h; the bulletin goes stale after 24 h, warnings after 6 h and a station observation
-  after 90 min.
+- **Staleness asks "has the publisher stopped publishing", not "is this run old".** For the two
+  sources that report a real run time both answers differ, because both are old the moment you can
+  first see them — so `Source.staleAfterHours` is cadence + measured publication lag + margin.
+  GeoSphere AROME runs three-hourly and publishes late: at 15:22 UTC on 2026-09-11 the newest run on
+  offer was 09:00, **6 h 24 min old, against a 6 h threshold**. SIAG KMOS runs 02:00 and 14:00 and
+  its 02:00 run carried a `fileCreationDate` of 13:00 — an eleven-hour lag — against 16 h. Since
+  `forecastsForBlend` drops anything not `Ok`, **both were being cut out of the consensus for hours
+  every day, silently**: the province's own forecast and the only non-ICON regional model. They are
+  10 h and 26 h now. The Open-Meteo eight are unaffected — `hasRunTime` is false for them, so their
+  stamp is the fetch. AROME's metadata publishes `available_forecast_reftimes`, which is where the
+  cadence came from rather than a guess. The bulletin goes stale after 24 h, warnings after 6 h and a
+  station observation after 90 min.
+- **A source that never answers is named on the home screen** (`HomeUiState.silentSources`). AROME
+  answered HTTP 400 for months and the only place that said so was four scrolls down the comparison
+  screen; the consensus went from ten models to nine and the agreement badge looked exactly as
+  confident. The rule is narrow on purpose: `Failed` **and** never having delivered anything, and
+  only once some refresh has succeeded — a source that failed this minute but has yesterday's data is
+  having a bad minute, and the very first fetch accuses nobody.
 - `WeatherSnapshot.forecastsForBlend` is what the blender gets, not `forecasts`: a stale run stays
   visible per source with its age beside it, and is kept out of the number the app leads with. If
   every run is stale they are all used and the offline banner carries the message instead.

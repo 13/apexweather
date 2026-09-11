@@ -19,6 +19,7 @@ import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WarningDismissals
 import it.apexweather.data.WeatherRepository
 import it.apexweather.data.local.AppDatabase
+import it.apexweather.data.local.HistoryDatabase
 import it.apexweather.data.remote.NowcastApi
 import it.apexweather.data.remote.NowcastResponse
 import it.apexweather.data.remote.RainViewerApi
@@ -142,10 +143,11 @@ class MapViewModelTest {
         rainViewer.frames = frames
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val db = AppDatabase.inMemory(context)
+        val history = HistoryDatabase.inMemory(context)
         val scope = CoroutineScope(UnconfinedTestDispatcher())
         val holder = WeatherStateHolder(
             WeatherRepository(
-                db.weatherDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(),
+                db.weatherDao(), history.stationHistoryDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(),
                 FakeMeteoAlarm(), FakeEnsemble(), Fixtures.json, clock,
             ),
             settings, PlaceCatalogue(context), WarningDismissals(context),
@@ -175,6 +177,8 @@ class MapViewModelTest {
             scope.cancel()
             runBlocking { scope.coroutineContext.job.join() }
             db.close()
+            history.close()
+        history.close()
         }
     }
 

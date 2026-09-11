@@ -129,6 +129,52 @@ class NowcastMapperTest {
         assertEquals(it.apexweather.domain.DORF_TIROL.lon, (west + east) / 2, 1e-3)
         assertTrue("the box must be south,west,north,east", south < north && west < east)
     }
+    /**
+     * The two halves are drawn at different sizes on the map, so a step has to say which it is —
+     * INCA's grid is a kilometre and AROME's two and a half, and cells drawn at the wrong width
+     * leave gaps that read as dry ground.
+     */
+    @Test
+    fun `each step says which run it came from`() {
+        assertTrue(nowcast.steps.all { it.kind == NowcastKind.NOWCAST })
+        assertTrue(outlook.steps.all { it.kind == NowcastKind.OUTLOOK })
+    }
+
+    /**
+     * The wetter end of the ensemble, carried beside the middle of it.
+     *
+     * A forecast drawn as one field looks like a fact, and fifty members do not agree on one. Over
+     * a box of the eastern Dolomites the median called 730 cell-hours dry that the ninetieth
+     * percentile called wet — that is where the rain might reach, and it is not the same claim as
+     * where it is expected.
+     */
+    @Test
+    fun `the outlook carries the ensemble's upper end as well as its middle`() {
+        val cells = outlook.steps.flatMap { it.cells }
+        assertTrue(cells.isNotEmpty())
+        assertTrue("no cell carried an upper bound", cells.any { it.upperMmPerHour != null })
+        assertTrue("the upper end is never below the middle", cells.all { (it.upperMmPerHour ?: 0.0) >= it.mmPerHour - 1e-9 })
+        assertEquals(22.429, cells.maxOf { it.upperMmPerHour ?: 0.0 }, 1e-3)
+    }
+
+    /**
+     * A cell the median calls dry is kept when the upper end does not, because "the middle of the
+     * ensemble says no" is not "no" — the map draws those pale rather than not at all.
+     */
+    @Test
+    fun `a cell only the upper end calls wet survives`() {
+        val onlyUpper = outlook.steps.flatMap { it.cells }
+            .filter { it.mmPerHour < NowcastMapper.MIN_MM_PER_HOUR }
+        assertTrue("nothing was kept on the upper end alone", onlyUpper.isNotEmpty())
+        assertTrue(onlyUpper.all { (it.upperMmPerHour ?: 0.0) >= NowcastMapper.MIN_MM_PER_HOUR })
+    }
+
+    /** INCA has no members, so it has no upper end to offer. */
+    @Test
+    fun `the nowcast carries no upper end`() {
+        assertTrue(nowcast.steps.flatMap { it.cells }.all { it.upperMmPerHour == null })
+    }
+
 }
 
 private operator fun <T> List<T>.component4(): T = this[3]

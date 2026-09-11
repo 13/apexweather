@@ -3,6 +3,7 @@ package it.apexweather.data
 import androidx.test.core.app.ApplicationProvider
 import it.apexweather.Fixtures
 import it.apexweather.data.local.AppDatabase
+import it.apexweather.data.local.HistoryDatabase
 import it.apexweather.data.local.SourceForecastEntity
 import it.apexweather.data.local.WeatherDao
 import it.apexweather.data.remote.GeoSphereApi
@@ -28,6 +29,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -57,6 +59,7 @@ class WeatherRepositoryTest {
     }
 
     private lateinit var db: AppDatabase
+    private lateinit var history: HistoryDatabase
     private val openMeteo = FakeOpenMeteo()
     private val geoSphere = FakeGeoSphere()
     private val siag = FakeSiag()
@@ -68,10 +71,14 @@ class WeatherRepositoryTest {
 
     @Before fun setUp() {
         db = AppDatabase.inMemory(ApplicationProvider.getApplicationContext())
-        repo = WeatherRepository(db.weatherDao(), openMeteo, geoSphere, siag, odh, meteoAlarm, ensemble, Fixtures.json, clock)
+        history = HistoryDatabase.inMemory(ApplicationProvider.getApplicationContext())
+        repo = WeatherRepository(db.weatherDao(), history.stationHistoryDao(), openMeteo, geoSphere, siag, odh, meteoAlarm, ensemble, Fixtures.json, clock)
     }
 
-    @After fun tearDown() = db.close()
+    @After fun tearDown() {
+        db.close()
+        history.close()
+    }
 
     @Test
     fun `empty snapshot before any refresh`() = runTest {
@@ -161,6 +168,29 @@ class WeatherRepositoryTest {
         assertEquals(2, openMeteo.forecastCalls)
     }
 
+    /**
+     * The two Open-Meteo calls are about two different points, and everything the hero shows rests
+     * on that: `StationDownscale` quotes the village as the models' village plus the thermometer's
+     * disagreement with the models' *station*. Ask about one point twice and the correction is
+     * silently zero; swap them and it is silently backwards. Neither would fail anything else.
+     */
+    @Test
+    fun `the village and the station are asked about separately`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        assertEquals(DORF_TIROL.lat to DORF_TIROL.lon, openMeteo.forecastAt)
+        val station = DORF_TIROL.station!!
+        assertEquals(Triple(station.lat, station.lon, station.altitudeM), openMeteo.stationAt)
+        assertNotEquals(openMeteo.forecastAt, openMeteo.stationAt?.let { it.first to it.second })
+    }
+
+    /** A place with no station nearby asks about no station. */
+    @Test
+    fun `a place without a station makes no station call`() = runTest {
+        repo.refresh(STERZING, "de")
+        assertEquals(STERZING.lat to STERZING.lon, openMeteo.forecastAt)
+        assertNull(openMeteo.stationAt)
+    }
+
     @Test
     fun `a failing source keeps its cached data and reports Failed`() = runTest {
         repo.refresh(DORF_TIROL, "de")
@@ -197,7 +227,7 @@ class WeatherRepositoryTest {
     @Test
     fun `a store failure is isolated and the refresh still records its meta`() = runTest {
         val failing = WeatherRepository(
-            FailingStoreDao(db.weatherDao(), Source.GEOSPHERE_AROME.name),
+            FailingStoreDao(db.weatherDao(), Source.GEOSPHERE_AROME.name), history.stationHistoryDao(),
             openMeteo, geoSphere, siag, odh, meteoAlarm, ensemble, Fixtures.json, clock,
         )
         val result = failing.refresh(DORF_TIROL, "de")
@@ -328,7 +358,7 @@ class WeatherRepositoryTest {
     @Test
     fun `a refresh writes down what the station read and what the models said it would`() = runTest {
         repo.refresh(DORF_TIROL, "de")
-        val history = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first()
+        val history = history.stationHistoryDao().history(DORF_TIROL.istat, 0L).first()
         val observed = history.filter { it.observedC != null }
         assertEquals(1, observed.size)
         assertTrue(observed.single().modelsJson.contains("ICON"))
@@ -346,7 +376,7 @@ class WeatherRepositoryTest {
         // Inside the recorded station series, so the run really does reach twelve hours ahead.
         clock.now = Instant.parse("2026-09-11T06:00:00Z")
         repo.refresh(DORF_TIROL, "de")
-        val history = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first()
+        val history = history.stationHistoryDao().history(DORF_TIROL.istat, 0L).first()
         val thisHour = clock.now.truncatedTo(java.time.temporal.ChronoUnit.HOURS)
         listOf(LeadBucket.SIX, LeadBucket.TWELVE).forEach { lead ->
             val row = history.single { it.hourEpoch == thisHour.plusSeconds(lead.hours * 3600).epochSecond }
@@ -363,7 +393,7 @@ class WeatherRepositoryTest {
     fun `refreshing again in the same hour keeps what was written twelve hours ago`() = runTest {
         clock.now = Instant.parse("2026-09-11T06:00:00Z")
         repo.refresh(DORF_TIROL, "de")
-        val before = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first()
+        val before = history.stationHistoryDao().history(DORF_TIROL.istat, 0L).first()
         val target = clock.now.truncatedTo(java.time.temporal.ChronoUnit.HOURS).plusSeconds(12 * 3600)
         assertTrue(before.single { it.hourEpoch == target.epochSecond }.modelsJson.contains("TWELVE"))
 
@@ -371,7 +401,7 @@ class WeatherRepositoryTest {
         // up holding both, because the twelve-hour-old forecast can never be fetched a second time.
         clock.now = clock.now.plus(Duration.ofHours(6))
         repo.refresh(DORF_TIROL, "de")
-        val row = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first()
+        val row = history.stationHistoryDao().history(DORF_TIROL.istat, 0L).first()
             .single { it.hourEpoch == target.epochSecond }
         assertTrue("the twelve-hour-old forecast was overwritten", row.modelsJson.contains("TWELVE"))
         assertTrue("the newer six-hour forecast was not added", row.modelsJson.contains("SIX"))
@@ -381,15 +411,15 @@ class WeatherRepositoryTest {
     @Test
     fun `refreshing twice in the same hour records that hour once`() = runTest {
         repo.refresh(DORF_TIROL, "de")
-        val after = db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first().size
+        val after = history.stationHistoryDao().history(DORF_TIROL.istat, 0L).first().size
         repo.refresh(DORF_TIROL, "de")
-        assertEquals(after, db.weatherDao().stationHistory(DORF_TIROL.istat, 0L).first().size)
+        assertEquals(after, history.stationHistoryDao().history(DORF_TIROL.istat, 0L).first().size)
     }
 
     /** A place with no station has nothing to measure a model against, and records nothing. */
     @Test
     fun `a place without a station records no history`() = runTest {
         repo.refresh(STERZING, "de")
-        assertTrue(db.weatherDao().stationHistory(STERZING.istat, 0L).first().isEmpty())
+        assertTrue(history.stationHistoryDao().history(STERZING.istat, 0L).first().isEmpty())
     }
 }

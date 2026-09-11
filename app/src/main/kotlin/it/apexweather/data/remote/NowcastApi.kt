@@ -64,7 +64,8 @@ interface NowcastApi {
     suspend fun outlook(
         @Query("bbox") bbox: String,
         @Query("end") end: String,
-        @Query("parameters") parameters: String = "rain_p50",
+        @Query("parameters") parameters: String =
+            "${NowcastMapper.OUTLOOK_PARAMETER},${NowcastMapper.OUTLOOK_UPPER_PARAMETER}",
         @Query("output_format") outputFormat: String = "geojson",
     ): NowcastResponse
 
@@ -114,11 +115,38 @@ data class NowcastProperties(val parameters: Map<String, NowcastParameter> = emp
 @Serializable
 data class NowcastParameter(val unit: String = "", val data: List<Double?> = emptyList())
 
-/** One grid point's forecast rate, in millimetres per hour. */
-data class NowcastCell(val lat: Double, val lon: Double, val mmPerHour: Double)
+/**
+ * One grid point's forecast rate, in millimetres per hour.
+ *
+ * [upperMmPerHour] is the ensemble's ninetieth percentile where there is one — what the wetter end
+ * of the members expects, which is the whole reason for running fifty of them. The nowcast has no
+ * members and leaves it null.
+ */
+data class NowcastCell(
+    val lat: Double,
+    val lon: Double,
+    val mmPerHour: Double,
+    val upperMmPerHour: Double? = null,
+)
 
-/** Every cell at one quarter-hour. */
-data class NowcastStep(val time: Instant, val cells: List<NowcastCell>)
+/**
+ * Which run a step came from, because the two do not answer at the same sharpness and the map
+ * should not pretend otherwise.
+ */
+enum class NowcastKind {
+    /** INCA: a kilometre, a quarter of an hour, and radar folded into it. */
+    NOWCAST,
+
+    /** AROME's ensemble median: 2,5 km and a whole hour, but it reaches the rest of the day. */
+    OUTLOOK,
+}
+
+/** Every cell at one step, and how finely it was drawn. */
+data class NowcastStep(
+    val time: Instant,
+    val cells: List<NowcastCell>,
+    val kind: NowcastKind = NowcastKind.NOWCAST,
+)
 
 /**
  * A nowcast for one place: a handful of quarter-hourly frames, each a grid of rates.
@@ -139,7 +167,17 @@ object NowcastMapper {
     private const val NOWCAST_PARAMETER = "rr"
 
     /** The ensemble's, a sum over its hour. Its `rr_*` is a different and far smaller quantity. */
-    private const val OUTLOOK_PARAMETER = "rain_p50"
+    const val OUTLOOK_PARAMETER = "rain_p50"
+
+    /**
+     * And the wetter end of the same ensemble.
+     *
+     * Fetched beside the median because a forecast drawn as one field looks like a fact, and an
+     * ensemble's answer is not one: over a box of the eastern Dolomites on 2026-09-11 the median
+     * called 730 cell-hours dry that the ninetieth percentile called wet. It costs 71 kB on top of
+     * the median's 117, measured over a place box for a day.
+     */
+    const val OUTLOOK_UPPER_PARAMETER = "rain_p90"
 
     private const val QUARTER_HOURS_PER_HOUR = 4
 
@@ -163,12 +201,17 @@ object NowcastMapper {
      * rather than drawn twice.
      */
     fun mapOutlook(resp: NowcastResponse, after: Instant?): PrecipNowcast =
-        map(resp, parameter = OUTLOOK_PARAMETER, after = after)
+        map(resp, parameter = OUTLOOK_PARAMETER, after = after, kind = NowcastKind.OUTLOOK)
 
     fun map(resp: NowcastResponse): PrecipNowcast =
-        map(resp, parameter = NOWCAST_PARAMETER, after = null)
+        map(resp, parameter = NOWCAST_PARAMETER, after = null, kind = NowcastKind.NOWCAST)
 
-    private fun map(resp: NowcastResponse, parameter: String, after: Instant?): PrecipNowcast {
+    private fun map(
+        resp: NowcastResponse,
+        parameter: String,
+        after: Instant?,
+        kind: NowcastKind,
+    ): PrecipNowcast {
         val issuedAt = parse(resp.referenceTime) ?: return PrecipNowcast.EMPTY
         // INCA sums over a quarter hour; the hourly runs sum over an hour. Both are turned into the
         // rate a colour scale and a reader can use.
@@ -182,11 +225,15 @@ object NowcastMapper {
                 val lat = feature.geometry.coordinates.getOrNull(1) ?: return@mapNotNull null
                 val mm = feature.properties.parameters[parameter]?.data?.getOrNull(i) ?: return@mapNotNull null
                 val rate = mm * perHour
-                // A dry cell is left out rather than carried as a zero: over a box this size that is
-                // most of them on most days, and they would be drawn as nothing anyway.
-                if (rate < MIN_MM_PER_HOUR) null else NowcastCell(lat, lon, rate)
+                val upper = feature.properties.parameters[OUTLOOK_UPPER_PARAMETER]
+                    ?.data?.getOrNull(i)?.times(perHour)
+                // A cell is kept when either the middle of the ensemble or its wetter end has
+                // something to say. Dropping the rest matters: over a box this size most cells are
+                // dry most days, and they would be drawn as nothing anyway.
+                val worthDrawing = rate >= MIN_MM_PER_HOUR || (upper ?: 0.0) >= MIN_MM_PER_HOUR
+                if (!worthDrawing) null else NowcastCell(lat, lon, rate, upper)
             }
-            NowcastStep(time, cells)
+            NowcastStep(time, cells, kind)
         }
         return PrecipNowcast(issuedAt, steps)
     }
