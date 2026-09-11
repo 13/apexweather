@@ -379,6 +379,23 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   and scaling to the largest hour on screen makes a height mean different rain on different days and
   magnifies a dry day's 0,2 mm into a downpour. Past 10 mm the bar is simply full and the number
   underneath says the rest. The card carries a legend.
+- **A dry sky is decided by the median of the cloud the models publish, not by a plurality over the
+  words they put on it.** Four ordered labels voted on as four unrelated categories throws away how
+  cloudy each model actually said, and `plurality`'s tie-break then hands the hour to the cloudier
+  one — the same failure the `WET_SHARE_DENOMINATOR` comment describes between wet and dry, one
+  level down. Measured against all 49 pyranometers in the province on the afternoon of 2026-09-11:
+  the label plurality ran **+1,12 steps too cloudy** against the instruments and the median of the
+  cloud **+0,59**, mean absolute error 1,49 against 1,00 — and of the 37 places the instruments
+  called clear or nearly so, **the plurality called twenty of them overcast where the median called
+  six**. One afternoon and one regime, but the mechanism does not depend on either. The boundaries
+  are the WMO codes' own (12,5 / 50 / 87,5 %) so a label keeps meaning what a model means by it, and
+  below `MIN_CLOUD_SOURCES` the labels have their vote back — a median over two numbers is one
+  model's opinion wearing a statistic's clothes. Wet hours are untouched: cloud cover says nothing
+  about rain.
+  **Do not try to weight models by how wrong they are about the current hour.** It is the obvious
+  next idea and it was measured and refused: at 13:00 that day ICON-D2, DMI, ICON-CH2 and ICON-2I
+  were all too cloudy and KNMI alone was right; by 14:00 all four were right and KNMI had gone to
+  100 % while the sky stayed clear. Being wrong about now anti-predicted being wrong an hour later.
 - **The hourly precipitation amount and the chance of rain are means; every other quantity is the
   median.** That is the one place the difference is deliberate. Precipitation is zero-inflated, so the
   moment half the models say dry the median is 0.0 and every wet model is discarded however much rain

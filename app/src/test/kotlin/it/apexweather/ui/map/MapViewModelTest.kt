@@ -106,8 +106,15 @@ class MapViewModelTest {
     private val clock = MutableClock(t0)
     private val rainViewer = FakeRainViewer(t0)
 
+    private lateinit var settings: SettingsRepository
+
     @Before fun setUp() {
         Dispatchers.setMain(mainDispatcher)
+        // Built once, and the place stated once, outside any `runTest`. The DataStore behind this
+        // is a delegate on the Context and is shared with every other test class in the process;
+        // driving it with `runBlocking` from inside a test body is a good way to hang one.
+        settings = SettingsRepository(ApplicationProvider.getApplicationContext())
+        runBlocking { settings.setPlace(DORF_TIROL.istat) }
     }
 
     @After fun tearDown() {
@@ -136,10 +143,6 @@ class MapViewModelTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val db = AppDatabase.inMemory(context)
         val scope = CoroutineScope(UnconfinedTestDispatcher())
-        val settings = SettingsRepository(context)
-        // The DataStore is shared between test classes under Robolectric; state the place rather
-        // than inheriting whichever one another test left behind.
-        runBlocking { settings.setPlace(DORF_TIROL.istat) }
         val holder = WeatherStateHolder(
             WeatherRepository(
                 db.weatherDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(),

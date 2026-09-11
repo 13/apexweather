@@ -402,6 +402,75 @@ class ConsensusBlenderTest {
         assertEquals(blender.blend(f).hourly.single().tempC, blender.blend(f, ModelBias.NONE, T0).hourly.single().tempC, 0.0)
     }
 
+    /**
+     * The afternoon of 2026-09-11, and what a plurality over labels costs.
+     *
+     * Six regional models: three called the hour overcast, two partly cloudy, one clear. Voted as
+     * words that is three to two to one and the hour reads "Bedeckt". The cloud they actually
+     * published was 100, 100, 87, 71, 61 and 14 per cent — a median of 79, which is not overcast,
+     * and the sky over the province at the time was mostly blue.
+     */
+    @Test
+    fun `a dry sky is decided by how much cloud the models publish, not by what they call it`() {
+        fun saying(source: Source, condition: Condition, cloud: Int) = source to forecast(
+            source, listOf(point(0, 20.0, condition = condition).copy(cloudPct = cloud)),
+        )
+        val f = mapOf(
+            saying(Source.ICON_CH1, Condition.CLOUDY, 100),
+            saying(Source.ICON_D2, Condition.CLOUDY, 100),
+            saying(Source.DMI_HARMONIE, Condition.CLOUDY, 87),
+            saying(Source.ICON_CH2, Condition.PARTLY_CLOUDY, 71),
+            saying(Source.ICON_2I, Condition.PARTLY_CLOUDY, 61),
+            saying(Source.KNMI_HARMONIE, Condition.CLEAR, 14),
+        )
+        assertEquals(Condition.PARTLY_CLOUDY, blender.blend(f).hourly.single().condition)
+        // The labels alone, which is what it used to do, still say overcast.
+        assertEquals(
+            Condition.CLOUDY,
+            ConsensusBlender.voteCondition(f.values.map { it.hourly.single().condition }, precipMm = 0.0),
+        )
+    }
+
+    /** The boundaries are the WMO codes' own, so a label keeps meaning what the models mean by it. */
+    @Test
+    fun `the cloud thresholds are the ones the model codes imply`() {
+        assertEquals(Condition.CLEAR, ConsensusBlender.fromCloudCover(0.0))
+        assertEquals(Condition.CLEAR, ConsensusBlender.fromCloudCover(12.0))
+        assertEquals(Condition.MOSTLY_CLEAR, ConsensusBlender.fromCloudCover(13.0))
+        assertEquals(Condition.MOSTLY_CLEAR, ConsensusBlender.fromCloudCover(49.0))
+        assertEquals(Condition.PARTLY_CLOUDY, ConsensusBlender.fromCloudCover(60.0))
+        assertEquals(Condition.CLOUDY, ConsensusBlender.fromCloudCover(95.0))
+    }
+
+    /**
+     * A median over one or two numbers is one model's opinion wearing a statistic's clothes, so the
+     * labels keep their vote. SIAG KMOS publishes no cloud cover at all.
+     */
+    @Test
+    fun `too few sources publishing cloud falls back to the labels`() {
+        val conditions = listOf(Condition.CLOUDY, Condition.CLOUDY, Condition.CLEAR)
+        assertEquals(
+            Condition.CLOUDY,
+            ConsensusBlender.voteCondition(conditions, precipMm = 0.0, cloudPct = listOf(5, 5)),
+        )
+        assertEquals(
+            Condition.CLEAR,
+            ConsensusBlender.voteCondition(conditions, precipMm = 0.0, cloudPct = listOf(5, 5, 5)),
+        )
+    }
+
+    /** A wet hour is still decided the way it was: cloud cover says nothing about rain. */
+    @Test
+    fun `cloud cover does not touch a wet hour`() {
+        assertEquals(
+            Condition.RAIN,
+            ConsensusBlender.voteCondition(
+                listOf(Condition.RAIN, Condition.RAIN, Condition.CLOUDY),
+                precipMm = 2.0, cloudPct = listOf(0, 0, 0),
+            ),
+        )
+    }
+
     private fun ensemble(halfWidth: Double, hours: Int = 24) = it.apexweather.data.remote.EnsembleSpread(
         fetchedAt = T0, memberCount = 20,
         halfWidthByEpochSecond = (0 until hours).associate { hour(it).epochSecond to halfWidth },

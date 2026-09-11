@@ -270,20 +270,23 @@ class HomeStateBuilderTest {
     fun `a station in full sun overrules a current hour voted overcast`() {
         // 13:40 local, the reading's own timestamp, with the sun 47 degrees up.
         val t0 = java.time.Instant.parse("2026-09-11T11:40:00Z")
-        fun saying(condition: Condition) = it.apexweather.domain.model.HourlyPoint(
-            time = t0, tempC = 22.0, cloudPct = if (condition == Condition.CLOUDY) 100 else 40,
-            condition = condition,
+        // Exactly what the six regional models said that afternoon, labels and cloud both.
+        fun saying(condition: Condition, cloud: Int) = it.apexweather.domain.model.HourlyPoint(
+            time = t0, tempC = 22.0, cloudPct = cloud, condition = condition,
         )
         val f = mapOf(
-            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(saying(Condition.CLOUDY))),
-            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(saying(Condition.CLOUDY))),
-            Source.DMI_HARMONIE to forecast(Source.DMI_HARMONIE, listOf(saying(Condition.CLOUDY))),
-            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(saying(Condition.PARTLY_CLOUDY))),
-            Source.ICON_2I to forecast(Source.ICON_2I, listOf(saying(Condition.PARTLY_CLOUDY))),
-            Source.KNMI_HARMONIE to forecast(Source.KNMI_HARMONIE, listOf(saying(Condition.CLEAR))),
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(saying(Condition.CLOUDY, 100))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(saying(Condition.CLOUDY, 100))),
+            Source.DMI_HARMONIE to forecast(Source.DMI_HARMONIE, listOf(saying(Condition.CLOUDY, 87))),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(saying(Condition.PARTLY_CLOUDY, 71))),
+            Source.ICON_2I to forecast(Source.ICON_2I, listOf(saying(Condition.PARTLY_CLOUDY, 61))),
+            Source.KNMI_HARMONIE to forecast(Source.KNMI_HARMONIE, listOf(saying(Condition.CLEAR, 14))),
         )
         val consensus = ConsensusBlender().blend(f)
-        assertEquals("the models really did vote this", Condition.CLOUDY, consensus.hourly.first().condition)
+        // Their labels are three overcast to two partly to one clear, which a plurality would call
+        // overcast; the cloud they publish has a median of 79 %, which is not.
+        assertEquals("the median of the cloud, not the plurality of the labels",
+            Condition.PARTLY_CLOUDY, consensus.hourly.first().condition)
 
         val sunny = WeatherSnapshot.EMPTY.copy(
             forecasts = f,
@@ -299,9 +302,9 @@ class HomeStateBuilderTest {
 
         // And with the pyranometer in shade, or absent, the models keep the hour.
         val shaded = sunny.copy(observation = sunny.observation!!.copy(radiationWm2 = 40.0))
-        assertEquals(Condition.CLOUDY, HomeStateBuilder.build(DORF_TIROL, shaded, AppSettings(), consensus, t0).heroCondition)
+        assertEquals(Condition.PARTLY_CLOUDY, HomeStateBuilder.build(DORF_TIROL, shaded, AppSettings(), consensus, t0).heroCondition)
         val blind = sunny.copy(observation = sunny.observation!!.copy(radiationWm2 = null))
-        assertEquals(Condition.CLOUDY, HomeStateBuilder.build(DORF_TIROL, blind, AppSettings(), consensus, t0).heroCondition)
+        assertEquals(Condition.PARTLY_CLOUDY, HomeStateBuilder.build(DORF_TIROL, blind, AppSettings(), consensus, t0).heroCondition)
     }
 
     /** A dry station leaves the vote exactly as the models cast it. */

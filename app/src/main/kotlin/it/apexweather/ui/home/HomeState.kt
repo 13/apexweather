@@ -156,6 +156,7 @@ object HomeStateBuilder {
                     h.perSource.values.map { it.condition },
                     h.precipMm,
                     stationSaturated = StationFog.saturated(snapshot.observation, now),
+                    cloudPct = h.perSource.values.mapNotNull { it.cloudPct },
                 )
             }
             // And then held to what the sunlight actually arriving allows. This runs last because
