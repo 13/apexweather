@@ -14,8 +14,8 @@ plugins {
 // The release workflow stamps the git tag in with -PapexVersionName / -PapexVersionCode.
 // Kept level with the newest published release, so a local build does not claim to be older than
 // what is on GitHub and the updater does not offer a version the developer already has.
-val apexVersionName: String = providers.gradleProperty("apexVersionName").getOrElse("0.9.3")
-val apexVersionCode: Int = providers.gradleProperty("apexVersionCode").map(String::toInt).getOrElse(903)
+val apexVersionName: String = providers.gradleProperty("apexVersionName").getOrElse("0.10.0")
+val apexVersionCode: Int = providers.gradleProperty("apexVersionCode").map(String::toInt).getOrElse(1000)
 
 // A real signing key, when one exists: environment variables on CI, or an
 // untracked keystore/keystore.properties locally. Without either, both build
