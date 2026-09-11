@@ -31,6 +31,29 @@ object StationDownscale {
      */
     private const val MAX_ADJUSTMENT_C = 6.0
 
+    /**
+     * How far the station may depart from what the models say about it before that departure stops
+     * being treated as this valley's weather and starts being treated as this valley floor's.
+     *
+     * Moving the reading up the hill carries the station's whole anomaly with it: the village is
+     * quoted as the models' village plus however much the thermometer differs from the models'
+     * station. That is right when the models have simply got the day a degree wrong — the whole
+     * column is a degree off, the village with it. It is wrong when the anomaly is the valley floor
+     * doing something of its own, which on a clear night is exactly what it does: cold air pools at
+     * the bottom, and the slope 270 m up does not join in.
+     *
+     * On 2026-09-11 at 04:00 the station read 12,7 °C at 100 % humidity while the eight models put
+     * it at 15,05 and the village at 13,35. Carrying the whole -2,35 K anomaly up gave 11,0 °C. A
+     * thermometer in the village read 12. The anomaly was the valley's, not the village's.
+     *
+     * The numbers below are a judgement calibrated on that night and the lapse rates in the class
+     * doc, not a measured constant, and one night is one night. `station_history` is accumulating
+     * what each model says against what the station reads; when BiasCorrector has six hours of it,
+     * the systematic half of this belongs there instead.
+     */
+    private const val FULLY_TRUSTED_ANOMALY_C = 1.5
+    private const val UNTRUSTED_ANOMALY_C = 4.5
+
     /** How stale the reference series may be before it stops describing today's air. */
     private val REFERENCE_MAX_AGE_HOURS = 12L
 
@@ -47,7 +70,32 @@ object StationDownscale {
     ): Double? {
         val observed = observation.tempC ?: return null
         val offset = offsetAt(observation.time, reference, consensus, now) ?: return null
-        return observed + offset
+        val anomaly = stationAnomaly(observation.time, observed, reference, now) ?: return observed + offset
+        // The village the models draw, plus as much of the thermometer's disagreement with them as
+        // is likely to be shared 270 m up the hill. At full trust this is exactly observed + offset,
+        // which is what it always was.
+        return (observed + offset) - anomaly * (1 - transferred(anomaly))
+    }
+
+    /**
+     * How much of a station anomaly of [anomaly] K belongs to the village: all of a small one, none
+     * of a large one, and a straight line between.
+     */
+    private fun transferred(anomaly: Double): Double {
+        val size = abs(anomaly)
+        return when {
+            size <= FULLY_TRUSTED_ANOMALY_C -> 1.0
+            size >= UNTRUSTED_ANOMALY_C -> 0.0
+            else -> (UNTRUSTED_ANOMALY_C - size) / (UNTRUSTED_ANOMALY_C - FULLY_TRUSTED_ANOMALY_C)
+        }
+    }
+
+    /** What the thermometer reads minus what the models say it should, at that hour. */
+    fun stationAnomaly(time: Instant, observed: Double, reference: StationReference?, now: Instant): Double? {
+        if (reference == null) return null
+        if (ChronoUnit.HOURS.between(reference.fetchedAt, now) > REFERENCE_MAX_AGE_HOURS) return null
+        val atStation = reference.tempAt(time.truncatedTo(ChronoUnit.HOURS)) ?: return null
+        return observed - atStation
     }
 
     /**

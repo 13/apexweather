@@ -6,6 +6,7 @@ import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.StationObservation
 import it.apexweather.domain.model.WeatherSnapshot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 import java.time.Instant
@@ -39,21 +40,53 @@ class StationDownscaleTest {
         ),
     )
 
+    /**
+     * The models put the village at 10,0 and the station 1,9 K above it; a thermometer reading
+     * 12,4 is 0,5 K above what they say the station should read, and that small a disagreement is
+     * the whole column being slightly off, so all of it is carried up.
+     */
     @Test
     fun `the reading is moved by exactly what the models put between the two points`() {
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 25.5), reference(offsetFromVillage = 1.9), consensus, now = hour(2),
+            observation(hour(2), 12.4), reference(offsetFromVillage = 1.9), consensus, now = hour(2),
         )
-        assertEquals(23.6, t!!, 1e-9)
+        assertEquals(10.5, t!!, 1e-9)
+    }
+
+    /**
+     * The night this was written for. The station read 12,7 while the models put it at 15,05 and the
+     * village at 13,35; carrying the whole -2,35 K anomaly up gave 11,0, and a thermometer in the
+     * village read 12. Cold air pools on the valley floor and the slope does not join in, so only
+     * part of that anomaly belongs to the village.
+     */
+    @Test
+    fun `a valley-floor anomaly is only partly carried up the hill`() {
+        val t = StationDownscale.villageTemperature(
+            observation(hour(2), 8.3), reference(offsetFromVillage = 1.7), consensus, now = hour(2),
+        )
+        // models: village 10,0, station 11,7; the thermometer is 3,4 K below what they say the
+        // station should read. Carrying all of it up would say 6,6; 36,7 % of it is shared at the
+        // village, so 10,0 - 0,367 x 3,4.
+        assertEquals(8.7533333333, t!!, 1e-6)
+        assertTrue("the correction must not overshoot the thermometer downwards", t > 8.3 - 1.7)
+    }
+
+    /** A thermometer that agrees with the models is carried up whole, as it always was. */
+    @Test
+    fun `a station the models agree with is carried up in full`() {
+        val t = StationDownscale.villageTemperature(
+            observation(hour(2), 11.7), reference(offsetFromVillage = 1.7), consensus, now = hour(2),
+        )
+        assertEquals(10.0, t!!, 1e-9)
     }
 
     /** On an inversion night the valley floor is the colder of the two and the sign flips. */
     @Test
     fun `an inversion moves the reading upwards, not down`() {
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 2.0), reference(offsetFromVillage = -3.0), consensus, now = hour(2),
+            observation(hour(2), 7.0), reference(offsetFromVillage = -3.0), consensus, now = hour(2),
         )
-        assertEquals(5.0, t!!, 1e-9)
+        assertEquals(10.0, t!!, 1e-9)
     }
 
     /** Beyond a few degrees this is no longer a height difference but a broken input. */

@@ -65,13 +65,31 @@ class HomeStateBuilderTest {
      */
     @Test
     fun `a fresh observation is carried up to the village before it becomes the hero`() {
-        val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(observation = observation(25.5), stationReference = reference(warmerBy = 2.0)),
+        // The models put the village at 14,0 and the station at 16,0; a thermometer reading 16,5
+        // agrees with them to within half a degree, so the whole 2 K is taken off.
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(observation = observation(16.5), stationReference = reference(warmerBy = 2.0)),
             AppSettings(), consensus, now = hour(3).plusSeconds(600),
         )
-        assertEquals(23.5, s.heroTempC!!, 1e-9)
+        assertEquals(14.5, s.heroTempC!!, 1e-9)
         assertEquals(-2.0, s.heroAdjustmentC!!, 1e-9)
         assertEquals(Condition.RAIN, s.heroCondition)
         assertTrue(s.observation != null)
+    }
+
+    /**
+     * The line under the hero quotes the correction, so it has to quote the one that was applied.
+     * A station well away from what the models say about it is carried up only in part, and the
+     * difference between the reading and the number on screen is then not the models' own gap.
+     */
+    @Test
+    fun `the stated correction is the one actually applied`() {
+        // village 14,0, station 16,0, thermometer 19,0: an anomaly of +3 K, half of which is shared.
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(observation = observation(19.0), stationReference = reference(warmerBy = 2.0)),
+            AppSettings(), consensus, now = hour(3).plusSeconds(600),
+        )
+        assertEquals(15.5, s.heroTempC!!, 1e-9)
+        assertEquals(s.heroTempC!! - 19.0, s.heroAdjustmentC!!, 1e-9)
+        assertEquals(-3.5, s.heroAdjustmentC!!, 1e-9)
     }
 
     /**

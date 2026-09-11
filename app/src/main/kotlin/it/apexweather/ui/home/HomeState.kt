@@ -128,8 +128,12 @@ object HomeStateBuilder {
         // The station stands 270 m below the village, so its thermometer is only worth quoting once
         // it has been carried up; where it cannot be, the consensus is already at the right height
         // and is the better number. The raw reading is the last resort, never the first choice.
-        val adjustment = obs?.let { StationDownscale.offsetAt(it.time, snapshot.stationReference, consensus, now) }
-        val heroFromStation = obs?.tempC?.let { t -> adjustment?.let { t + it } }
+        val heroFromStation = obs?.let { StationDownscale.villageTemperature(it, snapshot.stationReference, consensus, now) }
+        // What the screen says it moved the reading by has to be what it actually moved it by. The
+        // models' own village-minus-station gap is only part of that now — a large station anomaly
+        // is carried up only in part, see StationDownscale — so the difference is read back off the
+        // result rather than quoted from the gap.
+        val adjustment = heroFromStation?.let { village -> obs?.tempC?.let { village - it } }
         // A saturated station is the only ground truth this app has about the sky, and it applies to
         // this hour alone — which is why the hour is re-voted here rather than in the blender, where
         // it would colour all forty-eight. It cannot invent fog: something has to have forecast it.
