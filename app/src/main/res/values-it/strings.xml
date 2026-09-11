@@ -61,7 +61,12 @@
     <string name="nav_bulletin">Bollettino</string>
     <string name="nav_map">Mappa</string>
     <string name="nav_settings">Altro</string>
-    <string name="map_attribution">Mappa: Provincia autonoma di Bolzano – Alto Adige · Dati meteo di RainViewer</string>
+    <string name="map_attribution">Mappa: Provincia autonoma di Bolzano – Alto Adige · Radar: RainViewer · Previsione: GeoSphere Austria (CC BY 4.0)</string>
+    <string name="map_recenter">Torna al luogo</string>
+    <string name="map_kind_radar">Radar</string>
+    <string name="map_kind_forecast">Previsione</string>
+    <string name="map_legend_light">debole</string>
+    <string name="map_legend_heavy">forte</string>
     <string name="map_radar_unavailable">Immagini radar non raggiungibili</string>
     <string name="map_play">Riproduci</string>
     <string name="map_pause">Pausa</string>

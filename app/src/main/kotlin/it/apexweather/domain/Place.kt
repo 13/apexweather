@@ -49,4 +49,18 @@ data class Place(
         "en" -> nameEn
         else -> nameDe
     }
+
+    companion object {
+        /**
+         * How far around the place the rain forecast is asked for: about 40 km each way.
+         *
+         * Not the province, and the difference is the whole reason the forecast is affordable at
+         * all. GeoSphere serves the nowcast as uncompressed GeoJSON, so a South Tyrol box is 4,7 MB
+         * where this is about 300 kB. Forty kilometres is roughly what a shower covers in the two
+         * and a half hours the nowcast runs, so a box this size holds the weather that is actually
+         * coming to the place — and the reader can see past the edges of it on the radar behind.
+         */
+        const val NOWCAST_BOX_DEG_LAT = 0.18
+        const val NOWCAST_BOX_DEG_LON = 0.26
+    }
 }

@@ -61,7 +61,12 @@
     <string name="nav_bulletin">Bericht</string>
     <string name="nav_map">Karte</string>
     <string name="nav_settings">Mehr</string>
-    <string name="map_attribution">Karte: Autonome Provinz Bozen – Südtirol · Wetterdaten von RainViewer</string>
+    <string name="map_attribution">Karte: Autonome Provinz Bozen – Südtirol · Radar: RainViewer · Vorhersage: GeoSphere Austria (CC BY 4.0)</string>
+    <string name="map_recenter">Zurück zum Ort</string>
+    <string name="map_kind_radar">Radar</string>
+    <string name="map_kind_forecast">Vorhersage</string>
+    <string name="map_legend_light">leicht</string>
+    <string name="map_legend_heavy">stark</string>
     <string name="map_radar_unavailable">Radarbilder nicht erreichbar</string>
     <string name="map_play">Abspielen</string>
     <string name="map_pause">Pause</string>

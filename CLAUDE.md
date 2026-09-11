@@ -216,11 +216,29 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   sitting in, and because at zoom 16 a z7 radar pixel is 20 km smeared over a village — a wash of
   colour is honest about being a wash where a solid block is not. The alpha goes on a `ColorMatrix`,
   since osmdroid's `TilesOverlay` has none of its own.
-  The RainViewer credit in `map_attribution` is required and the province is credited beside it; the
-  bottom of the map carries a scrim so both stay readable over heavy rain. GeoSphere's `nowcast-v1-15min-1km` is the better forecast for
-  this province — 1 km, 15 minutes, three hours ahead, covering all of South Tyrol — and is not used
-  because a South Tyrol bounding box costs 4.6 MB of ungzipped GeoJSON against 198 kB of NetCDF; see
-  `docs/superpowers/specs/2026-09-10-icons-bars-and-radar-design.md`.
+  **The timeline carries both halves: where the rain has been and where it is going.** The radar's
+  last two hours are followed by GeoSphere's INCA nowcast — 1 km, quarter-hourly, two and a half
+  hours ahead — merged by `MapUiState.timeline`, which drops forecast steps the radar has already
+  watched because INCA reaches back to its own reference time. `MapFrame` keeps the two kinds apart
+  all the way to the screen: the card names which one it is showing, the track is solid for the past
+  and dashed for the future with a tick at the present, and the forecast is drawn a shade lighter
+  than the radar. **Confusing "this happened" with "this is expected" is the one mistake this map
+  can make that matters**, which is why that distinction is in the model rather than in the styling.
+  **The nowcast is asked for a box around the place, not the province**, and that is what makes it
+  affordable: a South Tyrol box is 4,7 MB of uncompressed GeoJSON (the service does not gzip, and
+  its 46 kB NetCDF alternative is HDF5, which nothing on Android reads without a library bigger than
+  this app), against about 300 kB for `Place.NOWCAST_BOX_DEG_*`. Its grid is a projected 1 km one,
+  so no two points share a latitude and `NowcastOverlay` draws cells one at a time — as squares, not
+  a smoothed field, because a smoothed field would look like radar and this is a model.
+  **Both layers share one colour ramp** (`PrecipColors`), read off live RainViewer tiles, and the
+  legend is labelled light-to-heavy rather than in millimetres: RainViewer does not publish what its
+  scheme 4 colours mean in rate, and the app will not invent numbers for somebody else's scale.
+  The RainViewer credit in `map_attribution` is required, GeoSphere's is required by CC BY 4.0, and
+  the province is credited beside them; the bottom of the map carries a scrim so all of it stays
+  readable over heavy rain. The spec that first rejected
+  `nowcast-v1-15min-1km` on payload —
+  `docs/superpowers/specs/2026-09-10-icons-bars-and-radar-design.md` — was measuring a whole-province
+  box; a place-centred one is a twelfth of that, which is what changed the answer.
 - `update/` is the in-app updater and is deliberately self-contained: it reads GitHub releases,
   verifies the download against the asset's sha256 and hands the APK to `PackageInstaller`. Nothing
   in the weather code imports it — the settings sheet takes it as a slot. Removing the feature means

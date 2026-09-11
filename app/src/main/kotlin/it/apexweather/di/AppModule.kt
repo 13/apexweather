@@ -12,6 +12,7 @@ import it.apexweather.data.local.WeatherDao
 import it.apexweather.data.remote.EnsembleApi
 import it.apexweather.data.remote.GeoSphereApi
 import it.apexweather.data.remote.MeteoAlarmApi
+import it.apexweather.data.remote.NowcastApi
 import it.apexweather.data.remote.OdhApi
 import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.RainViewerApi
@@ -68,6 +69,7 @@ object AppModule {
     @Provides @Singleton fun ensemble(c: OkHttpClient, j: Json): EnsembleApi = retrofit(EnsembleApi.BASE_URL, c, j).create(EnsembleApi::class.java)
     @Provides @Singleton fun meteoAlarm(c: OkHttpClient, j: Json): MeteoAlarmApi = retrofit(MeteoAlarmApi.BASE_URL, c, j).create(MeteoAlarmApi::class.java)
     @Provides @Singleton fun rainViewer(c: OkHttpClient, j: Json): RainViewerApi = retrofit(RainViewerApi.BASE_URL, c, j).create(RainViewerApi::class.java)
+    @Provides @Singleton fun nowcast(c: OkHttpClient, j: Json): NowcastApi = retrofit(NowcastApi.BASE_URL, c, j).create(NowcastApi::class.java)
 
     @Provides @Singleton fun database(@ApplicationContext ctx: Context): AppDatabase = AppDatabase.build(ctx)
     @Provides fun dao(db: AppDatabase): WeatherDao = db.weatherDao()
