@@ -70,11 +70,27 @@ object StationDownscale {
     ): Double? {
         val observed = observation.tempC ?: return null
         val offset = offsetAt(observation.time, reference, consensus, now) ?: return null
-        val anomaly = stationAnomaly(observation.time, observed, reference, now) ?: return observed + offset
+        val anomaly = stationAnomaly(observation.time, observed, reference, now)
         // The village the models draw, plus as much of the thermometer's disagreement with them as
         // is likely to be shared 270 m up the hill. At full trust this is exactly observed + offset,
         // which is what it always was.
-        return (observed + offset) - anomaly * (1 - transferred(anomaly))
+        val moved = (observed + offset) - (anomaly ?: 0.0) * (1 - transferred(anomaly ?: 0.0))
+        val forecast = consensus.hourly.firstOrNull { it.time == observation.time.truncatedTo(ChronoUnit.HOURS) }?.tempC
+            ?: return moved
+        // Never outside what its own two sources say. The app has exactly two views of the village:
+        // the thermometer 270 m below it, and the models' own value for it. A result colder than
+        // both, or warmer than both, is an assertion neither of them supports.
+        //
+        // That is what happened on 2026-09-11 at 05:00: the station read 12,9 and the models put the
+        // village at 12,95, while their gap between the two points said -1,5 K, so the reading was
+        // carried down to 11,4 and the screen led with a number nothing had measured or forecast.
+        // The village's own thermometer read 12 to 13. The models do not resolve what this valley
+        // does at night — they apply something like a lapse rate to a village that is warmer than
+        // the valley floor under an inversion — and this is the guard against believing them.
+        //
+        // It costs the honest case nothing: an afternoon where the station really is the warmer of
+        // the two leaves the moved reading inside the bracket, untouched.
+        return moved.coerceIn(minOf(observed, forecast), maxOf(observed, forecast))
     }
 
     /**

@@ -133,7 +133,10 @@ object HomeStateBuilder {
         // models' own village-minus-station gap is only part of that now — a large station anomaly
         // is carried up only in part, see StationDownscale — so the difference is read back off the
         // result rather than quoted from the gap.
+        // A move too small to show is not a move: "umgerechnet (0,0°)" claims a correction that did
+        // not happen, and the line without it already says which station the reading came from.
         val adjustment = heroFromStation?.let { village -> obs?.tempC?.let { village - it } }
+            ?.takeIf { kotlin.math.abs(it) >= 0.05 }
         // A saturated station is the only ground truth this app has about the sky, and it applies to
         // this hour alone — which is why the hour is re-voted here rather than in the blender, where
         // it would colour all forty-eight. It cannot invent fog: something has to have forecast it.

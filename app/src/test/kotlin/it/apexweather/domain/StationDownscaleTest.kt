@@ -71,6 +71,34 @@ class StationDownscaleTest {
         assertTrue("the correction must not overshoot the thermometer downwards", t > 8.3 - 1.7)
     }
 
+    /**
+     * 2026-09-11, 05:00: the station read 12,9 while the models put it at 14,45 and the village at
+     * 12,95. Their gap carried the reading down to 11,4 — colder than the thermometer and colder
+     * than the forecast, a number neither source supported. The village's own thermometer read 12
+     * to 13. The result may not leave the bracket its two sources span.
+     */
+    @Test
+    fun `the moved reading never leaves what its two sources say`() {
+        // models: village 10,0, station 11,5 (a gap of -1,5); thermometer 10,05, just above both.
+        val t = StationDownscale.villageTemperature(
+            observation(hour(2), 10.05), reference(offsetFromVillage = 1.5), consensus, now = hour(2),
+        )!!
+        // Pulled back to the nearer end of the bracket, which here is the models' own village value.
+        assertTrue("$t is colder than both the thermometer and the forecast", t >= 10.0)
+        assertTrue("$t is warmer than both", t <= 10.05)
+        assertEquals(10.0, t, 1e-9)
+    }
+
+    /** The bracket costs the honest case nothing: an afternoon correction still applies in full. */
+    @Test
+    fun `a correction inside the bracket is left alone`() {
+        // models: village 10,0, station 12,0; thermometer 12,4 — the village is genuinely colder.
+        val t = StationDownscale.villageTemperature(
+            observation(hour(2), 12.4), reference(offsetFromVillage = 2.0), consensus, now = hour(2),
+        )!!
+        assertEquals(10.4, t, 1e-9)
+    }
+
     /** A thermometer that agrees with the models is carried up whole, as it always was. */
     @Test
     fun `a station the models agree with is carried up in full`() {

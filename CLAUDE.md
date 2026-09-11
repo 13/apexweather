@@ -287,8 +287,15 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   station read 12,7 at 100 % humidity, the models said 15,05 there and 13,35 at the village, and
   carrying the whole -2,35 K up gave 11,0 against a village thermometer reading 12: cold air pools
   on the valley floor and the slope does not join in. The fade's thresholds are a judgement from
-  that one night, not a measurement. The line under the hero quotes the move that was applied, which
-  is no longer the same number as the models' own gap.
+  that one night, not a measurement.
+  **And the result may never leave the bracket its two sources span** — never colder than both the
+  thermometer and the models' own village value, never warmer than both. At 05:00 the same morning
+  the station read 12,9 and the models put the village at 12,95, while their gap between the two
+  points still said -1,5 K, so the hero led with 11,4: a number neither source supported, against a
+  village thermometer reading 12 to 13. The models do not resolve what this valley does at night.
+  The bracket costs the honest case nothing — an afternoon where the station really is the warmer of
+  the two leaves the moved reading untouched inside it. The line under the hero quotes the move that
+  was applied, and says nothing where that move rounds to zero.
 - Numbers, dates and times go through `ui/common/Format.kt`, which takes an explicit `Formats`
   (locale plus the 24-hour flag). Inside a composition take it from `LocalFormats.current`; outside
   one, build it from a `Context`. Never format with `Locale.ROOT` or interpolate a number into a
