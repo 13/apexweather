@@ -106,8 +106,10 @@ object HomeStateBuilder {
     private val OBSERVATION_MAX_AGE: Duration = Duration.ofMinutes(90)
 
     /**
-     * Two weeks, matching what Open-Meteo is asked for. Only ECMWF reaches beyond about day five, so
-     * the later days carry a source count of one and the list says so rather than implying a consensus.
+     * Two weeks, matching what Open-Meteo is asked for. Only the two ECMWF runs reach beyond about
+     * day five, so the later days are a consensus of two from one institution; their agreement comes
+     * from ECMWF's own ensemble instead, and a day down to a single model says so rather than
+     * implying a consensus.
      */
     const val MAX_DAYS = 14
 
@@ -125,10 +127,15 @@ object HomeStateBuilder {
         val today = consensus.daily.firstOrNull { it.date == now.atZone(SouthTyrol.ZONE).toLocalDate() }
         val phase = SunPhaseCalculator.phase(now, today?.sunrise, today?.sunset, SouthTyrol.ZONE)
         val obs = snapshot.observation?.takeIf { Duration.between(it.time, now) <= OBSERVATION_MAX_AGE && it.tempC != null }
-        // The station stands 270 m below the village, so its thermometer is only worth quoting once
-        // it has been carried up; where it cannot be, the consensus is already at the right height
-        // and is the better number. The raw reading is the last resort, never the first choice.
-        val heroFromStation = obs?.let { StationDownscale.villageTemperature(it, snapshot.stationReference, consensus, now) }
+        // The station stands somewhere else, and in this province mostly somewhere lower, so its
+        // thermometer is only worth quoting once it has been carried up; where it cannot be, the
+        // consensus is already at the right height and is the better number. The raw reading is the
+        // last resort, never the first choice. How far it has to travel bounds how far it may be
+        // moved, so the two altitudes go in with it.
+        val heightDifferenceM = place?.station?.let { place.altitudeM - it.altitudeM }
+        val heroFromStation = if (heightDifferenceM == null) null else obs?.let {
+            StationDownscale.villageTemperature(it, snapshot.stationReference, consensus, now, heightDifferenceM)
+        }
         // What the screen says it moved the reading by has to be what it actually moved it by. The
         // models' own village-minus-station gap is only part of that now — a large station anomaly
         // is carried up only in part, see StationDownscale — so the difference is read back off the

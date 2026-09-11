@@ -34,6 +34,21 @@ KMOS = "https://api-weather.services.siag.it/api/v2/municipality/MunicipalityBul
 # a ridge. A place with no station within the cap shows the consensus and no measurements card.
 STATION_MAX_KM = 20.0
 
+# And beyond this it is not speaking about the place's *air*. Picking the nearest station by ground
+# distance alone is the wrong measure in a province where four kilometres can be a kilometre of
+# height: it gave Hafling (1290 m) the thermometer at Gargazon on the valley floor at 254 m, Aldein
+# (1225 m) the one at Auer at 250 m, and Karneid (290 m) the one on the Ritten plateau 697 m above
+# it. A reading a kilometre below the village is not that village's weather however close it is —
+# it is a different climate, and on a clear afternoon it is five to ten degrees out.
+#
+# So height is part of the distance. A hundred metres of it costs as much as a kilometre of ground,
+# which is roughly the point at which a same-altitude station in the next valley starts being the
+# better witness than a valley-floor one below the village, and a station further than
+# STATION_MAX_DZ_M in height is not considered at all. Four hundred metres is about four degrees of
+# dry adiabat, which is as much as StationDownscale can honestly carry.
+STATION_MAX_DZ_M = 400
+HEIGHT_COST_KM_PER_M = 1 / 100
+
 DISTRICT_NAMES = {
     1: "Bozen, Überetsch und Unterland",
     2: "Burggrafenamt – Meran und Umgebung",
@@ -143,21 +158,27 @@ def main():
             print(f"{istat}: KMOS serves no forecast; skipped", file=sys.stderr)
             continue
 
-        lat, lon = m["Latitude"], m["Longitude"]
-        nearest, nearest_km = None, None
+        lat, lon, altitude = m["Latitude"], m["Longitude"], int(m["Altitude"])
+        nearest, nearest_km, nearest_cost = None, None, None
         for s in stations:
             d = distance_km(lat, lon, siag_float(s["latitude"]), siag_float(s["longitude"]))
-            if nearest_km is None or d < nearest_km:
-                nearest, nearest_km = s, d
+            dz = abs(altitude - int(s["altitude"]))
+            if d > STATION_MAX_KM or dz > STATION_MAX_DZ_M:
+                continue
+            cost = d + dz * HEIGHT_COST_KM_PER_M
+            if nearest_cost is None or cost < nearest_cost:
+                nearest, nearest_km, nearest_cost = s, d, cost
 
         station = None
-        if nearest is not None and nearest_km <= STATION_MAX_KM:
+        if nearest is not None:
             station = {
                 "code": nearest["code"],
                 "name": nearest["name"],
                 "lat": round(siag_float(nearest["latitude"]), 6),
                 "lon": round(siag_float(nearest["longitude"]), 6),
                 "altitudeM": int(nearest["altitude"]),
+                # The ground distance, which is what the app shows the reader. The height difference
+                # it is chosen on is the two altitudes, and needs no field of its own.
                 "distanceKm": round(nearest_km, 2),
             }
 
@@ -180,7 +201,22 @@ def main():
 
     without = [p["nameDe"] for p in places if p["station"] is None]
     print(f"\nwrote {len(places)} places to {out}", file=sys.stderr)
-    print(f"{len(without)} without a station within {STATION_MAX_KM:.0f} km: {', '.join(without)}", file=sys.stderr)
+    print(
+        f"{len(without)} without a station within {STATION_MAX_KM:.0f} km and "
+        f"{STATION_MAX_DZ_M} m: {', '.join(without)}",
+        file=sys.stderr,
+    )
+    # The height difference is what StationDownscale has to carry, so it is worth looking at before
+    # committing the file: these are the places whose reading travels furthest up or down.
+    with_station = [p for p in places if p["station"]]
+    steepest = sorted(with_station, key=lambda p: -abs(p["altitudeM"] - p["station"]["altitudeM"]))[:5]
+    for p in steepest:
+        dz = p["altitudeM"] - p["station"]["altitudeM"]
+        print(
+            f"  steepest: {p['nameDe']} {p['altitudeM']} m ← {p['station']['name']} "
+            f"{p['station']['altitudeM']} m ({dz:+d} m, {p['station']['distanceKm']} km)",
+            file=sys.stderr,
+        )
     for d in sorted(DISTRICT_NAMES):
         members = [p["nameDe"] for p in places if p["district"] == d]
         print(f"  {d} {DISTRICT_NAMES[d]}: {len(members)}", file=sys.stderr)

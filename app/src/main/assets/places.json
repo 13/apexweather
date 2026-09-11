@@ -9,12 +9,12 @@
   "altitudeM": 1225,
   "district": 1,
   "station": {
-   "code": "86900MS",
-   "name": "Auer",
-   "lat": 46.3469,
-   "lon": 11.305,
-   "altitudeM": 250,
-   "distanceKm": 4.12
+   "code": "87300MS",
+   "name": "Radein",
+   "lat": 46.3465,
+   "lon": 11.3968,
+   "altitudeM": 1551,
+   "distanceKm": 4.24
   }
  },
  {
@@ -81,12 +81,12 @@
   "altitudeM": 1290,
   "district": 2,
   "station": {
-   "code": "27100MS",
-   "name": "Gargazon",
-   "lat": 46.5767,
-   "lon": 11.2008,
-   "altitudeM": 254,
-   "distanceKm": 7.69
+   "code": "82200MS",
+   "name": "Sarnthein",
+   "lat": 46.6406,
+   "lon": 11.3551,
+   "altitudeM": 970,
+   "distanceKm": 10.06
   }
  },
  {
@@ -333,12 +333,12 @@
   "altitudeM": 1060,
   "district": 4,
   "station": {
-   "code": "74900MS",
-   "name": "Barbian Kollmann",
-   "lat": 46.5951,
-   "lon": 11.5291,
-   "altitudeM": 490,
-   "distanceKm": 3.8
+   "code": "79300MS",
+   "name": "Ritten Siffian",
+   "lat": 46.529,
+   "lon": 11.4638,
+   "altitudeM": 987,
+   "distanceKm": 8.49
   }
  },
  {
@@ -369,12 +369,12 @@
   "altitudeM": 784,
   "district": 6,
   "station": {
-   "code": "65600MS",
-   "name": "Terenten",
-   "lat": 46.8345,
-   "lon": 11.7856,
-   "altitudeM": 1349,
-   "distanceKm": 4.95
+   "code": "65350MS",
+   "name": "Obervintl",
+   "lat": 46.8111,
+   "lon": 11.7534,
+   "altitudeM": 746,
+   "distanceKm": 6.33
   }
  },
  {
@@ -405,12 +405,12 @@
   "altitudeM": 290,
   "district": 1,
   "station": {
-   "code": "79300MS",
-   "name": "Ritten Siffian",
-   "lat": 46.529,
-   "lon": 11.4638,
-   "altitudeM": 987,
-   "distanceKm": 4.83
+   "code": "83200MS",
+   "name": "Bozen",
+   "lat": 46.4977,
+   "lon": 11.3128,
+   "altitudeM": 245,
+   "distanceKm": 10.98
   }
  },
  {
@@ -639,12 +639,12 @@
   "altitudeM": 907,
   "district": 3,
   "station": {
-   "code": "02500MS",
-   "name": "Marienberg",
-   "lat": 46.7057,
-   "lon": 10.5213,
-   "altitudeM": 1310,
-   "distanceKm": 4.68
+   "code": "08200MS",
+   "name": "Laas Eyrs",
+   "lat": 46.6249,
+   "lon": 10.6496,
+   "altitudeM": 874,
+   "distanceKm": 8.76
   }
  },
  {
@@ -693,12 +693,12 @@
   "altitudeM": 1093,
   "district": 4,
   "station": {
-   "code": "74900MS",
-   "name": "Barbian Kollmann",
-   "lat": 46.5951,
-   "lon": 11.5291,
-   "altitudeM": 490,
-   "distanceKm": 3.14
+   "code": "71510MS",
+   "name": "Villnöss",
+   "lat": 46.6479,
+   "lon": 11.6894,
+   "altitudeM": 1327,
+   "distanceKm": 10.45
   }
  },
  {
@@ -873,12 +873,12 @@
   "altitudeM": 1312,
   "district": 3,
   "station": {
-   "code": "09700MS",
-   "name": "Schlanders",
-   "lat": 46.6238,
-   "lon": 10.7803,
-   "altitudeM": 698,
-   "distanceKm": 6.4
+   "code": "25900MS",
+   "name": "St. Walburg",
+   "lat": 46.5417,
+   "lon": 10.9898,
+   "altitudeM": 1142,
+   "distanceKm": 16.08
   }
  },
  {
@@ -891,12 +891,12 @@
   "altitudeM": 1142,
   "district": 1,
   "station": {
-   "code": "27100MS",
-   "name": "Gargazon",
-   "lat": 46.5767,
-   "lon": 11.2008,
-   "altitudeM": 254,
-   "distanceKm": 4.31
+   "code": "82910MS",
+   "name": "Jenesien",
+   "lat": 46.5304,
+   "lon": 11.3319,
+   "altitudeM": 970,
+   "distanceKm": 8.54
   }
  },
  {
@@ -1089,12 +1089,12 @@
   "altitudeM": 1234,
   "district": 7,
   "station": {
-   "code": "73500MS",
-   "name": "Wolkenstein",
-   "lat": 46.5456,
-   "lon": 11.7684,
-   "altitudeM": 1594,
-   "distanceKm": 7.93
+   "code": "71510MS",
+   "name": "Villnöss",
+   "lat": 46.6479,
+   "lon": 11.6894,
+   "altitudeM": 1327,
+   "distanceKm": 8.29
   }
  },
  {
@@ -1323,12 +1323,12 @@
   "altitudeM": 777,
   "district": 4,
   "station": {
-   "code": "68600MS",
-   "name": "Vals",
-   "lat": 46.8483,
-   "lon": 11.6272,
-   "altitudeM": 1410,
-   "distanceKm": 6.5
+   "code": "65350MS",
+   "name": "Obervintl",
+   "lat": 46.8111,
+   "lon": 11.7534,
+   "altitudeM": 746,
+   "distanceKm": 6.83
   }
  },
  {
@@ -1485,12 +1485,12 @@
   "altitudeM": 735,
   "district": 2,
   "station": {
-   "code": "27100MS",
-   "name": "Gargazon",
-   "lat": 46.5767,
-   "lon": 11.2008,
-   "altitudeM": 254,
-   "distanceKm": 8.79
+   "code": "19300MS",
+   "name": "Naturns",
+   "lat": 46.6477,
+   "lon": 10.9912,
+   "altitudeM": 541,
+   "distanceKm": 9.97
   }
  },
  {
@@ -1665,12 +1665,12 @@
   "altitudeM": 1310,
   "district": 3,
   "station": {
-   "code": "08200MS",
-   "name": "Laas Eyrs",
-   "lat": 46.6249,
-   "lon": 10.6496,
-   "altitudeM": 874,
-   "distanceKm": 8.36
+   "code": "02500MS",
+   "name": "Marienberg",
+   "lat": 46.7057,
+   "lon": 10.5213,
+   "altitudeM": 1310,
+   "distanceKm": 12.03
   }
  },
  {
@@ -1791,12 +1791,12 @@
   "altitudeM": 1127,
   "district": 1,
   "station": {
-   "code": "86900MS",
-   "name": "Auer",
-   "lat": 46.3469,
-   "lon": 11.305,
-   "altitudeM": 250,
-   "distanceKm": 4.48
+   "code": "85120MS",
+   "name": "Deutschnofen",
+   "lat": 46.4205,
+   "lon": 11.4269,
+   "altitudeM": 1470,
+   "distanceKm": 12.45
   }
  },
  {
@@ -1863,12 +1863,12 @@
   "altitudeM": 1048,
   "district": 6,
   "station": {
-   "code": "42700MS",
-   "name": "St. Veit in Prags",
-   "lat": 46.7119,
-   "lon": 12.1,
-   "altitudeM": 1285,
-   "distanceKm": 7.63
+   "code": "43200MS",
+   "name": "Welsberg",
+   "lat": 46.7431,
+   "lon": 12.1289,
+   "altitudeM": 1131,
+   "distanceKm": 7.78
   }
  },
  {
@@ -1899,12 +1899,12 @@
   "altitudeM": 1054,
   "district": 6,
   "station": {
-   "code": "54500MS",
-   "name": "Rein in Taufers",
-   "lat": 46.9428,
-   "lon": 12.0825,
-   "altitudeM": 1562,
-   "distanceKm": 9.66
+   "code": "56900MS",
+   "name": "Sand i.T. Mühlen",
+   "lat": 46.9003,
+   "lon": 11.9474,
+   "altitudeM": 851,
+   "distanceKm": 10.75
   }
  },
  {
@@ -1971,12 +1971,12 @@
   "altitudeM": 1204,
   "district": 2,
   "station": {
-   "code": "27100MS",
-   "name": "Gargazon",
-   "lat": 46.5767,
-   "lon": 11.2008,
-   "altitudeM": 254,
-   "distanceKm": 3.8
+   "code": "82200MS",
+   "name": "Sarnthein",
+   "lat": 46.6406,
+   "lon": 11.3551,
+   "altitudeM": 970,
+   "distanceKm": 10.55
   }
  },
  {
@@ -2043,12 +2043,12 @@
   "altitudeM": 851,
   "district": 4,
   "station": {
-   "code": "71510MS",
-   "name": "Villnöss",
-   "lat": 46.6479,
-   "lon": 11.6894,
-   "altitudeM": 1327,
-   "distanceKm": 7.32
+   "code": "39100MS",
+   "name": "Brixen - Vahrn",
+   "lat": 46.731,
+   "lon": 11.6451,
+   "altitudeM": 585,
+   "distanceKm": 7.73
   }
  },
  {

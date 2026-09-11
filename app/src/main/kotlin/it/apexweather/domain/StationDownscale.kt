@@ -10,10 +10,13 @@ import kotlin.math.abs
 /**
  * Carries the weather station's live reading up the hill to the village.
  *
- * The nearest station is in Meran at 330 m; the village sits at about 600 m, 1.4 km away. Quoting
- * the station's thermometer as the village's temperature is therefore wrong by however much those
- * 270 m are worth at that moment — a median 1.9 K across a two-day model run, up to 2.7 K on a
- * clear afternoon, and as little as 0.3 K when the valley is mixed.
+ * Every place in the catalogue is quoted a thermometer that stands somewhere else, and in this
+ * province "somewhere else" is mostly a height. Dorf Tirol is the worked example: its station is in
+ * Meran at 330 m, the village sits at about 600 m, 1.4 km away, and quoting the thermometer as the
+ * village's temperature is wrong by however much those 270 m are worth at that moment — a median
+ * 1.9 K across a two-day model run, up to 2.7 K on a clear afternoon, and as little as 0.3 K when
+ * the valley is mixed. The catalogue keeps that difference under 400 m for every place; this is
+ * what closes the rest of it.
  *
  * The correction is the models' own difference between the two points at that hour, not a textbook
  * lapse rate. That matters because the difference is not constant: it is largest in the afternoon
@@ -26,10 +29,33 @@ import kotlin.math.abs
 object StationDownscale {
 
     /**
+     * The steepest a well-mixed column gets, in kelvin per metre. A dry adiabat is the ceiling on
+     * what a height difference can honestly be worth.
+     */
+    private const val DRY_ADIABAT_K_PER_M = 0.0098
+
+    /**
+     * What a place whose station stands at its own altitude is still allowed, and what is added to
+     * the adiabat everywhere else: the difference between two points is never only their heights —
+     * a valley floor and a sunny shoulder differ by more than that, and so do two sides of a ridge.
+     */
+    private const val SLACK_C = 2.0
+
+    /**
      * Beyond this the difference is not a height correction any more but a broken input — a stale
      * reference, a model that has gone strange — and the observation is better left alone.
+     *
+     * It has to scale with the height it is correcting for. A flat six degrees was both too tight
+     * and too loose: too tight for the places whose nearest station used to stand the better part
+     * of a kilometre below them, where every correct afternoon offset was thrown away and the hero
+     * silently dropped back to the consensus; and too loose for the many places whose station is at
+     * their own altitude, where six degrees of "height correction" is nothing of the kind.
+     *
+     * `tools/generate-places.py` now keeps the station within 400 m of the place, so in practice
+     * this runs from 2 K to about 5,9 K.
      */
-    private const val MAX_ADJUSTMENT_C = 6.0
+    private fun maxAdjustment(heightDifferenceM: Int): Double =
+        SLACK_C + DRY_ADIABAT_K_PER_M * abs(heightDifferenceM)
 
     /**
      * How far the station may depart from what the models say about it before that departure stops
@@ -60,16 +86,20 @@ object StationDownscale {
     /**
      * The village temperature implied by [observation], or null when there is nothing to base a
      * correction on — in which case the caller should fall back to the forecast rather than quoting
-     * a station 270 m below the village.
+     * a station some hundreds of metres below the village.
+     *
+     * [heightDifferenceM] is the place's altitude minus the station's, and is what bounds the
+     * correction: see [maxAdjustment].
      */
     fun villageTemperature(
         observation: StationObservation,
         reference: StationReference?,
         consensus: ConsensusForecast,
         now: Instant,
+        heightDifferenceM: Int,
     ): Double? {
         val observed = observation.tempC ?: return null
-        val offset = offsetAt(observation.time, reference, consensus, now) ?: return null
+        val offset = offsetAt(observation.time, reference, consensus, now, heightDifferenceM) ?: return null
         val anomaly = stationAnomaly(observation.time, observed, reference, now)
         // The village the models draw, plus as much of the thermometer's disagreement with them as
         // is likely to be shared 270 m up the hill. At full trust this is exactly observed + offset,
@@ -123,6 +153,7 @@ object StationDownscale {
         reference: StationReference?,
         consensus: ConsensusForecast,
         now: Instant,
+        heightDifferenceM: Int,
     ): Double? {
         if (reference == null) return null
         if (ChronoUnit.HOURS.between(reference.fetchedAt, now) > REFERENCE_MAX_AGE_HOURS) return null
@@ -130,6 +161,6 @@ object StationDownscale {
         val atStation = reference.tempAt(hour) ?: return null
         val atVillage = consensus.hourly.firstOrNull { it.time == hour }?.tempC ?: return null
         val offset = atVillage - atStation
-        return if (abs(offset) > MAX_ADJUSTMENT_C) null else offset
+        return if (abs(offset) > maxAdjustment(heightDifferenceM)) null else offset
     }
 }

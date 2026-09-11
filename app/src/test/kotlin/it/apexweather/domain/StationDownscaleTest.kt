@@ -19,6 +19,9 @@ import java.time.Instant
  */
 class StationDownscaleTest {
 
+    /** Dorf Tirol at 600 m over its station in Meran at 330 m, which is what these cases are set at. */
+    private val dz = 270
+
     private val blender = ConsensusBlender()
     private val forecasts = mapOf(
         Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 24).map { point(it, 10.0) }),
@@ -48,7 +51,7 @@ class StationDownscaleTest {
     @Test
     fun `the reading is moved by exactly what the models put between the two points`() {
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 12.4), reference(offsetFromVillage = 1.9), consensus, now = hour(2),
+            observation(hour(2), 12.4), reference(offsetFromVillage = 1.9), consensus, now = hour(2), heightDifferenceM = dz,
         )
         assertEquals(10.5, t!!, 1e-9)
     }
@@ -62,7 +65,7 @@ class StationDownscaleTest {
     @Test
     fun `a valley-floor anomaly is only partly carried up the hill`() {
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 8.3), reference(offsetFromVillage = 1.7), consensus, now = hour(2),
+            observation(hour(2), 8.3), reference(offsetFromVillage = 1.7), consensus, now = hour(2), heightDifferenceM = dz,
         )
         // models: village 10,0, station 11,7; the thermometer is 3,4 K below what they say the
         // station should read. Carrying all of it up would say 6,6; 36,7 % of it is shared at the
@@ -81,7 +84,7 @@ class StationDownscaleTest {
     fun `the moved reading never leaves what its two sources say`() {
         // models: village 10,0, station 11,5 (a gap of -1,5); thermometer 10,05, just above both.
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 10.05), reference(offsetFromVillage = 1.5), consensus, now = hour(2),
+            observation(hour(2), 10.05), reference(offsetFromVillage = 1.5), consensus, now = hour(2), heightDifferenceM = dz,
         )!!
         // Pulled back to the nearer end of the bracket, which here is the models' own village value.
         assertTrue("$t is colder than both the thermometer and the forecast", t >= 10.0)
@@ -94,7 +97,7 @@ class StationDownscaleTest {
     fun `a correction inside the bracket is left alone`() {
         // models: village 10,0, station 12,0; thermometer 12,4 — the village is genuinely colder.
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 12.4), reference(offsetFromVillage = 2.0), consensus, now = hour(2),
+            observation(hour(2), 12.4), reference(offsetFromVillage = 2.0), consensus, now = hour(2), heightDifferenceM = dz,
         )!!
         assertEquals(10.4, t, 1e-9)
     }
@@ -103,7 +106,7 @@ class StationDownscaleTest {
     @Test
     fun `a station the models agree with is carried up in full`() {
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 11.7), reference(offsetFromVillage = 1.7), consensus, now = hour(2),
+            observation(hour(2), 11.7), reference(offsetFromVillage = 1.7), consensus, now = hour(2), heightDifferenceM = dz,
         )
         assertEquals(10.0, t!!, 1e-9)
     }
@@ -112,7 +115,7 @@ class StationDownscaleTest {
     @Test
     fun `an inversion moves the reading upwards, not down`() {
         val t = StationDownscale.villageTemperature(
-            observation(hour(2), 7.0), reference(offsetFromVillage = -3.0), consensus, now = hour(2),
+            observation(hour(2), 7.0), reference(offsetFromVillage = -3.0), consensus, now = hour(2), heightDifferenceM = dz,
         )
         assertEquals(10.0, t!!, 1e-9)
     }
@@ -120,25 +123,60 @@ class StationDownscaleTest {
     /** Beyond a few degrees this is no longer a height difference but a broken input. */
     @Test
     fun `an implausible difference is refused rather than applied`() {
-        assertNull(StationDownscale.offsetAt(hour(2), reference(offsetFromVillage = 20.0), consensus, now = hour(2)))
+        assertNull(StationDownscale.offsetAt(hour(2), reference(offsetFromVillage = 20.0), consensus, now = hour(2), heightDifferenceM = dz))
     }
 
     @Test
     fun `a reference from yesterday no longer describes today's air`() {
         val old = reference(1.9, fetchedAt = hour(0).minusSeconds(24 * 3600))
-        assertNull(StationDownscale.offsetAt(hour(2), old, consensus, now = hour(2)))
+        assertNull(StationDownscale.offsetAt(hour(2), old, consensus, now = hour(2), heightDifferenceM = dz))
     }
 
     @Test
     fun `no reference and no observed temperature both mean no correction`() {
-        assertNull(StationDownscale.offsetAt(hour(2), null, consensus, now = hour(2)))
-        assertNull(StationDownscale.villageTemperature(observation(hour(2), null), reference(1.9), consensus, hour(2)))
+        assertNull(StationDownscale.offsetAt(hour(2), null, consensus, now = hour(2), heightDifferenceM = dz))
+        assertNull(StationDownscale.villageTemperature(observation(hour(2), null), reference(1.9), consensus, hour(2), dz))
     }
 
     /** An hour the reference does not cover cannot be corrected, and is not guessed at. */
     @Test
     fun `an hour outside the reference is left alone`() {
-        assertNull(StationDownscale.offsetAt(hour(100), reference(1.9), consensus, now = hour(2)))
+        assertNull(StationDownscale.offsetAt(hour(100), reference(1.9), consensus, now = hour(2), heightDifferenceM = dz))
+    }
+
+    /**
+     * What counts as implausible depends on how far the reading has to travel.
+     *
+     * Five degrees between two points 400 m apart is a steep afternoon; five degrees between two
+     * points at the same altitude is a broken input, and the old flat six-degree cap called both of
+     * them fine. Kastelruth's station now stands 73 m below it and Karneid's 45 m above: for those
+     * places a five-degree "height correction" is not one.
+     */
+    @Test
+    fun `how far the reading may be moved depends on how far it has to travel`() {
+        val steep = reference(offsetFromVillage = 5.0)
+        // The station is five degrees above the village here, so the offset that carries a reading
+        // up to it is -5.
+        assertEquals(
+            -5.0,
+            StationDownscale.offsetAt(hour(2), steep, consensus, now = hour(2), heightDifferenceM = 400)!!,
+            1e-9,
+        )
+        assertNull(
+            "a station at the village's own altitude cannot be five degrees away from it",
+            StationDownscale.offsetAt(hour(2), steep, consensus, now = hour(2), heightDifferenceM = 0),
+        )
+    }
+
+    /** A station at the place's own height is still allowed the slack two points always differ by. */
+    @Test
+    fun `a station at the same altitude still gets the horizontal slack`() {
+        val gentle = reference(offsetFromVillage = 1.5)
+        assertEquals(
+            -1.5,
+            StationDownscale.offsetAt(hour(2), gentle, consensus, now = hour(2), heightDifferenceM = 0)!!,
+            1e-9,
+        )
     }
 }
 
