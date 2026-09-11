@@ -259,6 +259,36 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   and each has a `labelRes()` form as well as a composable one because the widget renders outside a
   composition. They reuse the one warning glyph — the level is what a reader takes in first and the
   colour carries it.
+- **Refreshing on open is `StaleRefresher`'s job, not a screen's.** It is app-scoped, holds the
+  30-minute rule, and owns the whole refresh path — fetch, place eviction, dismissal pruning, widget
+  update — so there is exactly one. `AppNavigation` calls it on every resume, above the tabs,
+  because the reader who left the app on the comparison or the radar is owed today's weather as
+  much as the one on the home screen. The check used to sit in `HomeViewModel.init`, which runs once
+  per place and therefore once per ViewModel: leaving the app open and coming back hours later to a
+  live process refreshed nothing, and clearing the app's data "fixed" it by forcing a cold start.
+  The radar is the same shape and has its own resume hook; `RadarRepository`'s ten-minute guard is
+  what makes asking that often free.
+- **The chart's y-axis is `ChartAxis`, and its step comes from a ladder of round numbers.** Dividing
+  the range into four and rounding each tick is what labelled two gridlines "0" on a day with no
+  rain in it. The step is never finer than half a unit, because at 0,04 mm the labels all read "0,0"
+  instead. It is pure, so the cases live in `ChartAxisTest` rather than on a phone.
+- **The weather icons are normalised by `tools/svg2vector.py`, not drawn at Meteocons' own sizes.**
+  Those differ by more than a factor of two — a crescent moon inks 0.47 of the canvas, a sun 0.88, a
+  sun behind a cloud 1.14 — so the same dp box gave wildly different icons and the hero's changed
+  size with the weather. The generator measures what each file actually draws, flattening curves and
+  arcs, and scales it to a common fraction of the canvas. It must ignore anything inside a `<mask>`
+  or `<clipPath>`: every mask in these files is a full-canvas rectangle, so counting it measured
+  every cloudy icon as exactly 128 by 128 and scaled it by one. The target is the ink's **height**,
+  with width capped so a wide glyph shrinks rather than being clipped. The hero's icon is sized from
+  the temperature's own type, so the two keep the same height at every font scale.
+- **A station anomaly is carried up the hill only in part.** `StationDownscale` quotes the village as
+  the models' village plus however much the thermometer disagrees with the models about the station
+  — and that disagreement is only shared up the slope while it is small. On 2026-09-11 at 04:00 the
+  station read 12,7 at 100 % humidity, the models said 15,05 there and 13,35 at the village, and
+  carrying the whole -2,35 K up gave 11,0 against a village thermometer reading 12: cold air pools
+  on the valley floor and the slope does not join in. The fade's thresholds are a judgement from
+  that one night, not a measurement. The line under the hero quotes the move that was applied, which
+  is no longer the same number as the models' own gap.
 - Numbers, dates and times go through `ui/common/Format.kt`, which takes an explicit `Formats`
   (locale plus the 24-hour flag). Inside a composition take it from `LocalFormats.current`; outside
   one, build it from a `Context`. Never format with `Locale.ROOT` or interpolate a number into a
