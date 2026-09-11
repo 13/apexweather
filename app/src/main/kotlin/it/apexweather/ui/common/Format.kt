@@ -87,14 +87,29 @@ object Format {
         DateTimeFormatter.ofPattern(if (f.use24Hour) "HH:mm" else "h:mm a", f.locale).format(t.atZone(zone))
 
     /**
-     * A timestamp that answers "how old is this". Within today it is the clock time alone; older
-     * than that it carries its date, because data from three days ago must not be able to read as a
-     * plausible time this afternoon.
+     * A timestamp that cannot be mistaken for a different day. Within today it is the clock time
+     * alone; on any other day it carries its date, because data from three days ago must not be
+     * able to read as a plausible time this afternoon — and, since the map's timeline started
+     * reaching a day ahead, because "10:00" on a forecast frame must not read as an hour ago.
      */
     fun timestamp(t: Instant, zone: ZoneId, now: Instant, f: Formats): String {
         val day = t.atZone(zone).toLocalDate()
         return if (day == now.atZone(zone).toLocalDate()) time(t, zone, f)
         else "${dayMonth(day, f)} ${time(t, zone, f)}"
+    }
+
+    /**
+     * A time on a timeline that spans at most a few days: the clock alone today, and the short
+     * weekday in front of it on any other day.
+     *
+     * [timestamp] answers the same ambiguity with a date, which is right for "how old is this" —
+     * a reading could be from any past week. Here the horizon is a day either side, so a weekday
+     * says it in three characters where a date takes ten, and nothing within a week can repeat.
+     */
+    fun dayTime(t: Instant, zone: ZoneId, now: Instant, f: Formats): String {
+        val day = t.atZone(zone).toLocalDate()
+        return if (day == now.atZone(zone).toLocalDate()) time(t, zone, f)
+        else "${weekday(day, f)} ${time(t, zone, f)}"
     }
 
     fun weekday(d: LocalDate, f: Formats): String = d.dayOfWeek.getDisplayName(TextStyle.SHORT, f.locale)

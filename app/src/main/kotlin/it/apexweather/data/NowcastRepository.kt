@@ -15,6 +15,10 @@ import javax.inject.Singleton
 /**
  * The rain forecast for the place the reader is looking at, held in memory the way the radar is.
  *
+ * A day of it, in two resolutions: GeoSphere's INCA for the two and a half hours it runs, at a
+ * kilometre and a quarter hour, then AROME hourly at 2,5 km to twenty-four. The join is where INCA
+ * stops.
+ *
  * Nothing here goes into Room, for the same reason [RadarRepository] stores nothing: this is a
  * picture of the next two hours, and a stale one is worse than none. It is keyed by place, because
  * the box it covers is drawn around the place — switching village asks again.
@@ -37,8 +41,25 @@ class NowcastRepository @Inject constructor(
         if (istat == place.istat && at != null && Duration.between(at, clock.instant()) < FRESH_FOR) {
             return@withLock nowcast
         }
-        val fetched = runCatching { NowcastMapper.map(api.precipitation(NowcastApi.boxAround(place))) }
-            .getOrNull()
+        val box = NowcastApi.boxAround(place)
+        // The two halves are fetched independently and either is worth having on its own: INCA
+        // carries the next two and a half hours at a kilometre and a quarter hour, AROME the rest of
+        // the day at 2,5 km and an hour. A failure in one leaves the other's stretch of the timeline
+        // standing.
+        val near = runCatching { NowcastMapper.map(api.precipitation(box)) }.getOrNull()
+        val far = runCatching {
+            NowcastMapper.mapOutlook(
+                api.outlook(box, NowcastApi.endOf(clock.instant())),
+                after = near?.steps?.lastOrNull()?.time,
+            )
+        }.getOrNull()
+        val fetched = when {
+            near == null && far == null -> null
+            else -> PrecipNowcast(
+                issuedAt = near?.issuedAt ?: far!!.issuedAt,
+                steps = near?.steps.orEmpty() + far?.steps.orEmpty(),
+            )
+        }
         if (fetched != null) {
             nowcast = fetched
             istat = place.istat

@@ -64,6 +64,53 @@ class NowcastMapperTest {
         }
     }
 
+    private val outlook = NowcastMapper.mapOutlook(
+        Fixtures.json.decodeFromString(NowcastResponse.serializer(), Fixtures.read("geosphere_outlook.json")),
+        after = null,
+    )
+
+    /**
+     * INCA stops two and a half hours out and "will it rain this evening" is a map question too, so
+     * AROME carries the rest of the day at 2,5 km and an hour.
+     */
+    @Test
+    fun `the outlook reaches a day ahead, hour by hour`() {
+        val times = outlook.steps.map { it.time }
+        assertEquals(times.sorted(), times)
+        assertEquals(Instant.parse("2026-09-12T08:00:00Z"), times.last())
+        times.zipWithNext().forEach { (a, b) -> assertEquals(3600L, b.epochSecond - a.epochSecond) }
+        assertTrue("${times.size} steps is not a day", times.size >= 23)
+    }
+
+    /**
+     * `rr_acc` is accumulated from the run's start. Drawn undifferenced it would paint the whole
+     * day's rain onto every hour of it, growing all afternoon and never stopping.
+     */
+    @Test
+    fun `the accumulated series is differenced into each hour's own rain`() {
+        val wettest = outlook.steps.maxOf { step -> step.cells.maxOfOrNull { it.mmPerHour } ?: 0.0 }
+        // The fixture's largest single-hour step up is well under its 6 mm total accumulation.
+        assertTrue("$wettest looks like an accumulation, not an hour", wettest < 3.0)
+        assertTrue(wettest > 0.0)
+    }
+
+    /** The first step has nothing before it to difference against, so it is not guessed at. */
+    @Test
+    fun `the first step of an accumulated series is dropped rather than taken whole`() {
+        assertTrue(outlook.steps.none { it.time == Instant.parse("2026-09-11T08:00:00Z") })
+    }
+
+    /** Where the finer forecast already covers an hour, the coarser one does not draw over it. */
+    @Test
+    fun `hours the nowcast already covers are left to it`() {
+        val trimmed = NowcastMapper.mapOutlook(
+            Fixtures.json.decodeFromString(NowcastResponse.serializer(), Fixtures.read("geosphere_outlook.json")),
+            after = Instant.parse("2026-09-11T14:00:00Z"),
+        )
+        assertTrue(trimmed.steps.all { it.time.isAfter(Instant.parse("2026-09-11T14:00:00Z")) })
+        assertTrue(trimmed.steps.size < outlook.steps.size)
+    }
+
     /** A response that says nothing is not a forecast of no rain. */
     @Test
     fun `an empty response yields no forecast at all`() {

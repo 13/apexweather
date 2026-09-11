@@ -110,4 +110,17 @@ class FormatTest {
         assertEquals("12 km/h", Format.wind(12.3, WindUnit.KMH, german))
         assertEquals("3,4 m/s", Format.wind(12.3, WindUnit.MS, german))
     }
+
+    /**
+     * The map's timeline runs a day out, so a forecast frame reading "10:00" at eleven in the
+     * morning must not be readable as an hour ago.
+     */
+    @Test fun dayTimeNamesTheDayWhenItIsNotThisOne() {
+        val now = Instant.parse("2026-09-11T09:00:00Z")
+        val today = Instant.parse("2026-09-11T16:00:00Z")
+        val tomorrow = Instant.parse("2026-09-12T08:00:00Z")
+        assertEquals("18:00", Format.dayTime(today, SouthTyrol.ZONE, now, german))
+        val ahead = Format.dayTime(tomorrow, SouthTyrol.ZONE, now, german)
+        assertTrue("$ahead should name its day", ahead.contains("10:00") && ahead.length > "10:00".length)
+    }
 }

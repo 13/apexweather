@@ -60,6 +60,7 @@ import it.apexweather.ui.common.GlassCard
 import it.apexweather.ui.common.LocalFormats
 import java.io.File
 import org.osmdroid.config.Configuration
+import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
@@ -93,19 +94,6 @@ fun MapContent(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int) -> Un
     val recenter = remember { mutableStateOf(0) }
     Box(Modifier.fillMaxSize().testTag("map_screen")) {
         RadarMap(state, recenter.value, Modifier.fillMaxSize())
-        // Panning away is easy and finding a village again on a map of ninety valleys is not, so
-        // the way back is one tap and always in the same corner.
-        if (state.place != null) {
-            FilledIconButton(
-                onClick = { recenter.value++ },
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = Color(0xCC121A2E), contentColor = Color.White,
-                ),
-                modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).testTag("map_recenter"),
-            ) {
-                Icon(Icons.Rounded.MyLocation, contentDescription = stringResource(R.string.map_recenter))
-            }
-        }
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 // Heavy rain is drawn in yellow and red, and white text on it is unreadable. The
@@ -115,6 +103,21 @@ fun MapContent(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int) -> Un
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            // Panning away is easy and finding a village again on a map of ninety valleys is not,
+            // so the way back is one tap. It sits directly above the timeline rather than in the
+            // far corner: everything the reader touches on this screen is then in one place, under
+            // the thumb, and none of it is over the map they are trying to look at.
+            if (state.place != null) {
+                FilledIconButton(
+                    onClick = { recenter.value++ },
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = Color(0xCC121A2E), contentColor = Color.White,
+                    ),
+                    modifier = Modifier.align(Alignment.End).size(44.dp).testTag("map_recenter"),
+                ) {
+                    Icon(Icons.Rounded.MyLocation, contentDescription = stringResource(R.string.map_recenter))
+                }
+            }
             if (state.radarUnavailable) {
                 Text(
                     stringResource(R.string.map_radar_unavailable),
@@ -163,8 +166,14 @@ private fun Timeline(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int)
                     contentDescription = stringResource(if (state.playing) R.string.map_pause else R.string.map_play),
                 )
             }
+            // The clock alone is not enough now that the timeline runs a day out: at eleven in the
+            // morning a forecast frame reading "10:00" would be read as an hour ago. `dayTime` puts
+            // the weekday in front on any day but the present one, and the present here is the
+            // newest frame a radar actually saw rather than a clock this composable would have to
+            // be handed.
+            val present = state.frames.getOrNull(state.nowIndex)?.time ?: state.frame?.time
             Text(
-                state.frame?.time?.let { Format.time(it, SouthTyrol.ZONE, formats) }.orEmpty(),
+                state.frame?.time?.let { Format.dayTime(it, SouthTyrol.ZONE, present ?: it, formats) }.orEmpty(),
                 style = MaterialTheme.typography.titleMedium, color = Color.White,
                 modifier = Modifier.testTag("map_frame_time"),
             )
@@ -296,6 +305,10 @@ private fun RadarMap(state: MapUiState, recenter: Int, modifier: Modifier = Modi
         MapView(context).apply {
             setTileSource(SouthTyrolTileSource())
             setMultiTouchControls(true)
+            // osmdroid shows a pair of stock +/- buttons by default. They sat over the province in
+            // a grey that belongs to no part of this app, and pinching is how anybody zooms a map
+            // on a phone — the buttons were a decade-old default, not a decision.
+            zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             // The province's map is already grey and already made to be drawn over, so all this
             // does now is take it down to the app's own night. The OSM raster style needed
             // desaturating as well, because it was a green-and-beige daylight road map.

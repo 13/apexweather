@@ -202,6 +202,11 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   returns identical bytes but wants the zoom **zero-padded to two digits**, which is a trap at zoom 7.
   The place is marked with a ring rather than osmdroid's stock green pin-with-a-hand: a pin covers
   the ground it points at, and which valley the village sits in is half of what this map is for.
+  **osmdroid's built-in zoom buttons are switched off** (`CustomZoomButtonsController.Visibility.NEVER`)
+  and must stay off: they are a stock pair of grey +/- squares in a grey that belongs to no part of
+  this app, sitting over the province, and pinching is how anybody zooms a map on a phone. Every
+  control the reader touches lives in one stack above the timeline instead — the way back to the
+  place included — so none of it covers the map they are trying to look at.
   **The province's own radar is not used, and cannot be without guessing.** It is better data —
   Monte Macaion, 120 km, fifteen frames five minutes apart against RainViewer's thirteen at ten, and
   `api/v2/radar/weatherHD` gives each frame an exact time in its `Last-Modified` header. But it is
@@ -217,9 +222,21 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   colour is honest about being a wash where a solid block is not. The alpha goes on a `ColorMatrix`,
   since osmdroid's `TilesOverlay` has none of its own.
   **The timeline carries both halves: where the rain has been and where it is going.** The radar's
-  last two hours are followed by GeoSphere's INCA nowcast — 1 km, quarter-hourly, two and a half
-  hours ahead — merged by `MapUiState.timeline`, which drops forecast steps the radar has already
-  watched because INCA reaches back to its own reference time. `MapFrame` keeps the two kinds apart
+  last two hours are followed by **a day of forecast in two resolutions** — GeoSphere's INCA nowcast
+  for the two and a half hours it runs (1 km, quarter-hourly, radar-blended) and then AROME hourly
+  at 2,5 km out to twenty-four. The join is where INCA stops, and `NowcastMapper.mapOutlook` takes
+  `after` so the coarser run never draws over an hour the finer one covers. AROME's `rr_acc` is
+  **accumulated from the run's start**, so consecutive steps are differenced — undifferenced it
+  would paint the whole day's rain onto every hour of it. Its first step has nothing to difference
+  against and is dropped rather than taken whole. `MapUiState.timeline` then drops forecast steps
+  the radar has already watched, because INCA reaches back to its own reference time.
+  The 2,5 km run rather than the 1 km one for the far hours is a measurement: over a place box a day
+  of the kilometre grid is 488 kB and this is 117 kB, for a resolution still finer than the radar's
+  at any zoom anyone uses. The kilometre is spent where it buys something, on the next two hours.
+  **A frame a day out cannot be labelled with the clock alone** — at eleven in the morning "10:00"
+  reads as an hour ago — so the card uses `Format.dayTime`, which puts the short weekday in front on
+  any day but the present one. The present on this timeline is the newest frame a radar actually
+  saw, not a clock the composable would have to be handed. `MapFrame` keeps the two kinds apart
   all the way to the screen: the card names which one it is showing, the track is solid for the past
   and dashed for the future with a tick at the present, and the forecast is drawn a shade lighter
   than the radar. **Confusing "this happened" with "this is expected" is the one mistake this map

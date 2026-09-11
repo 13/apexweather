@@ -38,8 +38,36 @@ interface NowcastApi {
         @Query("output_format") outputFormat: String = "geojson",
     ): NowcastResponse
 
+    /**
+     * The rest of the day, from AROME on the same grid service.
+     *
+     * INCA stops two and a half hours out, and "will it rain this evening" is a map question too.
+     * This is the 2,5 km run rather than the 1 km one on purpose: over a box around the place the
+     * kilometre grid is 488 kB for a day and this is 117 kB, for a resolution still finer than the
+     * radar's own at the zooms anyone looks at. The near hours keep INCA's kilometre and its
+     * quarter hours, which is where resolution actually buys something.
+     *
+     * `rr_acc` is accumulated from the run's start, so consecutive steps are differenced — the same
+     * shape `GeoSphereMapper` already handles for the village.
+     */
+    @GET("v1/grid/forecast/nwp-v1-1h-2500m")
+    suspend fun outlook(
+        @Query("bbox") bbox: String,
+        @Query("end") end: String,
+        @Query("parameters") parameters: String = "rr_acc",
+        @Query("output_format") outputFormat: String = "geojson",
+    ): NowcastResponse
+
     companion object {
         const val BASE_URL = "https://dataset.api.hub.geosphere.at/"
+
+        /** How far the map's forecast reaches. */
+        const val OUTLOOK_HOURS = 24L
+
+        /** The `end` this service wants: local-ish ISO minutes, no offset and no seconds. */
+        fun endOf(now: Instant): String = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
+            .withZone(java.time.ZoneOffset.UTC)
+            .format(now.plusSeconds(OUTLOOK_HOURS * 3600))
 
         /** `bbox` wants south,west,north,east. */
         fun boxAround(place: Place): String {
@@ -112,6 +140,36 @@ object NowcastMapper {
 
     private fun parse(text: String): Instant? =
         runCatching { OffsetDateTime.parse(text, TIME).toInstant() }.getOrNull()
+
+    /**
+     * AROME's accumulated series, turned into the same per-step rates INCA gives.
+     *
+     * [after] is the last hour the finer forecast already covers; steps at or before it are dropped
+     * rather than drawn twice. The first surviving step is differenced against the one before it in
+     * the response, so the hour's own rain is what is shown and not the run's total to date.
+     */
+    fun mapOutlook(resp: NowcastResponse, after: Instant?): PrecipNowcast {
+        val issuedAt = parse(resp.referenceTime) ?: return PrecipNowcast.EMPTY
+        val times = resp.timestamps.map(::parse)
+        val steps = times.mapIndexedNotNull { i, time ->
+            if (time == null) return@mapIndexedNotNull null
+            if (i == 0) return@mapIndexedNotNull null // nothing to difference against
+            if (after != null && !time.isAfter(after)) return@mapIndexedNotNull null
+            val cells = resp.features.mapNotNull { feature ->
+                val lon = feature.geometry.coordinates.getOrNull(0) ?: return@mapNotNull null
+                val lat = feature.geometry.coordinates.getOrNull(1) ?: return@mapNotNull null
+                val series = feature.properties.parameters["rr_acc"]?.data ?: return@mapNotNull null
+                val now = series.getOrNull(i) ?: return@mapNotNull null
+                val before = series.getOrNull(i - 1) ?: return@mapNotNull null
+                // An accumulation that goes backwards is a new run spliced into the series, not
+                // rain that un-fell.
+                val rate = (now - before).coerceAtLeast(0.0)
+                if (rate < MIN_MM_PER_HOUR) null else NowcastCell(lat, lon, rate)
+            }
+            NowcastStep(time, cells)
+        }
+        return PrecipNowcast(issuedAt, steps)
+    }
 
     fun map(resp: NowcastResponse): PrecipNowcast {
         val issuedAt = parse(resp.referenceTime) ?: return PrecipNowcast.EMPTY
