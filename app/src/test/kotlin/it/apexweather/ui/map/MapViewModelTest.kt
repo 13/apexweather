@@ -1,5 +1,8 @@
 package it.apexweather.ui.map
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ApplicationProvider
 import it.apexweather.Fixtures
 import it.apexweather.data.FakeEnsemble
@@ -130,22 +133,48 @@ class MapViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel() = MapViewModel(RadarRepository(rainViewer, clock), NowcastRepository(NoNowcast(), clock), holder)
+    /**
+     * Built through a [ViewModelStore] so the test can *clear* it, which is the only public way to
+     * cancel a `viewModelScope`.
+     *
+     * Leaving it uncancelled is not harmless. The ViewModel goes on collecting the holder's state
+     * after the test body ends, and `tearDown` then closes the database under it — the exception
+     * that throws surfaces in whichever test the dispatcher happens to run next, as
+     * `UncaughtExceptionsBeforeTest`. It passed here every time and failed on CI, which is what a
+     * leak between tests looks like.
+     */
+    private fun store() = ViewModelStore()
+
+    private fun ViewModelStore.mapViewModel(): MapViewModel = ViewModelProvider(
+        this,
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                MapViewModel(RadarRepository(rainViewer, clock), NowcastRepository(NoNowcast(), clock), holder) as T
+        },
+    )[MapViewModel::class.java]
 
     /**
-     * A test with the loop guaranteed to be stopped at the end.
+     * A test with the loop stopped and the ViewModel cleared at the end.
      *
      * `runTest` will not finish while work is still scheduled on its clock, and the animation is a
      * `while (true)` of delays — a test that leaves it running does not fail, it hangs.
      */
-    private fun mapTest(body: suspend kotlinx.coroutines.test.TestScope.(MapViewModel) -> Unit) =
+    private fun mapTest(
+        frames: Int = 13,
+        body: suspend kotlinx.coroutines.test.TestScope.(MapViewModel) -> Unit,
+    ) =
         runTest(mainDispatcher.scheduler) {
-            val vm = viewModel()
+            rainViewer.frames = frames
+            val store = store()
+            val vm = store.mapViewModel()
             runCurrent()
             try {
                 body(vm)
             } finally {
                 vm.pause()
+                store.clear()
+                runCurrent()
             }
         }
 
@@ -238,10 +267,7 @@ class MapViewModelTest {
 
     /** One frame is not a loop, and a slider with one stop cannot be dragged either. */
     @Test
-    fun `a single frame never starts the animation`() = runTest(mainDispatcher.scheduler) {
-        rainViewer.frames = 1
-        val vm = viewModel()
-        runCurrent()
+    fun `a single frame never starts the animation`() = mapTest(frames = 1) { vm ->
         vm.play()
         advanceTimeBy(5_000)
         runCurrent()
