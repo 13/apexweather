@@ -40,6 +40,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
@@ -106,6 +107,14 @@ fun ApexApp() {
     val dest = backStack?.destination
 
     Box(Modifier.fillMaxSize()) {
+        // Coming back to the app asks for today's weather, whichever tab it comes back to. This sits
+        // here rather than on the home screen because the reader who left the app on the comparison
+        // or the radar is owed the same thing, and because a ViewModel outlives a trip to another
+        // app — its one-shot check in init cannot notice that the cache has since gone stale.
+        LifecycleResumeEffect(Unit) {
+            homeVm.onResumed()
+            onPauseOrDispose { }
+        }
         SkyBackground(sky.palette, sky.animations)
         Scaffold(
             containerColor = Color.Transparent,

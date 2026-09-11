@@ -37,6 +37,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.apexweather.BuildConfig
 import it.apexweather.R
@@ -59,6 +60,14 @@ import java.io.File
 @Composable
 fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Frames are the last two hours of radar and the newest is the point of them, so a tab returned
+    // to later must not still show the old loop — the ViewModel fetches once when it is created and
+    // would otherwise never ask again. RadarRepository keeps its own ten-minute guard, which is
+    // RainViewer's publishing interval, so asking on every resume costs nothing.
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
     MapContent(
         state,
         onPlayPause = { if (state.playing) viewModel.pause() else viewModel.play() },

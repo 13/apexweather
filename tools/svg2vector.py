@@ -26,6 +26,7 @@ clip-path, so nothing is approximated here.
 An unhandled tag or attribute raises. If a future Meteocons release brings gradients — the fill,
 flat and line styles already have them — this script will say so instead of quietly dropping them.
 """
+import math
 import pathlib
 import re
 import sys
@@ -39,6 +40,24 @@ SIZE_DP = 24
 
 # Every stroke and fill in the monochrome style is this, and the app tints it at the use site.
 INK = "#FF000000"
+
+# How much of the canvas the drawn part of an icon fills.
+#
+# Meteocons draws each glyph at its natural size inside the 128-unit canvas, and those differ by
+# more than a factor of two: a crescent moon inks 0.47 of the canvas, a sun 0.88, a sun behind a
+# cloud 1.14. Asked for the same dp box, the moon therefore arrived half the size of the sun, and
+# the hero temperature's icon changed size with the weather. Every icon is scaled about the canvas
+# centre to this fraction instead, so a box of a given size means the same amount of ink whichever
+# condition it holds. It is applied here rather than at the call sites because the widget, the
+# hour strip and both sheets draw the same drawables.
+#
+# The target is the ink's *height*, because that is what the eye compares an icon against — the
+# temperature beside it, the row it sits in. Scaling by the longer side instead makes a wide glyph
+# short: a cloud is half again as wide as it is tall, so matching its width to a moon's height left
+# it visibly smaller than the moon, which was the complaint. Width is capped so that a wide glyph
+# shrinks rather than spilling out of the canvas, which a VectorDrawable would simply clip.
+TARGET_INK = 0.875
+MAX_INK_WIDTH = 0.98
 
 KNOWN_ATTRS = {
     "path": {"d", "fill", "fill-rule", "clip-rule", "stroke", "stroke-width", "stroke-linecap",
@@ -55,6 +74,153 @@ KNOWN_ATTRS = {
 
 def fail(msg):
     raise SystemExit(f"svg2vector: {msg}")
+
+
+import math, re
+
+TOKEN = re.compile(r"[MmLlHhVvCcSsQqTtAaZz]|-?\d*\.?\d+(?:[eE][-+]?\d+)?")
+
+
+def _arc_points(x0, y0, rx, ry, phi, large, sweep, x1, y1, steps=24):
+    if rx == 0 or ry == 0:
+        return [(x1, y1)]
+    phi = math.radians(phi)
+    cs, sn = math.cos(phi), math.sin(phi)
+    dx2, dy2 = (x0 - x1) / 2.0, (y0 - y1) / 2.0
+    x1p, y1p = cs * dx2 + sn * dy2, -sn * dx2 + cs * dy2
+    rx, ry = abs(rx), abs(ry)
+    lam = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry)
+    if lam > 1:
+        s = math.sqrt(lam)
+        rx, ry = rx * s, ry * s
+    num = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p
+    den = rx * rx * y1p * y1p + ry * ry * x1p * x1p
+    co = math.sqrt(max(num / den, 0)) * (-1 if large == sweep else 1)
+    cxp, cyp = co * rx * y1p / ry, -co * ry * x1p / rx
+    cx = cs * cxp - sn * cyp + (x0 + x1) / 2.0
+    cy = sn * cxp + cs * cyp + (y0 + y1) / 2.0
+
+    def ang(ux, uy, vx, vy):
+        d = (math.hypot(ux, uy) * math.hypot(vx, vy))
+        if d == 0:
+            return 0.0
+        c = max(-1.0, min(1.0, (ux * vx + uy * vy) / d))
+        a = math.acos(c)
+        return -a if ux * vy - uy * vx < 0 else a
+
+    th0 = ang(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry)
+    dth = ang((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry)
+    if not sweep and dth > 0:
+        dth -= 2 * math.pi
+    elif sweep and dth < 0:
+        dth += 2 * math.pi
+    pts = []
+    for i in range(1, steps + 1):
+        th = th0 + dth * i / steps
+        pts.append((cs * rx * math.cos(th) - sn * ry * math.sin(th) + cx,
+                    sn * rx * math.cos(th) + cs * ry * math.sin(th) + cy))
+    return pts
+
+
+def _bezier(p, steps=24):
+    out = []
+    n = len(p) - 1
+    for i in range(1, steps + 1):
+        t = i / steps
+        x = y = 0.0
+        for k, (px, py) in enumerate(p):
+            b = math.comb(n, k) * (1 - t) ** (n - k) * t ** k
+            x += b * px
+            y += b * py
+        out.append((x, y))
+    return out
+
+
+def points(d):
+    """Every point the path passes through, curves flattened."""
+    toks = TOKEN.findall(d)
+    i = 0
+    cur = (0.0, 0.0)
+    start = (0.0, 0.0)
+    prev_c = None
+    prev_q = None
+    cmd = None
+    pts = []
+
+    def take(n):
+        nonlocal i
+        vals = [float(v) for v in toks[i:i + n]]
+        i += n
+        return vals
+
+    while i < len(toks):
+        if re.fullmatch(r"[A-Za-z]", toks[i]):
+            cmd = toks[i]
+            i += 1
+            if cmd in "Zz":
+                cur = start
+                pts.append(cur)
+                continue
+        rel = cmd.islower()
+        c = cmd.upper()
+        if c == "M":
+            x, y = take(2)
+            cur = (cur[0] + x, cur[1] + y) if rel else (x, y)
+            start = cur
+            pts.append(cur)
+            cmd = "l" if rel else "L"
+        elif c == "L":
+            x, y = take(2)
+            cur = (cur[0] + x, cur[1] + y) if rel else (x, y)
+            pts.append(cur)
+        elif c == "H":
+            (x,) = take(1)
+            cur = (cur[0] + x, cur[1]) if rel else (x, cur[1])
+            pts.append(cur)
+        elif c == "V":
+            (y,) = take(1)
+            cur = (cur[0], cur[1] + y) if rel else (cur[0], y)
+            pts.append(cur)
+        elif c in ("C", "S", "Q", "T"):
+            if c == "C":
+                x1, y1, x2, y2, x, y = take(6)
+                if rel:
+                    x1, y1, x2, y2, x, y = cur[0] + x1, cur[1] + y1, cur[0] + x2, cur[1] + y2, cur[0] + x, cur[1] + y
+                ctrl = [cur, (x1, y1), (x2, y2), (x, y)]
+            elif c == "S":
+                x2, y2, x, y = take(4)
+                if rel:
+                    x2, y2, x, y = cur[0] + x2, cur[1] + y2, cur[0] + x, cur[1] + y
+                r = prev_c or cur
+                ctrl = [cur, (2 * cur[0] - r[0], 2 * cur[1] - r[1]), (x2, y2), (x, y)]
+            elif c == "Q":
+                x1, y1, x, y = take(4)
+                if rel:
+                    x1, y1, x, y = cur[0] + x1, cur[1] + y1, cur[0] + x, cur[1] + y
+                ctrl = [cur, (x1, y1), (x, y)]
+            else:
+                x, y = take(2)
+                if rel:
+                    x, y = cur[0] + x, cur[1] + y
+                r = prev_q or cur
+                ctrl = [cur, (2 * cur[0] - r[0], 2 * cur[1] - r[1]), (x, y)]
+            seg = _bezier(ctrl)
+            pts += seg
+            prev_c = ctrl[-2] if c in ("C", "S") else None
+            prev_q = ctrl[-2] if c in ("Q", "T") else None
+            cur = ctrl[-1]
+            continue
+        elif c == "A":
+            rx, ry, rot, large, sweep, x, y = take(7)
+            if rel:
+                x, y = cur[0] + x, cur[1] + y
+            seg = _arc_points(cur[0], cur[1], rx, ry, rot, int(large), int(sweep), x, y)
+            pts += seg
+            cur = (x, y)
+        else:
+            raise SystemExit(f"path command {cmd!r} is not handled")
+        prev_c = prev_q = None
+    return pts
 
 
 def num(v):
@@ -141,7 +307,47 @@ class Converter:
 
     # ---- emitting ----
 
+    def ink_bounds(self):
+        """The box the drawn shapes actually cover, strokes included, in canvas units.
+
+        Clip paths and masks are not measured: they are not ink. That exclusion is load-bearing
+        rather than tidy — every mask in these files is a full-canvas rectangle carrying a fill, so
+        counting it measured every cloudy icon as exactly 128 by 128 and scaled it by one.
+
+        Where a mask cuts a shape the box is still an over-estimate, which for these seventeen files
+        is never the side that decides the size: a hidden sun disc sits inside its own rays.
+        """
+        hidden = {id(e) for holder in self.root.iter() if tag_of(holder) in ("mask", "clipPath", "defs")
+                  for e in holder.iter()}
+        xs, ys = [], []
+        for e in self.root.iter():
+            if tag_of(e) not in ("path", "rect", "circle") or id(e) in hidden:
+                continue
+            if e.get("fill") in (None, "none") and e.get("stroke") in (None, "none"):
+                continue  # a shape that draws nothing
+            pts = points(shape_path(e))
+            m = re.fullmatch(r"translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\s*\)", (e.get("transform") or "").strip())
+            if m:
+                dx, dy = float(m.group(1)), float(m.group(2))
+                pts = [(x + dx, y + dy) for x, y in pts]
+            pad = float(e.get("stroke-width", 0)) / 2 if e.get("stroke") not in (None, "none") else 0.0
+            xs += [x - pad for x, _ in pts] + [x + pad for x, _ in pts]
+            ys += [y - pad for _, y in pts] + [y + pad for _, y in pts]
+        if not xs:
+            fail("nothing is drawn in this file")
+        return min(xs), min(ys), max(xs), max(ys)
+
+    def normalisation(self):
+        """Scale and offset putting the ink at [TARGET_INK] of the canvas, centred."""
+        x0, y0, x1, y1 = self.ink_bounds()
+        ink_w, ink_h = x1 - x0, y1 - y0
+        if ink_w <= 0 or ink_h <= 0:
+            fail("the drawn shapes have no size")
+        scale = min(TARGET_INK * self.h / ink_h, MAX_INK_WIDTH * self.w / ink_w)
+        return scale, self.w / 2 - scale * (x0 + x1) / 2, self.h / 2 - scale * (y0 + y1) / 2
+
     def convert(self, name):
+        scale, tx, ty = self.normalisation()
         out = [
             '<?xml version="1.0" encoding="utf-8"?>',
             f'<!-- {name}, from Meteocons (MIT). Generated by tools/svg2vector.py; do not edit by hand. -->',
@@ -149,7 +355,11 @@ class Converter:
             f'    android:width="{SIZE_DP}dp" android:height="{SIZE_DP}dp"',
             f'    android:viewportWidth="{num(self.w)}" android:viewportHeight="{num(self.h)}">',
         ]
-        out += self.children(self.root, indent=1)
+        out.append('    <!-- scaled so every condition inks the same height; see tools/svg2vector.py -->')
+        out.append(f'    <group android:scaleX="{num(scale)}" android:scaleY="{num(scale)}"')
+        out.append(f'        android:translateX="{num(tx)}" android:translateY="{num(ty)}">')
+        out += self.children(self.root, indent=2)
+        out.append("    </group>")
         out.append("</vector>")
         out.append("")
         return "\n".join(out)

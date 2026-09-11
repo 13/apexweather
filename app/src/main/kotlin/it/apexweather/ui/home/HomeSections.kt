@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.painterResource
@@ -89,10 +90,17 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
         // The number and the picture are the two halves of one answer, so they share a line. The
         // icon carries no content description: the word for the condition is directly underneath,
         // and describing the icon as well would have a screen reader say the weather twice.
+        //
+        // Its size comes from the temperature's own type rather than a constant, so the two stay
+        // the same height at every font scale. The factor is the two fills multiplied out: the
+        // generated icons ink 0.875 of their box (see tools/svg2vector.py) and a digit's cap is
+        // about 0.7 of its font size.
+        val tempStyle = MaterialTheme.typography.displayLarge
+        val iconSize = with(LocalDensity.current) { (tempStyle.fontSize * 0.8f).toDp() }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
                 text = state.heroTempC?.let { Format.temp(it, formats) } ?: "–",
-                style = MaterialTheme.typography.displayLarge,
+                style = tempStyle,
                 color = Color.White,
                 // Without a weight a wide reading at a large font/display scale fills the row and the
                 // 56 dp icon is measured against zero width left over — it just disappears. The number
@@ -104,7 +112,7 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
                 painterResource(state.heroCondition.iconRes(state.phase)),
                 contentDescription = null,
                 tint = Color.fromArgb(state.palette.accent),
-                modifier = Modifier.size(56.dp).testTag("hero_condition_icon"),
+                modifier = Modifier.size(iconSize).testTag("hero_condition_icon"),
             )
         }
         Text(state.heroCondition.label(), style = MaterialTheme.typography.headlineMedium, color = Color.White)
