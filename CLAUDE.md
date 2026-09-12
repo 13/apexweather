@@ -378,8 +378,13 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   through the ridge's edges: those carry on upward and slice the disc into a bowtie. The sun's rays
   are not decoration either — without them the disc and the chevron read as head and shoulders once
   Android flattens them for a themed icon — and only the five upper ones are drawn, because a
-  downward ray runs into the ridge. `ic_notification.xml` deliberately keeps the old A-sharp
-  silhouette: at 24 dp the rays turn to mush. Source of the original glyph:
+  downward ray runs into the ridge. `ic_notification.xml` carries **the same mark**, not the old
+  A-sharp silhouette it was left on when the launcher was redrawn — the app wore one logo on the
+  home screen and another in the status bar and on every notification. Android flattens it to a
+  white silhouette, so two things give at 24 dp: the rays are thicker and shorter (stroke 14 over
+  r 62–76 against the launcher's 9 over 63–74, or they are under a pixel wide and turn to mush) and
+  the gap is cut wider (the ridge silhouette pushed 13 units outward, not 8, or the peak stops
+  reading as standing in front). Source of the original glyph:
   `assets/apexmaps-A-sharp-source.svg`.
 
 ## Conventions
@@ -573,14 +578,34 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   carrying the whole -2,35 K up gave 11,0 against a village thermometer reading 12: cold air pools
   on the valley floor and the slope does not join in. The fade's thresholds are a judgement from
   that one night, not a measurement.
+  **The anomaly is measured at the minute the thermometer read, not on the hour.** Meran publishes
+  every twenty minutes and the models exist only on the hour, so a reading sat up to fifty minutes
+  from the value it was held against — and on a September morning the models have this valley
+  warming three degrees an hour (measured: the station went 10,9 at 08:00 to 14,4 at 08:40). That
+  charged the thermometer for warming it had not done yet and invented most of a cold anomaly, which
+  was then partly carried up the hill. `StationReference.interpolatedAt` straight-lines between the
+  two hours either side; at the end of the series the last hour stands on its own.
   **And the result may never leave the bracket its two sources span** — never colder than both the
   thermometer and the models' own village value, never warmer than both. At 05:00 the same morning
   the station read 12,9 and the models put the village at 12,95, while their gap between the two
   points still said -1,5 K, so the hero led with 11,4: a number neither source supported, against a
   village thermometer reading 12 to 13. The models do not resolve what this valley does at night.
   The bracket costs the honest case nothing — an afternoon where the station really is the warmer of
-  the two leaves the moved reading untouched inside it. The line under the hero quotes the move that
-  was applied, and says nothing where that move rounds to zero.
+  the two leaves the moved reading untouched inside it.
+  **When it does leave the bracket, the models win, not the thermometer** — `villageTemperature`
+  returns null and the caller falls back to the consensus, which is already at the village's height.
+  It used to clamp to the nearer end, and the nearer end is the thermometer whenever the reading is
+  the outer value. On 2026-09-12 at 08:00 Meran was fogged in — 10,9 at 100 % humidity under
+  35 W/m² — while Dorf Tirol 264 m above it was in the clear at about 13. The carried reading came
+  out under both, the clamp handed the screen 10,9, and the strip one line below read 13 with
+  nothing accounting for the gap. The raw reading is the last resort, never the fallback.
+  The line under the hero quotes the move that was applied, and says nothing where that move rounds
+  to zero.
+- **The hero and the strip's first column are the same hour and must be the same weather.**
+  `HomeStateBuilder` re-votes that hour's condition (`StationFog`, `StationSun`) and gives it the
+  hero's temperature; only the condition was ever carried across, and the temperature quietly was
+  not. That hour alone — a thermometer speaks for the hour it measured, and the other forty-seven
+  are still exactly what the models say.
 - Numbers, dates and times go through `ui/common/Format.kt`, which takes an explicit `Formats`
   (locale plus the 24-hour flag). Inside a composition take it from `LocalFormats.current`; outside
   one, build it from a `Context`. Never format with `Locale.ROOT` or interpolate a number into a

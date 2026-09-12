@@ -79,17 +79,63 @@ class StationDownscaleTest {
      * 12,95. Their gap carried the reading down to 11,4 — colder than the thermometer and colder
      * than the forecast, a number neither source supported. The village's own thermometer read 12
      * to 13. The result may not leave the bracket its two sources span.
+     *
+     * Leaving it means the two sources cannot be reconciled, and there is then nothing here worth
+     * quoting: the caller falls back to the models' own village value, which is already at the
+     * village's height. It used to be clamped to the nearer end of the bracket instead, and the
+     * nearer end is the thermometer whenever the reading is the outer value — see the class doc for
+     * the morning over Dorf Tirol that turned that into the Etschtal's fog quoted as the village's
+     * temperature. On this night it makes no difference to the screen, because the nearer end here
+     * *is* the models' village value.
      */
     @Test
-    fun `the moved reading never leaves what its two sources say`() {
+    fun `a reading that cannot be reconciled with the models is not quoted at all`() {
         // models: village 10,0, station 11,5 (a gap of -1,5); thermometer 10,05, just above both.
+        // Carrying it up gives 8,55 — colder than the thermometer and colder than the forecast.
         val t = StationDownscale.villageTemperature(
             observation(hour(2), 10.05), reference(offsetFromVillage = 1.5), forecasts, consensus, now = hour(2), heightDifferenceM = dz,
-        )!!
-        // Pulled back to the nearer end of the bracket, which here is the models' own village value.
-        assertTrue("$t is colder than both the thermometer and the forecast", t >= 10.0)
-        assertTrue("$t is warmer than both", t <= 10.05)
-        assertEquals(10.0, t, 1e-9)
+        )
+        assertNull(t)
+    }
+
+    /**
+     * The thermometer does not report on the hour, and the models only exist on it.
+     *
+     * Meran publishes every twenty minutes, so a reading is up to fifty minutes away from the model
+     * hour it used to be compared against — and on a September morning the models have the valley
+     * warming at three degrees an hour. Measuring the station's anomaly against a stale hour charges
+     * the thermometer for the warming it has not done yet, invents a cold anomaly of up to two and a
+     * half degrees, and then carries part of that invention up the hill. That is most of what put
+     * 11° over Dorf Tirol on 2026-09-12 while the strip below it said 13: the 07:50 reading was held
+     * against the models' 07:00.
+     *
+     * The models are interpolated to the minute the thermometer actually read instead.
+     */
+    @Test
+    fun `the anomaly is measured at the minute the thermometer read, not on the hour`() {
+        val ramping = StationReference(
+            fetchedAt = hour(0), elevationM = 330.0,
+            bySource = mapOf(
+                Source.ICON_CH1.name to mapOf(hour(2).epochSecond to 12.0, hour(3).epochSecond to 15.0),
+                Source.ICON_D2.name to mapOf(hour(2).epochSecond to 12.0, hour(3).epochSecond to 15.0),
+            ),
+        )
+        val halfPast = hour(2).plusSeconds(1800)
+        // Halfway through a 3 K hour the models say 13,5 there, so a thermometer reading 13,0 is
+        // half a degree cool — not the whole degree warm the hour's own value would have made it.
+        assertEquals(-0.5, StationDownscale.stationAnomaly(halfPast, 13.0, ramping, now = hour(3))!!, 1e-9)
+        // On the hour there is nothing to interpolate and the value is the hour's own.
+        assertEquals(1.0, StationDownscale.stationAnomaly(hour(2), 13.0, ramping, now = hour(3))!!, 1e-9)
+    }
+
+    /** The last hour the reference covers has no hour after it to lean on, and is used as it is. */
+    @Test
+    fun `a reading past the end of the reference falls back to the last hour it has`() {
+        val ending = StationReference(
+            fetchedAt = hour(0), elevationM = 330.0,
+            bySource = mapOf(Source.ICON_CH1.name to mapOf(hour(2).epochSecond to 12.0)),
+        )
+        assertEquals(1.0, StationDownscale.stationAnomaly(hour(2).plusSeconds(1800), 13.0, ending, now = hour(3))!!, 1e-9)
     }
 
     /** The bracket costs the honest case nothing: an afternoon correction still applies in full. */

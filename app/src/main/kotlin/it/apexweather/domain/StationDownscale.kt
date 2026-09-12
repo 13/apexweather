@@ -123,7 +123,23 @@ object StationDownscale {
         //
         // It costs the honest case nothing: an afternoon where the station really is the warmer of
         // the two leaves the moved reading inside the bracket, untouched.
-        return moved.coerceIn(minOf(observed, forecast), maxOf(observed, forecast))
+        //
+        // Which of the two wins when it *is* outside is the second half of the same question, and
+        // clamping to the nearer end answered it wrongly. Clamping means the thermometer whenever
+        // the reading is the outer value — and the thermometer is the source standing in the wrong
+        // place. Measured over Dorf Tirol on 2026-09-12 at 08:00: Meran read 10,9 at 100 % humidity
+        // under 35 W/m², which is a valley floor with cold air pooled on it and the fog to prove it,
+        // while the village 264 m up was in the clear at about 13. The models put the station at
+        // 13,35 and the village at 13,0; the carried reading came out at 10,08, under both. The
+        // clamp handed the screen 10,9 — the Etschtal's temperature quoted as the village's, with
+        // the strip one line below reading 13 and nothing accounting for the gap.
+        //
+        // So: give way to the models. They are already at the village's height, which is the whole
+        // reason this class exists, and it is the same answer the caller reaches when there is no
+        // reference at all — the raw reading is the last resort, never the fallback. Returning null
+        // rather than the forecast keeps that decision in one place, and stops the hero calling
+        // itself a measurement it no longer is.
+        return moved.takeIf { it in minOf(observed, forecast)..maxOf(observed, forecast) }
     }
 
     /**
@@ -139,11 +155,18 @@ object StationDownscale {
         }
     }
 
-    /** What the thermometer reads minus what the models say it should, at that hour. */
+    /**
+     * What the thermometer reads minus what the models say it should, at the minute it read it.
+     *
+     * At the minute, not at the hour: the station publishes every twenty minutes and the models only
+     * exist on the hour, so a reading is up to fifty minutes from the value it used to be held
+     * against. See [StationReference.interpolatedAt] for what that was worth — on the morning of
+     * 2026-09-12 it was most of the two degrees that put the hero below the strip.
+     */
     fun stationAnomaly(time: Instant, observed: Double, reference: StationReference?, now: Instant): Double? {
         if (reference == null) return null
         if (ChronoUnit.HOURS.between(reference.fetchedAt, now) > REFERENCE_MAX_AGE_HOURS) return null
-        val atStation = reference.tempAt(time.truncatedTo(ChronoUnit.HOURS)) ?: return null
+        val atStation = reference.interpolatedTempAt(time) ?: return null
         return observed - atStation
     }
 

@@ -94,6 +94,40 @@ class HomeStateBuilderTest {
     }
 
     /**
+     * When the carried reading lands outside what either of its sources says, neither of them
+     * supports it and the station's is the one standing at the wrong altitude. The models' village
+     * value wins, and the hero stops calling itself a measurement.
+     *
+     * Measured over Dorf Tirol on 2026-09-12 at 08:00. Meran was fogged in — 10,9 °C at 100 %
+     * humidity under 35 W/m² of global radiation, which is a valley floor with cold air pooled on
+     * it — while the village 264 m up was in the clear at about 13. The eight models put the station
+     * at 13,35 and the village at 13,0, and their own gap between the two points said -1,60. The
+     * carried reading came out at 10,08, below the thermometer *and* below the models' village, and
+     * the bracket then handed the screen the raw 10,9: the Etschtal's temperature, quoted as the
+     * village's, with the strip one line below it reading 13. The bracket was written to stop the
+     * app leading with a number nothing supports; picking the thermometer when the two cannot be
+     * reconciled is that same fault in the other direction, because the thermometer is the source
+     * that is in the wrong place.
+     */
+    @Test
+    fun `a reading that cannot be reconciled with the models gives way to them`() {
+        // Models: village 14,0, station 16,0. A thermometer reading 13,0 is 3 K below what the
+        // models say about its own site, and carrying what is left of that up the hill lands at
+        // 12,5 — colder than the reading and colder than the models' village both.
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(observation = observation(13.0), stationReference = reference(warmerBy = 2.0)),
+            AppSettings(), consensus, now = hour(3).plusSeconds(600),
+        )
+        assertEquals(consensus.hourly[3].tempC, s.heroTempC!!, 1e-9)
+        // Not a moved reading any more, so the line under the hero must not claim one — and the
+        // station's own card still shows what was actually measured.
+        assertNull(s.heroAdjustmentC)
+        assertNull(s.observation)
+        assertTrue(s.station != null)
+        // And the column labelled "Jetzt" says the same thing the hero does.
+        assertEquals(s.heroTempC!!, s.upcomingHours.first().tempC, 1e-9)
+    }
+
+    /**
      * With nothing to carry it up with, the raw station reading is 270 m too low to stand for the
      * village, while the consensus is already at the village's height. The forecast wins.
      */
@@ -124,6 +158,37 @@ class HomeStateBuilderTest {
         val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(observation = obs), AppSettings(), consensus, now = hour(0).plus(Duration.ofMinutes(91)))
         assertNull(s.observation)
         assertEquals(consensus.hourly[1].tempC, s.heroTempC!!, 0.0)
+    }
+
+    /**
+     * The strip's first column is labelled "Jetzt", and so is the hero. Two different numbers under
+     * one word is the bug this covers.
+     *
+     * Measured on the phone on 2026-09-12 at 08:14 over Dorf Tirol: the hero read 11° and the column
+     * directly beneath it read 13°, with nothing on screen accounting for the gap. The models had
+     * the morning 2,5 K too warm — the thermometer in Meran read 10,9 where they put it at 13,35,
+     * and the stations standing at the village's own height (St. Martin, 588 m: 9,1; Naturns,
+     * 541 m: 9,4) agreed with the thermometer, not with the models. The hero had the correction and
+     * the strip did not, because only the hour's *condition* was ever carried across.
+     */
+    @Test
+    fun `the strip's first column carries the hero's corrected temperature`() {
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot.copy(observation = observation(16.5), stationReference = reference(warmerBy = 2.0)),
+            AppSettings(), consensus, now = hour(3).plusSeconds(600),
+        )
+        assertEquals(14.5, s.heroTempC!!, 1e-9)
+        assertEquals(s.heroTempC!!, s.upcomingHours.first().tempC, 1e-9)
+        assertEquals(s.heroTempC!!, s.currentHour!!.tempC, 1e-9)
+        // Only that hour. The models are not second-guessed for any hour a thermometer cannot see.
+        assertEquals(consensus.hourly[4].tempC, s.upcomingHours[1].tempC, 1e-9)
+    }
+
+    /** With no reading to correct it with, the column is the consensus, untouched. */
+    @Test
+    fun `the strip's first column is the consensus when the hero is`() {
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), consensus, now = hour(3).plusSeconds(600))
+        assertEquals(consensus.hourly[3].tempC, s.upcomingHours.first().tempC, 0.0)
+        assertEquals(s.heroTempC!!, s.upcomingHours.first().tempC, 0.0)
     }
 
     @Test

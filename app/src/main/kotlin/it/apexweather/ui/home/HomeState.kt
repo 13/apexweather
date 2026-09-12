@@ -178,9 +178,27 @@ object HomeStateBuilder {
             } ?: voted
             if (revoted == h.condition) h else h.copy(condition = revoted)
         }
-        // The strip's first column is this same hour, so it carries the re-vote too; the hero
-        // disagreeing with the column directly beneath it is the failure mode this avoids.
-        val upcoming = if (current == null || current === rawCurrent) upcomingRaw else listOf(current) + upcomingRaw.drop(1)
+        // The hero and the strip's first column both answer to the word "Jetzt", so they have to be
+        // the same weather. The re-vote above gave that hour its condition; this gives it its
+        // temperature, and for the same reason.
+        //
+        // Only the condition was ever carried across, and the temperature quietly was not. Measured
+        // on the phone on 2026-09-12 at 08:14 over Dorf Tirol: the hero read 11° and the column
+        // directly beneath it read 13°, with nothing on screen accounting for the gap. The models
+        // had that morning 2,5 K too warm — the thermometer in Meran read 10,9 where the eight of
+        // them put it at 13,35 — and the hero had the thermometer's word for it while the strip had
+        // only the models. Which of the two was right is not a matter of opinion either: the
+        // stations standing at the village's own height read 9,1 (St. Martin, 588 m) and 9,4
+        // (Naturns, 541 m) at that hour. The corrected number was the better one and it was being
+        // contradicted, on the same screen, one line down.
+        //
+        // This hour alone. A thermometer can only speak for the hour it measured, and the forty-seven
+        // hours after it are still exactly what the models say — see StationSun, which draws the same
+        // line for the same reason.
+        val currentShown = current?.let { h ->
+            if (heroFromStation == null || heroFromStation == h.tempC) h else h.copy(tempC = heroFromStation)
+        }
+        val upcoming = if (currentShown == null || currentShown === rawCurrent) upcomingRaw else listOf(currentShown) + upcomingRaw.drop(1)
         val heroCondition = current?.condition ?: Condition.PARTLY_CLOUDY
         val isEmpty = current == null && obs == null && snapshot.bulletin == null
         return HomeUiState(
@@ -198,7 +216,7 @@ object HomeStateBuilder {
             heroCondition = heroCondition,
             // The ensemble's own spread where it reaches this hour, the models' disagreement otherwise.
             bandHalfWidth = current?.let { it.ensembleHalfWidthC ?: (it.tempMaxC - it.tempMinC) / 2.0 },
-            currentHour = current,
+            currentHour = currentShown,
             observation = obs?.takeIf { heroFromStation != null },
             station = snapshot.observation,
             warnings = snapshot.warnings,

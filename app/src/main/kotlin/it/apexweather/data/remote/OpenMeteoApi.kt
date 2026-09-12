@@ -207,6 +207,38 @@ data class StationReference(
     fun tempAt(t: Instant): Double? = at(t).values.takeIf { it.isNotEmpty() }?.let { ConsensusBlender.median(it.toList()) }
 
     /**
+     * Every model's value at [t] itself, straight-lined between the hours either side of it.
+     *
+     * The models exist on the hour and the thermometer does not: Meran publishes every twenty
+     * minutes, so a reading sits up to fifty minutes from the hour it would otherwise be compared
+     * against. On a September morning the models have this valley warming three degrees an hour, and
+     * charging the thermometer for warming it has not done yet invents an anomaly of most of that —
+     * which is then partly carried up the hill by [it.apexweather.domain.StationDownscale]. A
+     * straight line between two hourly values is not the diurnal curve, but it is right at both ends
+     * and wrong by far less than a whole hour of it in between.
+     *
+     * Where the hour after is missing — the end of the series — the hour before stands on its own
+     * rather than the value being dropped: an observation is worth something even at the far end.
+     */
+    fun interpolatedAt(t: Instant): Map<Source, Double> {
+        val hour = t.truncatedTo(java.time.temporal.ChronoUnit.HOURS)
+        val fraction = (t.epochSecond - hour.epochSecond) / 3600.0
+        if (fraction == 0.0) return at(hour)
+        val before = hour.epochSecond
+        val after = hour.epochSecond + 3600
+        return bySource.mapNotNull { (name, series) ->
+            val source = runCatching { Source.valueOf(name) }.getOrNull() ?: return@mapNotNull null
+            val start = series[before] ?: return@mapNotNull null
+            val end = series[after] ?: return@mapNotNull source to start
+            source to start + (end - start) * fraction
+        }.toMap()
+    }
+
+    /** [interpolatedAt] collapsed to the median, which is what the hill correction reads. */
+    fun interpolatedTempAt(t: Instant): Double? =
+        interpolatedAt(t).values.takeIf { it.isNotEmpty() }?.let { ConsensusBlender.median(it.toList()) }
+
+    /**
      * The same series with [source]'s own hourly temperatures at the station added or replaced.
      *
      * This exists for one source. Eight of the ten models arrive in a single Open-Meteo call that

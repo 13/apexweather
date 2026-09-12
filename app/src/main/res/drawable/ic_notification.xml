@@ -1,16 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Status-bar icon: the same A-sharp glyph as the launcher, but scaled to fill a 24dp canvas
-     instead of sitting inside the launcher's safe zone. Android draws it as a white silhouette,
-     so it carries no colour of its own. -->
+<!--
+  Status-bar icon: the same mark as the launcher — the sun setting behind the Apex Maps chevron —
+  not the old A-sharp glyph. It was left behind when the launcher icon was redrawn, so the app wore
+  one logo on the home screen and a different one in the status bar and on every notification.
+
+  Android draws this as a flat white silhouette, so it carries no colour of its own and the gap
+  between the sun and the ridge is the only thing keeping the two shapes apart — the same problem
+  the themed launcher layer has, and the same answer: see ic_launcher_monochrome.xml.
+
+  The geometry is the launcher's, unchanged, at 1/9 the scale. Two things had to give at 24 dp:
+  the rays are drawn thicker and shorter (stroke 14 over r 62–76, against the launcher's 9 over
+  63–74), because at the launcher's proportions a ray is under a pixel wide here and turns to mush;
+  and the gap between the sun and the peak is cut wider — the ridge silhouette is pushed 13 units
+  outward rather than the launcher's 8 — because at 24 dp the launcher's gap closes up and the peak
+  stops reading as standing in front. The mark also fills the canvas rather than sitting in a
+  launcher safe zone. The rays are still not decoration: without them a disc behind a chevron reads
+  as head and shoulders.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp"
     android:viewportWidth="24" android:viewportHeight="24">
 
-    <group android:scaleX="0.111" android:scaleY="0.111"
-        android:translateX="0.89" android:translateY="1.25">
-        <path android:fillColor="#FFFFFFFF"
-            android:pathData="M10.02,176L100,151.9L189.98,176L100,100.5Z" />
-        <path android:fillColor="#FFFFFFFF"
-            android:pathData="M28.08,142.58L100,82.22L171.92,142.58L100,18Z" />
+    <group android:scaleX="0.11667" android:scaleY="0.11667"
+        android:translateX="0.331" android:translateY="1.91">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M61.95,115.43A52.00,52.00 0 1,1 138.05,115.43L100.00,83.50Z" />
+        <path android:pathData="M38.00,80.00L24.00,80.00"
+            android:strokeColor="#FFFFFFFF" android:strokeWidth="14" android:strokeLineCap="round" />
+        <path android:pathData="M56.16,36.16L46.26,26.26"
+            android:strokeColor="#FFFFFFFF" android:strokeWidth="14" android:strokeLineCap="round" />
+        <path android:pathData="M100.00,18.00L100.00,4.00"
+            android:strokeColor="#FFFFFFFF" android:strokeWidth="14" android:strokeLineCap="round" />
+        <path android:pathData="M143.84,36.16L153.74,26.26"
+            android:strokeColor="#FFFFFFFF" android:strokeWidth="14" android:strokeLineCap="round" />
+        <path android:pathData="M162.00,80.00L176.00,80.00"
+            android:strokeColor="#FFFFFFFF" android:strokeWidth="14" android:strokeLineCap="round" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M10.02,176L100,151.9L189.98,176L100,100.5Z" />
     </group>
 </vector>
