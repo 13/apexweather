@@ -777,6 +777,21 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   the range into four and rounding each tick is what labelled two gridlines "0" on a day with no
   rain in it. The step is never finer than half a unit, because at 0,04 mm the labels all read "0,0"
   instead. It is pure, so the cases live in `ChartAxisTest` rather than on a phone.
+- **Everything the hero says quietly is right-aligned under the icon**, and the feels-like reading
+  shares a line with it. Measured before: the two footnote lines reached 157 and 123 dp of a 360 dp
+  card and each had a row to itself, so a third of the width carried them and two thirds carried
+  nothing — directly under an icon that also leaves the right of its line empty. The block is about
+  17 dp shorter now and the day list starts that much higher.
+  **The line is straight because it is aligned by baseline, not by size.** Matching the type was the
+  first half — the reading was `bodyMedium` against the column's `labelSmall`, 3 dp taller, enough
+  to make the row look bent — but matching sizes is not enough on its own, because the badge beside
+  it is a pill and *its* height is what the row would otherwise be measured by. `alignByBaseline`
+  holds at any font scale where a computed offset would not, and the badge and the reading are their
+  own inner row so the badge centres on **them**: at a 2x font scale the line opposite wraps to
+  three lines and the row grows to 77 dp, and a badge centred in that floats in the middle of the
+  hero, detached from the reading it belongs to. Checked at 1,0 and 2,0.
+  The rain line sits above that row rather than in it — it is the only line there that is weather
+  rather than provenance, it is the one worth reading first, and it is not always present.
 - **The hero's icon is centred in the space left after the temperature** (`HeroLine`), and the
   `Row` of two equally weighted children it replaced was not that, though its comment said so. A
   weighted child's slot is a fixed half of the line, but children are *placed* one after another at

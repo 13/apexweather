@@ -43,6 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -119,27 +120,6 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
         )
         Text(state.heroCondition.label(), style = MaterialTheme.typography.headlineMedium, color = Color.White)
         Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            state.heroFeelsLikeC?.let { Text(stringResource(R.string.feels_like, Format.temp(it, formats)), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f)) }
-            state.bandHalfWidth?.let {
-                AgreementBadge(
-                    it, state.currentHour?.agreement ?: 0.5f,
-                    sourceCount = state.currentHour?.sourceCount ?: 0,
-                    ensembleBacked = state.currentHour?.ensembleHalfWidthC != null,
-                )
-            }
-        }
-        // A quarter-hour, not an hour: this is the one line on the screen that the sub-hourly series
-        // makes honest, and "ab 14:15" is worth more than "ab 14:00" to someone deciding to leave.
-        state.minutelyStart?.let {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                stringResource(R.string.rain_starts_at, Format.time(it, SouthTyrol.ZONE, formats)),
-                style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f),
-                modifier = Modifier.testTag("rain_starts_at"),
-            )
-        }
-        Spacer(Modifier.height(4.dp))
         val sourceCount = state.currentHour?.sourceCount ?: 0
         // A moved reading has to say it was moved, and by how much: it is still a measurement, but
         // not one taken where the reader is standing.
@@ -154,13 +134,85 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
                 ?.let { stringResource(R.string.now_from_station_adjusted, obs.stationName, at, Format.tempDelta(it, formats)) }
                 ?: stringResource(R.string.now_from_station, obs.stationName, at)
         } ?: pluralStringResource(R.plurals.now_from_consensus, sourceCount, sourceCount)
-        Text(source, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.65f))
+
+        // Everything the hero says quietly moves to the right, under the icon, and shares a row with
+        // what it qualifies. Measured before: the two footnote lines reached 157 and 123 dp of a
+        // 360 dp card and had their own rows, so a third of the width carried them and two thirds
+        // carried nothing — directly under an icon that also leaves the right of the line empty.
+        // Beside the feels-like reading instead, the block is about 25 dp shorter and the dead space
+        // under the icon is where it lives.
+        //
+        // `Top` rather than centred: the right column is usually taller than the left one, and the
+        // first thing in it should line up with the reading it qualifies rather than float against
+        // the middle of it.
+        // One straight line across the hero: the feels-like reading at the margin and the line that
+        // says where the number came from at the far edge, **aligned by their baselines**.
+        //
+        // The reading was `bodyMedium` against the column's `labelSmall` — 3 dp taller, enough to
+        // make the row look bent — and matching the sizes was not enough on its own, because the
+        // badge beside it is a pill and its height, not the text's, is what the row would otherwise
+        // be measured by. `alignByBaseline` sidesteps that and keeps holding at any font scale,
+        // where a hand-computed offset would not. The badge is centred on the line, which is what a
+        // pill on a line looks like.
+        //
+        // The rain line sits above this row rather than in it: it is the only line here that is
+        // weather rather than provenance, it is the one worth reading first, and it is not always
+        // there. Everything quiet is right-aligned under the icon, where the hero had a third of
+        // its width carrying nothing.
+        state.minutelyStart?.let {
+            Text(
+                stringResource(R.string.rain_starts_at, Format.time(it, SouthTyrol.ZONE, formats)),
+                style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f),
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth().testTag("rain_starts_at"),
+            )
+            Spacer(Modifier.height(4.dp))
+        }
+        Row(Modifier.fillMaxWidth()) {
+            // The reading and its badge are their own row so the badge centres on *them* rather than
+            // on the whole line. At a large text size the line opposite wraps to three lines and the
+            // row grows to 77 dp; a badge centred in that floats in the middle of the hero, detached
+            // from the reading it belongs to. Measured at a 2x font scale, which is the only place
+            // it shows.
+            Row(Modifier.alignByBaseline(), verticalAlignment = Alignment.CenterVertically) {
+                state.heroFeelsLikeC?.let {
+                    Text(
+                        stringResource(R.string.feels_like, Format.temp(it, formats)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.alignByBaseline(),
+                    )
+                }
+                state.bandHalfWidth?.let {
+                    Spacer(Modifier.width(10.dp))
+                    AgreementBadge(
+                        it, state.currentHour?.agreement ?: 0.5f,
+                        sourceCount = state.currentHour?.sourceCount ?: 0,
+                        ensembleBacked = state.currentHour?.ensembleHalfWidthC != null,
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                source,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.65f),
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f).alignByBaseline(),
+            )
+        }
         state.updatedAt?.let {
-            Text(stringResource(R.string.updated_at, Format.timestamp(it, SouthTyrol.ZONE, state.now, formats)), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
+            Text(
+                stringResource(R.string.updated_at, Format.timestamp(it, SouthTyrol.ZONE, state.now, formats)),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.5f),
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         // A source that never answers is otherwise invisible: the consensus simply has one model
         // fewer and says nothing about it. Named where there is one, counted where there are more,
-        // and in the same quiet type as the rest of this block — it is a fact about the forecast,
+        // and in the same quiet type as the rest of this column — it is a fact about the forecast,
         // not an alarm.
         if (state.silentSources.isNotEmpty()) {
             val text = if (state.silentSources.size == 1) {
@@ -172,7 +224,8 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
                 text,
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFFFFD166).copy(alpha = 0.85f),
-                modifier = Modifier.testTag("silent_sources"),
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth().testTag("silent_sources"),
             )
         }
     }
