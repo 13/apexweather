@@ -36,7 +36,7 @@ interface EnsembleApi {
         @Query("models") models: String = ICON_D2,
         @Query("forecast_days") forecastDays: Int = ICON_D2_DAYS,
         @Query("timezone") timezone: String = SouthTyrol.ZONE.id,
-        @Query("hourly") hourly: String = "temperature_2m",
+        @Query("hourly") hourly: String = HOURLY_VARS,
     ): EnsembleResponse
 
     companion object {
@@ -49,6 +49,17 @@ interface EnsembleApi {
         /** Fifteen, which is one day more than the day list shows. */
         const val ECMWF_ENS = "ecmwf_ifs025"
         const val ECMWF_ENS_DAYS = 15
+
+        /**
+         * Temperature for the spread, precipitation for the chance of rain.
+         *
+         * The second is what an ensemble is actually *for*. A probability of precipitation built
+         * from deterministic models is an average of eleven opinions about a chance; built from an
+         * ensemble it is a counted frequency — how many of fifty equally likely atmospheres got
+         * wet. Measured on the live API: precipitation costs 225 B gzipped on ICON-D2's two days
+         * and 3 238 B on ECMWF's fifteen, against 1 834 B and 23 939 B for temperature alone.
+         */
+        const val HOURLY_VARS = "temperature_2m,precipitation"
     }
 }
 
@@ -71,9 +82,22 @@ data class EnsembleSpread(
     val memberCount: Int,
     /** Epoch second → half the tenth-to-ninetieth percentile range. */
     val halfWidthByEpochSecond: Map<Long, Double> = emptyMap(),
+    /**
+     * Epoch second → the share of members, 0..1, that got wet in that hour.
+     *
+     * This is the thing an ensemble is for. Every other probability in this app is an average of
+     * what several deterministic models each *say* the chance is; this is a count of how many of
+     * fifty equally plausible atmospheres actually rained. Defaulted empty so a row cached by a
+     * build that did not fetch precipitation still decodes.
+     */
+    val wetShareByEpochSecond: Map<Long, Double> = emptyMap(),
 ) {
     fun halfWidthAt(t: Instant): Double? =
         halfWidthByEpochSecond[t.truncatedTo(java.time.temporal.ChronoUnit.HOURS).epochSecond]
+
+    /** The measured chance of precipitation at [t], 0..1, where an ensemble reaches it. */
+    fun wetShareAt(t: Instant): Double? =
+        wetShareByEpochSecond[t.truncatedTo(java.time.temporal.ChronoUnit.HOURS).epochSecond]
 
     companion object {
         /**
@@ -89,28 +113,47 @@ data class EnsembleSpread(
             far == null -> near
             else -> near.copy(
                 halfWidthByEpochSecond = far.halfWidthByEpochSecond + near.halfWidthByEpochSecond,
+                wetShareByEpochSecond = far.wetShareByEpochSecond + near.wetShareByEpochSecond,
             )
         }
     }
 }
 
 object EnsembleMapper {
-    private const val MEMBER_PREFIX = "temperature_2m_member"
+    private const val TEMP_PREFIX = "temperature_2m_member"
+    private const val PRECIP_PREFIX = "precipitation_member"
+
+    /** The millimetres in an hour at which a member counts as wet; the app's own threshold. */
+    private const val MEMBER_WET_MM = 0.1
+
+    /** Fewer members than this reaching an hour and it is not an ensemble, it is a couple of runs. */
+    private const val MIN_MEMBERS = 5
 
     fun map(resp: EnsembleResponse, fetchedAt: Instant): EnsembleSpread {
         val times = resp.hourly.strings("time").map { parseLocal(it!!, SouthTyrol.ZONE) }
-        val members = resp.hourly.keys.filter { it.startsWith(MEMBER_PREFIX) }.sorted()
-            .map { resp.hourly.doubles(it) }
-        if (members.isEmpty()) return EnsembleSpread(fetchedAt, 0)
+        fun members(prefix: String) =
+            resp.hourly.keys.filter { it.startsWith(prefix) }.sorted().map { resp.hourly.doubles(it) }
+        val temps = members(TEMP_PREFIX)
+        if (temps.isEmpty()) return EnsembleSpread(fetchedAt, 0)
+        val precip = members(PRECIP_PREFIX)
 
         val byHour = times.indices.mapNotNull { i ->
-            val values = members.mapNotNull { it.getOrNull(i) }.sorted()
+            val values = temps.mapNotNull { it.getOrNull(i) }.sorted()
             // Two members is not an ensemble; an hour the run does not reach contributes nothing.
-            if (values.size < 5) return@mapNotNull null
+            if (values.size < MIN_MEMBERS) return@mapNotNull null
             val low = values[(values.size * 0.1).toInt()]
             val high = values[((values.size - 1) * 0.9).toInt()]
             times[i].epochSecond to (high - low) / 2.0
         }.toMap()
-        return EnsembleSpread(fetchedAt, members.size, byHour)
+
+        // The share of members that got wet, which is a counted frequency rather than an average of
+        // opinions. An hour too few members reach is absent rather than reported as dry.
+        val wet = times.indices.mapNotNull { i ->
+            val values = precip.mapNotNull { it.getOrNull(i) }
+            if (values.size < MIN_MEMBERS) return@mapNotNull null
+            times[i].epochSecond to values.count { it >= MEMBER_WET_MM }.toDouble() / values.size
+        }.toMap()
+
+        return EnsembleSpread(fetchedAt, temps.size, byHour, wet)
     }
 }

@@ -98,7 +98,7 @@
     <string name="setting_animations">Himmel animieren</string>
     <string name="refresh_now">Jetzt aktualisieren</string>
     <string name="about">Apex Weather %1$s · Südtirol · Konsens aus 10 Wettermodellen</string>
-    <string name="widget_description">Aktuelle Temperatur und die nächsten Stunden für den gewählten Ort</string>
+    <string name="widget_description">Aktuelle Temperatur und die nächsten Stunden für den gewählten Ort · größer gezogen auch die nächsten Tage</string>
     <string name="open_day_details">Tagesdetails öffnen</string>
     <string name="section_day_hours">STUNDENVERLAUF</string>
     <string name="day_sun">Sonnenaufgang %1$s · Sonnenuntergang %2$s</string>

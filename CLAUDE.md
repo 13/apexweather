@@ -68,7 +68,12 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   serves every municipality in the valley, and the warnings, which are regional. The last three
   places are kept — **and every pinned one**, which is what a pin is actually worth: a starred place
   stays cached, so it opens instantly and with no signal, which is the state a mountain is usually
-  in. `AppSettings.keptPlaces` is the single list both evicting callers read, because the resume hook
+  in. **Kept is not the same as kept fresh**, and for one release it was written here as though it
+  were: `RefreshWorker` refreshed the chosen place only, so a pin held whatever it had when it was
+  last opened. It refreshes pins too now, **on an unmetered connection alone** — a place costs about
+  60 kB gzipped an hour, so four pins is five times the data and five times the work per wake; on
+  Wi-Fi that is nothing and on a phone roaming over a pass it is somebody's money. The rule is a
+  pure function (`RefreshWorker.pinsToRefresh`) for the same reason `outcome` is. `AppSettings.keptPlaces` is the single list both evicting callers read, because the resume hook
   and the hourly worker must never disagree about what is worth keeping. Pins are kept apart from the
   recents on purpose: recency is what the app observed and a pin is what the reader said, and one
   list ordered by use would drop the pin after three other visits — exactly the case pins exist for.
@@ -105,8 +110,13 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   the blend. Not 1/n: the four run at different resolutions over different domains at four centres,
   and ICON-CH1 at 1 km is the best-resolved thing this app has for a valley 2 km wide. The middle is
   deliberate — ICON's share of the regional eight goes from 50 % to 37 %. Grouping is by **core, not
-  institution**, which is why IFS and AIFS are *not* one family. Every threshold that was a count is
-  now a share, so none of them moved; with one model per family every weighted statistic is exactly
+  institution**, which is why IFS and AIFS are *not* one family. It reaches **every median the hero
+  is built from**, not only the blend: `StationDownscale.offsetAt` and
+  `StationReference.tempAt`/`interpolatedTempAt` take the weighted median too, because the hill
+  correction is a subtraction whose other end is the weighted village consensus, and two medians
+  over differently weighted populations are not comparable. They were plain medians for one release,
+  which let the four ICON runs carry the height of the hill in exactly the way the blend no longer
+  does. Every threshold that was a count is now a share, so none of them moved; with one model per family every weighted statistic is exactly
   the unweighted one, including the even-count median's average of its middle pair, and
   `ModelFamilyTest` pins that.
 - **`BiasCorrector` is the accuracy lever.** Every hour the app writes down what the station read and
@@ -143,6 +153,17 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   into the one cached row. A day reached by a single model *and* an ensemble now shows its measured
   percentage rather than the grey "1 model" pill, and `daily_tail_note_ensemble` is the sentence that
   accounts for it; both remain reachable only if one of the two ECMWF runs fails.
+- **The chance of rain is counted, not averaged, wherever an ensemble reaches the hour.** Every
+  other probability in this app is an average of what several deterministic models each *claim* the
+  chance is; `EnsembleSpread.wetShareAt` is the share of fifty equally plausible atmospheres that
+  actually got wet, which is what a probability means and the one question an ensemble is built to
+  answer — the app was already paying for the members and reading only their temperatures.
+  Measured: precipitation costs **225 B gzipped on ICON-D2's two days and 3 238 B on ECMWF's
+  fifteen**. The ladder below it is unchanged and still needed past day fifteen or where an ensemble
+  fails: the weighted mean of the models' own figures, then the weighted share of wet ones.
+  `NotificationDecider.RAIN_MIN_PROB` was **re-examined rather than inherited** — it stays at 30,
+  which now reads literally as three atmospheres in ten and is better founded than the average of
+  opinions it used to bound.
 - **The scale the agreement badge is read against opens with lead time.** `fullDisagreementAt` is
   6 K + 0,5 K per day of lead. A flat 6 K was right while everything the badge measured sat inside two
   days, and wrong the moment it was fed a fortnight: ECMWF's ensemble opens from about 2 K over the
@@ -163,6 +184,12 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   a fifth of the track is not what four centimetres means to anybody here. The station's own `hs`
   (snow depth) and `sd` (sunshine duration) are read now too — one of 57 stations published `hs` in
   September and most do in February, which is the argument for it rather than against.
+  **The rule that decides millimetres or centimetres is `Format.showsSnow`/`Format.precip`**, beside
+  the formatting rather than with the strip's bar geometry, because four things have to agree about
+  it and one of them is not on screen at all. The strip, the day list and the day sheet had it and
+  **the notifications did not**, so a snowy hour reached the lock screen titled "Schneefall um
+  15:00" — the title reads the condition — over a body reading "0,8 mm". A title and a body
+  disagreeing about the same hour is worse than either being wrong alone.
 - **A day carries the chance of its likeliest daylight hour**, not the mean of its hours
   (`ConsensusDay.precipProb`). The day list had an amount and no chance at all, leaving "will it rain
   on Saturday" to be guessed off the icon. The mean is wrong across hours the way the median is wrong

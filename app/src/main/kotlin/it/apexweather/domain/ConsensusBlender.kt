@@ -72,7 +72,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
                     feelsLikeC = point.feelsLikeC?.minus(correction),
                 )
             }
-            blendHour(time, corrected, ensemble?.halfWidthAt(time), lead)
+            blendHour(time, corrected, ensemble?.halfWidthAt(time), ensemble?.wetShareAt(time), lead)
         }
 
         val sunTimes = forecasts.values.flatMap { it.daily }
@@ -156,6 +156,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         time: Instant,
         points: Map<Source, HourlyPoint>,
         ensembleHalfWidth: Double?,
+        ensembleWetShare: Double?,
         leadHours: Long,
     ): ConsensusHour {
         val values = points.values
@@ -183,22 +184,30 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         // six is 0,13 mm, which is what the hour actually amounts to.
         val precip = weightedMean(points.mapValues { it.value.precipMm })
 
-        // The **mean**, for the same reason the amount above is: a probability is the other
-        // zero-inflated quantity here, and averaging is what the number actually means. Asked
-        // "will it rain at four", each model answers with its own chance, and the chance across a
-        // set of equally good models is the average of theirs — three models at 60 % and five at
-        // 0 % is a 23 % hour.
+        // **The ensemble's own wet share where one reaches this hour**, and the models' opinions
+        // only where it does not.
         //
-        // It used to be the maximum, which let the single most alarmist of ten models set the
-        // figure on the screen on its own: the same eight-model hour read 60 %. The median is no
-        // better here than it is for the amount, and for the same reason — five dry models put it
-        // at zero and the three that see the shower are discarded.
+        // The two are not the same kind of number and the ensemble's is the better one. A model's
+        // `precipitation_probability` is that model's own claim about a chance, and averaging
+        // eleven of them averages eleven claims; the wet share is a count of how many of fifty
+        // equally plausible atmospheres actually rained. That is what a probability means, and it
+        // is the one question an ensemble is built to answer — the app was already paying for the
+        // members and reading only their temperatures.
         //
-        // The fallback, for an hour no model publishes a probability for, is already this same
-        // average, of ones and zeroes.
+        // The ladder below it is unchanged and still needed: ICON-D2's ensemble runs two days and
+        // ECMWF's fifteen, so an hour past the fortnight, or one where the ensembles failed, falls
+        // back to the weighted mean of the models' own figures and then to counting the wet ones.
+        // That mean is itself a decision worth keeping written down: it was once the *maximum*,
+        // which let the single most alarmist of ten models set the figure on its own (an
+        // eight-model hour read 60 % where the average of them is 23 %), and the median is no
+        // better than it is for the amount, because five dry models put it at zero and the three
+        // that see the shower are discarded.
         val probs = points.mapNotNullValues { it.precipProb?.toDouble() }
-        val precipProb = if (probs.isNotEmpty()) weightedMean(probs).roundToInt()
-        else (100.0 * weightedShare(points.keys) { points.getValue(it).precipMm > 0.1 }).roundToInt()
+        val precipProb = when {
+            ensembleWetShare != null -> (100.0 * ensembleWetShare).roundToInt()
+            probs.isNotEmpty() -> weightedMean(probs).roundToInt()
+            else -> (100.0 * weightedShare(points.keys) { points.getValue(it).precipMm > 0.1 }).roundToInt()
+        }
 
         // Snow is the third zero-inflated quantity on this list and takes the mean for the reason
         // the two above it do: the moment half the models say the hour is dry, a median throws away

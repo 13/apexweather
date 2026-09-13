@@ -105,4 +105,54 @@ class EnsembleMapperTest {
         assertEquals(0, mapped.memberCount)
         assertTrue(mapped.halfWidthByEpochSecond.isEmpty())
     }
+
+    /**
+     * The one question an ensemble is built to answer, and the app was paying for the members and
+     * reading only their temperatures.
+     *
+     * Every other probability here is an average of what several deterministic models each *claim*
+     * the chance is. This is a count: how many of fifty equally plausible atmospheres actually got
+     * wet. It costs 225 B gzipped on ICON-D2's two days and 3 238 B on ECMWF's fifteen, measured
+     * against the same calls without it.
+     */
+    @Test
+    fun `the wet share is the fraction of members that rained`() {
+        val spread = EnsembleMapper.map(
+            Fixtures.json.decodeFromString(EnsembleResponse.serializer(), Fixtures.read("openmeteo_ensemble_ecmwf.json")),
+            fetchedAt,
+        )
+        assertEquals(50, spread.memberCount)
+        assertTrue("the recorded run has wet hours in it", spread.wetShareByEpochSecond.isNotEmpty())
+        spread.wetShareByEpochSecond.values.forEach {
+            assertTrue("a share is a fraction, not a percentage: $it", it in 0.0..1.0)
+        }
+        // Fifty members, so every share is a fiftieth of something and never an arbitrary real.
+        spread.wetShareByEpochSecond.values.forEach {
+            assertEquals(0.0, (it * 50).let { n -> n - Math.round(n) }.toDouble(), 1e-9)
+        }
+    }
+
+    /** An hour the ensemble does not reach has no share at all, rather than a share of zero. */
+    @Test
+    fun `an hour beyond the run is absent rather than dry`() {
+        val spread = EnsembleMapper.map(
+            Fixtures.json.decodeFromString(EnsembleResponse.serializer(), Fixtures.read("openmeteo_ensemble.json")),
+            fetchedAt,
+        )
+        val last = spread.wetShareByEpochSecond.keys.max()
+        assertNull(spread.wetShareAt(java.time.Instant.ofEpochSecond(last + 3600 * 24 * 30)))
+    }
+
+    /**
+     * ICON-D2 wins wherever it reaches, for precipitation as for temperature: twenty members at
+     * 2 km say more about an Alpine valley tomorrow than fifty at 25 km do.
+     */
+    @Test
+    fun `combining prefers the near ensemble's wet share where it reaches`() {
+        val near = EnsembleSpread(fetchedAt, 20, mapOf(1L to 1.0), mapOf(1L to 0.2))
+        val far = EnsembleSpread(fetchedAt, 50, mapOf(1L to 5.0, 2L to 5.0), mapOf(1L to 0.9, 2L to 0.6))
+        val combined = EnsembleSpread.combine(near, far)!!
+        assertEquals(0.2, combined.wetShareByEpochSecond.getValue(1L), 1e-9)
+        assertEquals("and the far one carries the rest", 0.6, combined.wetShareByEpochSecond.getValue(2L), 1e-9)
+    }
 }

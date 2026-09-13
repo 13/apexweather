@@ -285,8 +285,7 @@ fun HourStrip(
                     h.condition.label(), Format.temp(h.tempC, formats), h.precipProb,
                     // Whatever the column prints, so the spoken hour and the drawn one cannot
                     // disagree about whether it is eight centimetres or eight tenths of a millimetre.
-                    if (PrecipScale.showsSnow(h.snowCm, h.condition)) Format.cm(h.snowCm!!, formats)
-                    else Format.mm(h.precipMm, formats),
+                    Format.precip(h.precipMm, h.snowCm, h.condition, formats),
                 )
                 val behaviour = if (onHourClick == null) Modifier.semantics(mergeDescendants = true) { contentDescription = spoken }
                 else Modifier.clickable(onClickLabel = openLabel) { onHourClick(h.time) }
@@ -324,7 +323,7 @@ private fun PrecipBar(mm: Double, snowCm: Double?, prob: Int, condition: Conditi
     val snow = PrecipScale.showsSnow(snowCm, condition)
     val fraction = if (snow) PrecipScale.snowFillFraction(snowCm!!) else PrecipScale.fillFraction(mm)
     val amount = when {
-        snow -> Format.cm(snowCm!!, formats)
+        snow -> Format.precip(mm, snowCm, condition, formats)
         PrecipScale.hasAmount(mm) -> Format.mm(mm, formats)
         else -> ""
     }
@@ -393,10 +392,10 @@ fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate
                 // them in. The chance is what the row was missing: it had "how much" and left "will
                 // it rain on Saturday" to be guessed off the icon. See ConsensusDay.precipProb.
                 Column(Modifier.width(48.dp)) {
-                    val frozen = PrecipScale.showsSnow(d.snowCm, d.condition)
+                    val frozen = Format.showsSnow(d.snowCm, d.condition)
                     Text(
                         when {
-                            frozen -> Format.cm(d.snowCm!!, formats)
+                            frozen -> Format.precip(d.precipMm, d.snowCm, d.condition, formats)
                             d.precipMm >= 0.5 -> Format.mm(d.precipMm, formats)
                             else -> ""
                         },

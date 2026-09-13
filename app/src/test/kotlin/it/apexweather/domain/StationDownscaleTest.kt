@@ -286,12 +286,47 @@ class StationDownscaleTest {
             1e-9,
         )
     }
+
+    /**
+     * The hill correction is weighted by family, exactly as the consensus it is subtracted from is.
+     *
+     * It was a plain median over the models' own village-minus-station differences, which let the
+     * four ICON runs carry the height of the hill in precisely the way the blend they feed no
+     * longer lets them. Two medians taken over differently weighted populations are not comparable,
+     * and this one is the station end of a subtraction whose other end is the weighted village.
+     *
+     * Here four ICON runs put the village 1 K above the station and the three other families put it
+     * at 5 K. Counted one for one the median is ICON's 1,0; weighted, ICON is worth 4 x 0,5 = 2,0
+     * against 3,0, and the answer is the other side's. Four rather than five so the
+     * result stays inside StationDownscale's own cap for a 264 m hill, which is 4,59 K.
+     */
+    @Test
+    fun `the models' view of the hill is weighted by family`() {
+        val hour = hour(0)
+        val station = mapOf(
+            Source.ICON_CH1 to 10.0, Source.ICON_CH2 to 10.0, Source.ICON_2I to 10.0, Source.ICON_D2 to 10.0,
+            Source.GEOSPHERE_AROME to 10.0, Source.KNMI_HARMONIE to 10.0, Source.ECMWF to 10.0,
+        )
+        val village = station.mapValues { (source, _) ->
+            if (source.family == it.apexweather.domain.model.ModelFamily.ICON) 11.0 else 14.0
+        }
+        val reference = StationReference(
+            fetchedAt = hour,
+            elevationM = 330.0,
+            bySource = station.mapKeys { it.key.name }.mapValues { mapOf(hour.epochSecond to it.value) },
+        )
+        val forecasts = village.mapValues { (source, temp) ->
+            forecast(source, listOf(point(0, temp)))
+        }
+        assertEquals(
+            "four runs of one core must not outvote three separate ones",
+            4.0,
+            StationDownscale.offsetAt(hour, reference, forecasts, hour, heightDifferenceM = 264)!!,
+            1e-6,
+        )
+    }
 }
 
-/**
- * A stale model run stays visible per source, with its age beside it, but is kept out of the number
- * the app leads with — mixing yesterday's run into the median looks exactly as confident as the rest.
- */
 class ForecastsForBlendTest {
 
     private val fresh = forecast(Source.ICON_CH1, listOf(point(0, 10.0)))

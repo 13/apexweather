@@ -103,7 +103,8 @@ class WeatherNotifier @Inject constructor(@ApplicationContext private val contex
             .setContentText(
                 context.getString(
                     R.string.notif_summary_text,
-                    Format.temp(n.minC, formats), Format.temp(n.maxC, formats), Format.mm(n.precipMm, formats),
+                    Format.temp(n.minC, formats), Format.temp(n.maxC, formats),
+                    Format.precip(n.precipMm, n.snowCm, n.condition, formats),
                 ),
             )
             .build()
@@ -116,7 +117,16 @@ class WeatherNotifier @Inject constructor(@ApplicationContext private val contex
                     Format.time(n.startsAt, SouthTyrol.ZONE, formats),
                 ),
             )
-            .setContentText(context.getString(R.string.notif_rain_text, n.hour.precipProb, Format.mm(n.hour.precipMm, formats)))
+            // The title already reads the hour's condition, so a snowy hour is headed "Schneefall
+            // um 15:00"; the body said "0,8 mm" underneath it. A title and a body disagreeing about
+            // the same hour is worse than either being wrong on its own.
+            .setContentText(
+                context.getString(
+                    R.string.notif_rain_text,
+                    n.hour.precipProb,
+                    Format.precip(n.hour.precipMm, n.hour.snowCm, n.hour.condition, formats),
+                ),
+            )
             .build()
 
         is WeatherNotification.Severe -> {

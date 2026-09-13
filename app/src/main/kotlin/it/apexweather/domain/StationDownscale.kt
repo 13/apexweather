@@ -208,14 +208,17 @@ object StationDownscale {
         if (reference == null) return null
         if (ChronoUnit.HOURS.between(reference.fetchedAt, now) > REFERENCE_MAX_AGE_HOURS) return null
         val hour = time.truncatedTo(ChronoUnit.HOURS)
-        // One model's own view of the hill, for every model that has both ends of it.
+        // One model's own view of the hill, for every model that has both ends of it — kept against
+        // the model that holds it, because the median below is weighted by how many of the others
+        // share its core. Collapsing to a bare list here would let the four ICON runs carry the
+        // height of the hill in exactly the way the consensus they feed no longer lets them.
         val perModel = reference.at(hour).mapNotNull { (source, stationC) ->
             village[source]?.hourly
                 ?.firstOrNull { it.time.truncatedTo(ChronoUnit.HOURS) == hour }
-                ?.tempC?.minus(stationC)
-        }
+                ?.tempC?.minus(stationC)?.let { source to it }
+        }.toMap()
         if (perModel.isEmpty()) return null
-        val offset = ConsensusBlender.median(perModel)
+        val offset = ConsensusBlender.weightedMedian(perModel)
         return if (abs(offset) > maxAdjustment(heightDifferenceM)) null else offset
     }
 }

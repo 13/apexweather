@@ -2,6 +2,7 @@ package it.apexweather.ui.common
 
 import it.apexweather.data.WindUnit
 import it.apexweather.domain.SouthTyrol
+import it.apexweather.domain.model.Condition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -122,5 +123,27 @@ class FormatTest {
         assertEquals("18:00", Format.dayTime(today, SouthTyrol.ZONE, now, german))
         val ahead = Format.dayTime(tomorrow, SouthTyrol.ZONE, now, german)
         assertTrue("$ahead should name its day", ahead.contains("10:00") && ahead.length > "10:00".length)
+    }
+
+    /**
+     * The rule that decides millimetres or centimetres lives here, beside the formatting, because
+     * four things have to agree about it and one of them is not on screen at all.
+     *
+     * The hourly strip, the day list and the day sheet all had it; **the notifications did not**, so
+     * a snowy hour arrived on the lock screen titled "Schneefall um 15:00" — the title reads the
+     * condition — over a body reading "0,8 mm". A title and a body disagreeing about the same hour
+     * is worse than either being wrong on its own.
+     */
+    @Test
+    fun `precipitation is printed in the unit it arrives in`() {
+        val f = Formats(Locale.GERMAN, use24Hour = true)
+        assertEquals("8,0 cm", Format.precip(0.8, 8.0, Condition.SNOW, f))
+        assertEquals("8,0 cm", Format.precip(0.8, 8.0, Condition.SLEET, f))
+        // A trace of snowfall on a rainy hour is still rain.
+        assertEquals("0,8 mm", Format.precip(0.8, 8.0, Condition.RAIN, f))
+        // And a model that publishes no depth leaves the millimetres to say it.
+        assertEquals("0,8 mm", Format.precip(0.8, null, Condition.SNOW, f))
+        // Below half a centimetre the millimetres are the more honest number.
+        assertEquals("0,1 mm", Format.precip(0.1, 0.2, Condition.SNOW, f))
     }
 }

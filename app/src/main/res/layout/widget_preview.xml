@@ -2,6 +2,12 @@
 <!--
   What the widget picker shows before the widget is placed. It is a still image of a fair-weather
   afternoon, not live data: a preview cannot run the app's code.
+
+  It shows the *small* layout on purpose, even though the widget has three. The picker renders this
+  at the provider's target size, which is two cells by one, so a preview drawn as the tall variant
+  would be shown squashed into a strip and would misrepresent what placing it actually gives you.
+  That the widget grows into hours and then days is said in widget_description instead, which is the
+  only place the picker will carry it.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"

@@ -92,7 +92,9 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState, onClose: () -> Unit = {}) {
         Spacer(Modifier.height(6.dp))
 
         Text(
-            stringResource(R.string.day_precip_total, Format.mm(day.precipMm, formats)),
+            // In the unit the day actually arrives in. The list row above this sheet had that and
+            // the sheet it opens did not, so a snowy Wednesday read "9,8 mm" here and "9,8 cm" there.
+            stringResource(R.string.day_precip_total, Format.precip(day.precipMm, day.snowCm, day.condition, formats)),
             style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f),
         )
         day.freezingLevelMinM?.let {

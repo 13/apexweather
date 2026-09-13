@@ -225,8 +225,14 @@ data class StationReference(
         }.toMap()
     }
 
-    /** The median across the models, which is the statistic the village consensus uses too. */
-    fun tempAt(t: Instant): Double? = at(t).values.takeIf { it.isNotEmpty() }?.let { ConsensusBlender.median(it.toList()) }
+    /**
+     * The median across the models, which is the statistic the village consensus uses too — and
+     * weighted the same way, by how many of the models present share a dynamical core. It has to
+     * be: this is the station end of a subtraction whose other end is the weighted village
+     * consensus, and two medians taken over differently weighted populations are not comparable.
+     */
+    fun tempAt(t: Instant): Double? =
+        at(t).takeIf { it.isNotEmpty() }?.let { ConsensusBlender.weightedMedian(it) }
 
     /**
      * Every model's value at [t] itself, straight-lined between the hours either side of it.
@@ -256,9 +262,9 @@ data class StationReference(
         }.toMap()
     }
 
-    /** [interpolatedAt] collapsed to the median, which is what the hill correction reads. */
+    /** [interpolatedAt] collapsed to the same weighted median [tempAt] takes. */
     fun interpolatedTempAt(t: Instant): Double? =
-        interpolatedAt(t).values.takeIf { it.isNotEmpty() }?.let { ConsensusBlender.median(it.toList()) }
+        interpolatedAt(t).takeIf { it.isNotEmpty() }?.let { ConsensusBlender.weightedMedian(it) }
 
     /**
      * The same series with [source]'s own hourly temperatures at the station added or replaced.

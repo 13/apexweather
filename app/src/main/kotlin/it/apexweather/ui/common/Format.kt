@@ -1,6 +1,7 @@
 package it.apexweather.ui.common
 
 import it.apexweather.data.WindUnit
+import it.apexweather.domain.model.Condition
 import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
@@ -79,6 +80,35 @@ object Format {
      * the 0,8 mm of water it would melt down to. See [it.apexweather.domain.model.HourlyPoint.snowCm].
      */
     fun cm(cm: Double, f: Formats): String = "${cmValue(cm, f)} cm"
+
+    /**
+     * Half a centimetre. Below it an hour is frozen drizzle and the millimetres are the more honest
+     * number, so the amount falls back to them rather than printing "0,2 cm" of nothing.
+     */
+    const val MIN_PRINTED_CM = 0.5
+
+    /**
+     * Whether this weather is better told in centimetres of snow than in millimetres of water.
+     *
+     * It lives here, beside the formatting, rather than with the strip's bar geometry, because four
+     * separate things have to agree about it and one of them is not on screen at all: the hourly
+     * strip, the day list, the day sheet and **the notifications**. The first three had it and the
+     * notifications did not, so a snowy hour arrived on the lock screen with a title reading
+     * "Schneefall um 15:00" — the title reads the condition — over a body reading "0,8 mm". A title
+     * and a body disagreeing about the same hour is worse than either being wrong alone.
+     *
+     * Both halves are required. The condition, because a model publishing a trace of snowfall on a
+     * rainy hour must not turn the number white; and the amount, because there is no point printing
+     * a depth finer than it is measured to.
+     */
+    fun showsSnow(snowCm: Double?, condition: Condition): Boolean =
+        condition.isFrozen && snowCm != null && snowCm >= MIN_PRINTED_CM
+
+    /**
+     * What an hour or a day amounts to, in the unit it actually arrives in. See [showsSnow].
+     */
+    fun precip(precipMm: Double, snowCm: Double?, condition: Condition, f: Formats): String =
+        if (showsSnow(snowCm, condition)) cm(snowCm!!, f) else mm(precipMm, f)
 
     /**
      * A height above sea level. Rounded to 50 m: the models do not agree to better than that, and a

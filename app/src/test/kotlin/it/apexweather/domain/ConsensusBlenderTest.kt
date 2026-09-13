@@ -1,5 +1,6 @@
 package it.apexweather.domain
 
+import it.apexweather.data.remote.EnsembleSpread
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.Source
 import org.junit.Assert.assertNull
@@ -756,5 +757,46 @@ class ConsensusBlenderTest {
         }
         val f = mapOf(Source.ICON_CH1 to forecast(Source.ICON_CH1, hours))
         assertEquals(10, ConsensusBlender().blend(f).daily.first().precipProb)
+    }
+
+    /**
+     * Where an ensemble reaches the hour, the chance of rain is counted rather than averaged.
+     *
+     * The models here all say 10 %, which is an average of what eleven deterministic runs *claim*
+     * the chance is. The ensemble says 30 of its members got wet, which is what a probability
+     * actually means. The second wins.
+     */
+    @Test
+    fun `the ensemble's wet share is the chance of rain where it reaches`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 12.0, prob = 10))),
+            Source.GEOSPHERE_AROME to forecast(Source.GEOSPHERE_AROME, listOf(point(0, 12.0, prob = 10))),
+        )
+        val ensemble = EnsembleSpread(
+            fetchedAt = hour(0),
+            memberCount = 50,
+            halfWidthByEpochSecond = mapOf(hour(0).epochSecond to 1.0),
+            wetShareByEpochSecond = mapOf(hour(0).epochSecond to 0.6),
+        )
+        assertEquals(60, ConsensusBlender().blend(f, ensemble = ensemble).hourly.single().precipProb)
+    }
+
+    /**
+     * And past the far end of the ensemble the ladder is exactly what it was: the weighted mean of
+     * what the models themselves publish. ICON-D2's ensemble runs two days and ECMWF's fifteen, so
+     * this is a real case rather than a defensive one.
+     */
+    @Test
+    fun `an hour the ensemble does not reach still uses the models' own figures`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 12.0, prob = 40))),
+            Source.GEOSPHERE_AROME to forecast(Source.GEOSPHERE_AROME, listOf(point(0, 12.0, prob = 40))),
+        )
+        val elsewhere = EnsembleSpread(
+            fetchedAt = hour(0),
+            memberCount = 50,
+            wetShareByEpochSecond = mapOf(hour(0).plusSeconds(999_999).epochSecond to 0.9),
+        )
+        assertEquals(40, ConsensusBlender().blend(f, ensemble = elsewhere).hourly.single().precipProb)
     }
 }

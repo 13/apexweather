@@ -56,6 +56,7 @@ class RefreshWorker @AssistedInject constructor(
             // After the refresh, from settings read then: the reader may have changed place while
             // it ran, and a list worked out beforehand would evict the place they are now looking at.
             val current = settings.settings.first()
+            refreshPins(current, language, except = place.istat)
             val keep = current.keptPlaces
             repository.evictAllBut(keep, keep.mapNotNull { catalogue.byIstat(it)?.district }.distinct())
         } catch (e: CancellationException) {
@@ -85,6 +86,41 @@ class RefreshWorker @AssistedInject constructor(
      * cache rather than the refresh result is what makes an offline hour behave correctly: the
      * warning that came in an hour ago is still in force, and still worth announcing once.
      */
+    /**
+     * The pinned places, on a connection nobody is paying for by the megabyte.
+     *
+     * A pin keeps a place in the cache, and the cache was the whole of what it did: nothing kept
+     * the place *current*, so pinning the valley you ski in and not opening it for a week left a
+     * week-old forecast to be found the one time it mattered — opening it somewhere with no signal,
+     * which is the state a mountain is usually in. Keeping and keeping fresh are different promises
+     * and only one of them was being met.
+     *
+     * **Unmetered only**, and that is the whole of the rule. A place costs about 60 kB gzipped an
+     * hour — 30,7 for the village's eleven models, 1,8 for the station's, the rest ensembles and the
+     * regional upstreams — so four pins is five times today's data and five times the work per
+     * wake. On Wi-Fi that is nothing; on a phone roaming over a pass it is somebody's money, and the
+     * place they are actually looking at is refreshed either way.
+     *
+     * Each pin is independent: one failing must not cost the others, and none of them may fail the
+     * refresh of the place the reader is on, which has already happened by the time this runs.
+     */
+    private suspend fun refreshPins(current: it.apexweather.data.AppSettings, language: String, except: String) {
+        val connectivity = applicationContext.getSystemService(android.net.ConnectivityManager::class.java)
+        // No connectivity service to ask is not a licence to spend somebody's data.
+        val metered = connectivity?.isActiveNetworkMetered ?: true
+        pinsToRefresh(current, except, metered).forEach { istat ->
+            val pinned = catalogue.byIstat(istat) ?: return@forEach
+            try {
+                repository.refresh(pinned, language)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A pin that could not be reached keeps whatever it had, and says how old it is
+                // when it is opened. That is the same bargain every source in this app makes.
+            }
+        }
+    }
+
     private suspend fun notify(place: Place, appSettings: it.apexweather.data.AppSettings, language: String) {
         if (!appSettings.anyNotification || !notifier.canPost()) return
         val snapshot = repository.snapshot(place, language).first()
@@ -105,6 +141,19 @@ class RefreshWorker @AssistedInject constructor(
     }
 
     companion object {
+        /**
+         * Which pinned places to refresh in the background this wake.
+         *
+         * Pure, so the rule can be read and tested without a worker — the same reason [outcome] is.
+         *
+         * The place on screen is refreshed by the caller whatever the connection; this is only about
+         * the others. A place costs about 60 kB gzipped an hour, so four pins is five times the data
+         * and five times the work per wake: on Wi-Fi that is nothing, and on a phone roaming over a
+         * pass it is somebody's money.
+         */
+        fun pinsToRefresh(settings: it.apexweather.data.AppSettings, current: String, metered: Boolean): List<String> =
+            if (metered) emptyList() else settings.favouritePlaces.filterNot { it == current }
+
         fun outcome(result: RefreshResult?, runAttemptCount: Int): Result = when {
             result == null -> Result.retry()
             result.allFailed -> if (runAttemptCount < 2) Result.retry() else Result.failure()

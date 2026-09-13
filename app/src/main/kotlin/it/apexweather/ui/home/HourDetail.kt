@@ -131,7 +131,7 @@ fun HourDetail(hour: ConsensusHour, state: HomeUiState, onClose: () -> Unit = {}
             // come for the detail, and the water equivalent is the number the models actually agree
             // on while the depth depends on how the snow packs. The strip above prints one or the
             // other because a column has room for one; here there is room for both.
-            hour.snowCm?.takeIf { hour.condition.isFrozen && it >= PrecipScale.MIN_PRINTED_CM }?.let {
+            hour.snowCm?.takeIf { Format.showsSnow(it, hour.condition) }?.let {
                 add(
                     Stat(
                         label = stringResource(R.string.stat_snow),

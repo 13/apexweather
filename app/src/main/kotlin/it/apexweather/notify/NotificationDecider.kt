@@ -29,6 +29,15 @@ sealed interface WeatherNotification {
         val minC: Double,
         val maxC: Double,
         val precipMm: Double,
+        /**
+         * Centimetres of snow, where the day is frozen and any model published a depth.
+         *
+         * Carried alongside the millimetres rather than instead of them, so [WeatherNotifier] can
+         * decide which to print with the same rule the screen uses — see [Format.showsSnow]. The
+         * notification is the one part of this app a reader cannot check by looking at it, so it is
+         * the one place a unit being wrong would go unnoticed.
+         */
+        val snowCm: Double? = null,
     ) : WeatherNotification
 
     /** [startsAt] is the quarter-hour the rain begins where a model publishes one, else the hour. */
@@ -60,12 +69,22 @@ object NotificationDecider {
      * Left unchanged, the same constant quietly turned a heads-up into something that almost never
      * arrives.
      *
-     * Thirty, because that is the app's own existing threshold for "wet enough to say so" expressed
-     * as a probability: `ConsensusBlender.WET_SHARE_DENOMINATOR` calls an hour wet when a third of
-     * the models put water in the sky, and a third of them at ninety per cent against the rest at
-     * zero averages to thirty. The asymmetry is deliberate and runs the same way as every other one
-     * in this app — being rained on unwarned is worse than carrying a jacket that was not needed —
-     * and [RAIN_MIN_MM] still has to be met by the same hour, so this is never a trace shower.
+     * Thirty, which was picked as the app's own "wet enough to say so" threshold expressed as a
+     * probability: `ConsensusBlender.WET_SHARE_DENOMINATOR` calls an hour wet when a third of the
+     * models put water in the sky, and a third of them at ninety per cent against the rest at zero
+     * averages to thirty.
+     *
+     * **The number it is read against has since changed meaning a second time**, and the value
+     * survives it on its own merits rather than by inheritance. Where an ensemble reaches the hour,
+     * `precipProb` is no longer an average of what eleven models each claim the chance is; it is
+     * the share of fifty equally plausible atmospheres that actually got wet. Thirty then reads
+     * literally — three atmospheres in ten — which is a defensible bar for a heads-up and a
+     * better-founded one than the average of opinions it replaced. It was re-examined rather than
+     * assumed; had it needed to move, this is where it would have moved.
+     *
+     * The asymmetry is deliberate and runs the same way as every other one in this app — being
+     * rained on unwarned is worse than carrying a jacket that was not needed — and [RAIN_MIN_MM]
+     * still has to be met by the same hour, so this is never a trace shower.
      */
     private const val RAIN_MIN_PROB = 30
     private const val RAIN_MIN_MM = 0.2
@@ -114,7 +133,7 @@ object NotificationDecider {
         val hoursSinceDue = local.hour - settings.notifySummaryHour
         if (hoursSinceDue < 0 || hoursSinceDue > SUMMARY_GRACE_HOURS) return null
         val day = state.days.firstOrNull { it.date == today } ?: return null
-        return WeatherNotification.Summary(placeName, today, day.condition, day.minC, day.maxC, day.precipMm)
+        return WeatherNotification.Summary(placeName, today, day.condition, day.minC, day.maxC, day.precipMm, day.snowCm)
     }
 
     private fun rain(

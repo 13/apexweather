@@ -2,6 +2,7 @@ package it.apexweather.ui.home
 
 import androidx.compose.ui.graphics.Color
 import it.apexweather.domain.model.Condition
+import it.apexweather.ui.common.Format
 import kotlin.math.sqrt
 
 /**
@@ -48,11 +49,7 @@ object PrecipScale {
      */
     const val FULL_SCALE_CM = 10.0
 
-    /**
-     * Half a centimetre. Below it the hour is frozen drizzle and the millimetres are the more honest
-     * number, so the bar falls back to them rather than printing "0,2 cm" of nothing.
-     */
-    const val MIN_PRINTED_CM = 0.5
+
 
     /** Millimetres in the hour at which the fill steps up a shade. */
     private const val MODERATE_FROM_MM = 0.5
@@ -76,14 +73,12 @@ object PrecipScale {
     fun hasAmount(mm: Double): Boolean = mm >= MIN_PRINTED_MM
 
     /**
-     * Whether this hour is better told in centimetres of snow than in millimetres of water.
+     * Whether this hour is drawn against [FULL_SCALE_CM] rather than [FULL_SCALE_MM].
      *
-     * Both halves are required. The condition, because a model publishing a trace of snowfall on a
-     * rainy hour must not turn the column white; and the amount, because there is no point printing
-     * a centimetre figure smaller than the number it is measured to.
+     * The decision itself is [Format.showsSnow]'s, because the bar is only one of four places that
+     * has to agree about it and the notifications cannot reach into this file.
      */
-    fun showsSnow(snowCm: Double?, condition: Condition): Boolean =
-        condition.isFrozen && snowCm != null && snowCm >= MIN_PRINTED_CM
+    fun showsSnow(snowCm: Double?, condition: Condition): Boolean = Format.showsSnow(snowCm, condition)
 
     /**
      * Colour of the fill. It repeats what the height says, which is deliberate — it is what makes a
