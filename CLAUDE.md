@@ -522,6 +522,18 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   is drawn dim rather than hidden — "you have used your four" is a different message from "this
   cannot be pinned". A pinned ISTAT code the catalogue no longer knows is dropped rather than drawn
   as a blank row.
+  **Which places are pinned and which are shown in the pinned section are two different fields**
+  (`pinnedIstats` and `favourites`), and for one release they were one. The section is deliberately
+  empty while the reader is typing; the row read its star out of it, so during a search every row
+  believed itself unpinned. Three things broke together: the star drew hollow for a pinned place,
+  tapping always meant "pin" so nothing could be unpinned from search results, and — the symptom
+  that was reported, because it reads as the star being dead — with four pins already spent no row
+  could claim to be one of them, `canPin` was false, and **every star in the results was disabled**.
+  Searching and then starring is how anybody actually pins a place, so this was the path most likely
+  to be used and the only one not covered.
+  The star's test tag goes **inside** its `clearAndSetSemantics` block: that clears the node's whole
+  config, so a `Modifier.testTag` further along the chain is cleared with it and the button cannot
+  be reached by tag at all — which is why nothing tested the star until this was reported by hand.
 - Everything that opens a bottom-bar destination goes through `NavHostController.openTopLevel` in
   `ui/navigation/AppNavigation.kt`. The bulletin has two entrances, its tab and the teaser card on
   home; when the card used a plain `navigate` the home tab could no longer bring itself back.

@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -116,7 +117,10 @@ fun PlacePickerContent(
             return@Column
         }
 
-        val pinned = state.favourites.map { it.istat }.toSet()
+        // From the state's own membership set, never from the section above: the section is empty
+        // while the reader is typing and a place does not stop being pinned because it was searched
+        // for. See PlacePickerUiState.pinnedIstats.
+        val pinned = state.pinnedIstats
         LazyColumn(Modifier.fillMaxSize()) {
             if (state.favourites.isNotEmpty()) {
                 item(key = "favourites_header") {
@@ -208,9 +212,14 @@ private fun PlaceRow(
         IconButton(
             onClick = { onFavourite(place.istat, !pinned) },
             enabled = canPin,
+            // The tag goes *inside* the block. `clearAndSetSemantics` clears the node's whole
+            // config, so a `Modifier.testTag` further down the chain is cleared with everything
+            // else and the button becomes unreachable by tag — which is why nothing tested the
+            // star until the bug above was reported by hand.
             modifier = Modifier.clearAndSetSemantics {
                 contentDescription = pinLabel
-            }.testTag("place_pin_${place.istat}"),
+                testTag = "place_pin_${place.istat}"
+            },
         ) {
             Icon(
                 if (pinned) Icons.Filled.Star else Icons.Outlined.StarBorder,

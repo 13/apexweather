@@ -33,6 +33,21 @@ data class PlacePickerUiState(
      * a search for "Brixen" is noise.
      */
     val favourites: List<Place> = emptyList(),
+    /**
+     * Which places are pinned — **always all of them**, whatever the search box says.
+     *
+     * Separate from [favourites] because that field answers a different question. [favourites] is
+     * the *section* at the head of the list and is deliberately empty while the reader is typing;
+     * this is *membership*, and a place does not stop being pinned because somebody searched for it.
+     *
+     * One field was doing both jobs and the row read its star out of [favourites], so during a
+     * search every row believed itself unpinned. Three things broke at once: the star drew hollow
+     * for a place that was pinned, tapping it always meant "pin" so a place could never be unpinned
+     * from search results, and — the one that reads as nothing working at all — with four pins
+     * already spent no row could claim to be one of them, so `canPin` was false and every star in
+     * the results was disabled.
+     */
+    val pinnedIstats: Set<String> = emptySet(),
     /** Whether another pin would be accepted, so the star can be shown as spent rather than broken. */
     val canPinMore: Boolean = true,
 )
@@ -60,6 +75,8 @@ class PlacePickerViewModel @Inject constructor(
                     // blank row: a regenerated catalogue may lose a municipality, and the reader's
                     // stale pin is not a reason to draw nothing.
                     favourites = if (q.isBlank()) s.favouritePlaces.mapNotNull { catalogue.byIstat(it) } else emptyList(),
+                    // Not conditional on the query: see the field's own note.
+                    pinnedIstats = s.favouritePlaces.toSet(),
                     canPinMore = s.favouritePlaces.size < SettingsRepository.MAX_FAVOURITE_PLACES,
                 )
             }
