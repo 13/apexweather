@@ -790,6 +790,12 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   own inner row so the badge centres on **them**: at a 2x font scale the line opposite wraps to
   three lines and the row grows to 77 dp, and a badge centred in that floats in the middle of the
   hero, detached from the reading it belongs to. Checked at 1,0 and 2,0.
+  **Both quiet lines live in one `Column`**, which is what makes the reading sit opposite the *pair*
+  rather than opposite the first of them. Keeping only the first line in the shared row and letting
+  the rest fall below looked the same in a screenshot and was not: the badge makes that row 19 dp
+  tall, so the next line began after it and 5,7 dp opened between two lines that belong together.
+  `alignByBaseline` on the `Column` carries its first child's baseline out to the row, so the
+  grouping costs nothing.
   The rain line sits above that row rather than in it — it is the only line there that is weather
   rather than provenance, it is the one worth reading first, and it is not always present.
 - **The hero's icon is centred in the space left after the temperature** (`HeroLine`), and the

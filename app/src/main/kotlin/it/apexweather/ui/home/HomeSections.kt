@@ -170,10 +170,9 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
         }
         Row(Modifier.fillMaxWidth()) {
             // The reading and its badge are their own row so the badge centres on *them* rather than
-            // on the whole line. At a large text size the line opposite wraps to three lines and the
-            // row grows to 77 dp; a badge centred in that floats in the middle of the hero, detached
-            // from the reading it belongs to. Measured at a 2x font scale, which is the only place
-            // it shows.
+            // on the whole line. At a large text size the column opposite wraps and the line grows
+            // to 77 dp; a badge centred in that floats in the middle of the hero, detached from the
+            // reading it belongs to.
             Row(Modifier.alignByBaseline(), verticalAlignment = Alignment.CenterVertically) {
                 state.heroFeelsLikeC?.let {
                     Text(
@@ -193,40 +192,44 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
                 }
             }
             Spacer(Modifier.width(12.dp))
-            Text(
-                source,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.65f),
-                textAlign = TextAlign.End,
-                modifier = Modifier.weight(1f).alignByBaseline(),
-            )
-        }
-        state.updatedAt?.let {
-            Text(
-                stringResource(R.string.updated_at, Format.timestamp(it, SouthTyrol.ZONE, state.now, formats)),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.5f),
-                textAlign = TextAlign.End,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        // A source that never answers is otherwise invisible: the consensus simply has one model
-        // fewer and says nothing about it. Named where there is one, counted where there are more,
-        // and in the same quiet type as the rest of this column — it is a fact about the forecast,
-        // not an alarm.
-        if (state.silentSources.isNotEmpty()) {
-            val text = if (state.silentSources.size == 1) {
-                stringResource(R.string.source_silent_one, state.silentSources.single().displayName)
-            } else {
-                pluralStringResource(R.plurals.source_silent_many, state.silentSources.size, state.silentSources.size)
+            // All of it in one column, so the lines stack against each other rather than against
+            // the row. Keeping only the first line in the shared row and letting the rest fall
+            // below put 5,7 dp between them — the badge makes the row 19 dp tall and the next line
+            // begins after it — which broke the two apart as a pair.
+            Column(Modifier.weight(1f).alignByBaseline(), horizontalAlignment = Alignment.End) {
+                Text(
+                    source,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.65f),
+                    textAlign = TextAlign.End,
+                )
+                state.updatedAt?.let {
+                    Text(
+                        stringResource(R.string.updated_at, Format.timestamp(it, SouthTyrol.ZONE, state.now, formats)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.5f),
+                        textAlign = TextAlign.End,
+                    )
+                }
+                // A source that never answers is otherwise invisible: the consensus simply has one
+                // model fewer and says nothing about it. Named where there is one, counted where
+                // there are more, and in the same quiet type as the rest of this column — it is a
+                // fact about the forecast, not an alarm.
+                if (state.silentSources.isNotEmpty()) {
+                    val text = if (state.silentSources.size == 1) {
+                        stringResource(R.string.source_silent_one, state.silentSources.single().displayName)
+                    } else {
+                        pluralStringResource(R.plurals.source_silent_many, state.silentSources.size, state.silentSources.size)
+                    }
+                    Text(
+                        text,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFFFD166).copy(alpha = 0.85f),
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.testTag("silent_sources"),
+                    )
+                }
             }
-            Text(
-                text,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFFFD166).copy(alpha = 0.85f),
-                textAlign = TextAlign.End,
-                modifier = Modifier.fillMaxWidth().testTag("silent_sources"),
-            )
         }
     }
 }
