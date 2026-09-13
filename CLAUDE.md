@@ -782,7 +782,18 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   card and each had a row to itself, so a third of the width carried them and two thirds carried
   nothing — directly under an icon that also leaves the right of its line empty. The block is about
   17 dp shorter now and the day list starts that much higher.
-  **The line is straight because it is aligned by baseline, not by size.** Matching the type was the
+  **The reading is set large enough to stand as tall as the pair opposite it** — 22 sp against their
+  11, about 26 dp against their 26,3 — and the two blocks are *centred on each other*, not aligned
+  by baseline: with one side at 22 sp and one at 11 a shared baseline puts two 26 dp blocks 6 dp out
+  of step, because a large line's baseline sits much lower in its box. **The badge keeps its own
+  size**, which is a measurement: grown to match, its pill is 101 dp against 51, leaving the column
+  95 dp where its longest line needs 133, and both quiet lines wrapped while the hero grew 36 dp.
+  **And the row only fits at the ordinary text size.** It has 22 dp of slack at 1,0 and none above
+  it: at 1,1 the column already wraps, at 2,0 it is left 19,5 dp and wraps to about one letter a
+  line, 435 dp tall. Past `HeroRowMaxFontScale` the two stack — reading first, quiet lines under it,
+  still right-aligned. A threshold of 1,2 was written here first on the strength of an estimate and
+  measuring it proved the estimate wrong; every scale in between was tried on the phone.
+  **The line was straight, before the reading grew, because it was aligned by baseline, not by size.** Matching the type was the
   first half — the reading was `bodyMedium` against the column's `labelSmall`, 3 dp taller, enough
   to make the row look bent — but matching sizes is not enough on its own, because the badge beside
   it is a pill and *its* height is what the row would otherwise be measured by. `alignByBaseline`
