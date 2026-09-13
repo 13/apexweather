@@ -43,15 +43,30 @@ class StationFogTest {
         assertFalse(StationFog.saturated(null, now))
         assertFalse(StationFog.saturated(obs(null), now))
     }
-    private fun hourOf(precipMm: Double, cloudPct: Int?) = ConsensusHour(
+    private fun hourOf(precipMm: Double, cloudPct: Int?, humidityPct: Int? = 94) = ConsensusHour(
         time = now, tempC = 15.0, tempMinC = 14.0, tempMaxC = 16.0, feelsLikeC = null,
         precipMm = precipMm, precipProb = 60, windKmh = 4.0, gustKmh = null, freezingLevelM = null,
         condition = Condition.CLOUDY, agreement = 0.8f, sourceCount = 2,
         perSource = mapOf(
-            Source.ICON_CH1 to HourlyPoint(now, 15.0, precipMm = precipMm, cloudPct = cloudPct, condition = Condition.CLOUDY),
-            Source.ICON_D2 to HourlyPoint(now, 15.0, precipMm = precipMm, cloudPct = cloudPct, condition = Condition.CLOUDY),
+            Source.ICON_CH1 to HourlyPoint(now, 15.0, precipMm = precipMm, cloudPct = cloudPct, humidityPct = humidityPct, condition = Condition.CLOUDY),
+            Source.ICON_D2 to HourlyPoint(now, 15.0, precipMm = precipMm, cloudPct = cloudPct, humidityPct = humidityPct, condition = Condition.CLOUDY),
         ),
     )
+
+    /**
+     * Dorf Tirol, 2026-09-14, 00:40: "Nebel" on the screen and no fog outside. Meran read 99 % under
+     * an overcast sky, and every one of twelve models put the village's air at 54 to 79 % — the
+     * station's saturation was the valley floor's, not the village's.
+     */
+    @Test
+    fun `a saturated station is not fog where the models put the village's air well short of it`() {
+        assertFalse(StationFog.impliesFog(obs(99), now, hourOf(precipMm = 0.0, cloudPct = 100, humidityPct = 65)))
+    }
+
+    @Test
+    fun `no modelled humidity is simply not evidence`() {
+        assertFalse(StationFog.impliesFog(obs(100), now, hourOf(precipMm = 0.0, cloudPct = 100, humidityPct = null)))
+    }
 
     /** Dorf Tirol, 2026-09-10, 19:00: foggy outside, ten forecasts saying otherwise, station at 100 %. */
     @Test

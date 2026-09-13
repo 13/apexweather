@@ -749,8 +749,10 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   humidity: as a tiebreaker it lets a single source carry the fog, and `impliesFog` can raise fog on
   the **current hour only** when the measured air is saturated under a covered sky with nothing much
   falling. Every clause there is load-bearing — rain saturates the air exactly as fog does, and a
-  clear humid dawn is not fog. It can still be wrong: the station is 270 m below the village and
-  valley fog often lies below a shoulder rather than over it.
+  clear humid dawn is not fog. **And the models must put the village's own air at 80 % or more**
+  (weighted median): on 2026-09-14 at 00:40 Meran read 99 % under overcast, the hero said "Nebel"
+  and there was none — twelve models had the village at 54 to 79 %, where the real fog evening ran
+  82 to 94 %. A saturated valley floor is not a saturated shoulder 264 m above it.
   On 2026-09-10 it was foggy in Dorf Tirol and **not one of the ten sources said so** — eight
   Open-Meteo models returned overcast or drizzle, the three publishing visibility said 12 to 29 km,
   and SIAG KMOS, which has codes for Hochnebel and Talnebel, returned "Bedeckt, mäßiger Regen". The

@@ -64,11 +64,28 @@ object StationFog {
         if (hour == null || !saturated(observation, now)) return false
         if (hour.precipMm > FOG_LOSES_ABOVE_MM) return false
         val clouds = hour.perSource.values.mapNotNull { it.cloudPct }
-        return clouds.isNotEmpty() && clouds.average() >= COVERED_PCT
+        if (clouds.isEmpty() || clouds.average() < COVERED_PCT) return false
+        val humidity = hour.perSource.mapNotNull { (s, p) -> p.humidityPct?.let { s to it.toDouble() } }.toMap()
+        return humidity.isNotEmpty() && ConsensusBlender.weightedMedian(humidity) >= VILLAGE_HUMID_PCT
     }
 
     /** Fog is cloud on the ground, so the sky has to be covered. Matches the AROME mapper's 0.9. */
     private const val COVERED_PCT = 90.0
+
+    /**
+     * The station's saturation has to be at least plausible up at the village, by the models' own
+     * account of the village's air.
+     *
+     * The station is on the valley floor and the village is not, and a saturated thermometer 264 m
+     * down says nothing on its own about the shoulder above it. On 2026-09-14 at 00:40 Meran read
+     * 99 % under an overcast sky, the screen said "Nebel" over Dorf Tirol, and there was no fog:
+     * twelve models put the village at 54 to 79 %, median 65, with 12 to 42 km of visibility. On the
+     * foggy evening this object was written for, the same median ran 82 to 94 % from 15:00 to
+     * 23:00. Eighty sits under the whole of the real case and well over the false one — two
+     * evenings, so a judgement rather than a calibration. Not higher: the models did not see that
+     * fog either, and a bar they would have to reach on their own would make the station pointless.
+     */
+    private const val VILLAGE_HUMID_PCT = 80.0
 
     /** Above this the hour is a rain hour, and rain is the more useful thing to be told. */
     private const val FOG_LOSES_ABOVE_MM = 0.5
