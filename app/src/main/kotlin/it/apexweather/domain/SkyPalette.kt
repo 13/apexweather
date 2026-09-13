@@ -8,7 +8,7 @@ import it.apexweather.domain.model.Condition
  * than as weather — distracting behind the text, and never informative, since the icon and the word
  * beside the temperature already say it is cloudy.
  */
-enum class ParticleKind { NONE, STARS, RAIN, SNOW, FOG, LIGHTNING }
+enum class ParticleKind { NONE, STARS, RAIN, SNOW, LIGHTNING }
 
 /** Colors are ARGB longs so this stays free of Android/Compose dependencies. */
 data class SkyPalette(
@@ -110,12 +110,12 @@ object SkyPaletteSelector {
             // dark. Nothing noticed because nothing renders fog here — no model has voted for it —
             // and until now no golden covered it either.
             Condition.FOG -> when (phase) {
-                SunPhase.NIGHT -> p(0xFF0D1017, 0xFF1B1F26, 0xFF2C3138, 0xFFD5D8DD, 0xFF0E1116, ParticleKind.FOG, 0.8f)
+                SunPhase.NIGHT -> p(0xFF0D1017, 0xFF1B1F26, 0xFF2C3138, 0xFFD5D8DD, 0xFF0E1116, ParticleKind.NONE)
                 // Darkened to sit with the other daylight palettes. The original ran to #D1D5DB at
                 // the foot of the screen, and this app writes in white: the moment fog became
                 // reachable, the labels over it were barely there. Still the greyest sky in the
                 // set, which is what makes it read as fog rather than as overcast.
-                else -> p(0xFF4E5763, 0xFF6E7885, 0xFF97A1AD, 0xFFEDEFF2, 0xFF434B56, ParticleKind.FOG, 0.8f)
+                else -> p(0xFF4E5763, 0xFF6E7885, 0xFF97A1AD, 0xFFEDEFF2, 0xFF434B56, ParticleKind.NONE)
             }
             Condition.DRIZZLE, Condition.RAIN -> when (phase) {
                 SunPhase.NIGHT -> p(0xFF0A0E1A, 0xFF141C2E, 0xFF20304A, 0xFF8FB3E8, 0xFF0B101C, ParticleKind.RAIN, precipDensity)

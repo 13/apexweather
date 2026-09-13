@@ -21,7 +21,7 @@ class SkyPaletteSelectorTest {
     @Test fun `snow and thunderstorm map to their particle kinds`() {
         assertEquals(ParticleKind.SNOW, SkyPaletteSelector.select(Condition.SNOW, SunPhase.DAY, 1.0).particle)
         assertEquals(ParticleKind.LIGHTNING, SkyPaletteSelector.select(Condition.THUNDERSTORM, SunPhase.NIGHT, 3.0).particle)
-        assertEquals(ParticleKind.FOG, SkyPaletteSelector.select(Condition.FOG, SunPhase.DAY, 0.0).particle)
+        assertEquals(ParticleKind.NONE, SkyPaletteSelector.select(Condition.FOG, SunPhase.DAY, 0.0).particle)
     }
 
     @Test fun `phase changes clear palette`() {

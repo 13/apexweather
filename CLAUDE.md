@@ -556,9 +556,10 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   `GlassCard` then paints **black**, not the white wash it used to: a white card lifted the
   background back above the floor the palette had just been held to and put text on it at 3,9:1.
   Black keeps the guarantee, because a card can then only make a passing sky darker.
-- **There are no cloud particles.** Broken cloud used to drift a handful of pale ovals across the
-  sky; they read as smudges behind the text rather than as weather, and the icon and the word beside
-  the temperature already say it is cloudy. `ParticleKind` has no CLOUDS member — do not add one.
+- **There are no cloud or fog particles.** Broken cloud and fog both used to drift a handful of pale
+  ovals across the sky; they read as smudges behind the text rather than as weather, and the icon and
+  the word beside the temperature already say it is cloudy or foggy. Fog keeps its own grey palette
+  and nothing moves on it. `ParticleKind` has no CLOUDS or FOG member — do not add one.
 - Source colours are in `ui/common/SourceColors.kt`; SIAG letter codes in `domain/SiagCodes.kt`.
   **A column is headed by `Source.shortName`, which is spelled out and not derived.** It used to be
   `displayName.substringAfter(' ')` — a rule that works until a name does not fit it, and two did
