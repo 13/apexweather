@@ -107,7 +107,28 @@ class HomeScreenTest {
     fun heroShowsConsensusTemperature() {
         rule.setContent { ApexTheme { HomeContent(state, onRefresh = {}, onOpenBulletin = {}) } }
         rule.onNodeWithTag("hero_temp").assertIsDisplayed().assertTextContains("16°")
-        rule.onNodeWithTag("agreement_badge").assertIsDisplayed()
+    }
+
+    /** The hero carries no spread badge; that lives in the hour and day sheets. */
+    @Test
+    fun heroHasNoAgreementBadge() {
+        rule.setContent { ApexTheme { HomeContent(state, onRefresh = {}, onOpenBulletin = {}) } }
+        rule.onNodeWithTag("agreement_badge").assertDoesNotExist()
+    }
+
+    /**
+     * Where the number came from and when it was fetched stand as two lines at the card's left edge,
+     * with the temperature. Geometry, not wording — CI's emulator is en-US.
+     */
+    @Test
+    fun heroQuietLinesSitOnTheLeft() {
+        rule.setContent { ApexTheme { HomeContent(state.copy(updatedAt = t0), onRefresh = {}, onOpenBulletin = {}) } }
+        val temp = rule.onNodeWithTag("hero_temp").fetchSemanticsNode().boundsInRoot
+        val source = rule.onNodeWithTag("hero_source").fetchSemanticsNode().boundsInRoot
+        val updated = rule.onNodeWithTag("hero_updated").fetchSemanticsNode().boundsInRoot
+        assertEquals(temp.left, source.left, 1f)
+        assertEquals(source.left, updated.left, 1f)
+        assertTrue(updated.top >= source.bottom - 1f)
     }
 
     /**

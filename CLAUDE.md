@@ -777,38 +777,12 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   the range into four and rounding each tick is what labelled two gridlines "0" on a day with no
   rain in it. The step is never finer than half a unit, because at 0,04 mm the labels all read "0,0"
   instead. It is pure, so the cases live in `ChartAxisTest` rather than on a phone.
-- **Everything the hero says quietly is right-aligned under the icon**, and the feels-like reading
-  shares a line with it. Measured before: the two footnote lines reached 157 and 123 dp of a 360 dp
-  card and each had a row to itself, so a third of the width carried them and two thirds carried
-  nothing — directly under an icon that also leaves the right of its line empty. The block is about
-  17 dp shorter now and the day list starts that much higher.
-  **The reading is set large enough to stand as tall as the pair opposite it** — 22 sp against their
-  11, about 26 dp against their 26,3 — and the two blocks are *centred on each other*, not aligned
-  by baseline: with one side at 22 sp and one at 11 a shared baseline puts two 26 dp blocks 6 dp out
-  of step, because a large line's baseline sits much lower in its box. **The badge keeps its own
-  size**, which is a measurement: grown to match, its pill is 101 dp against 51, leaving the column
-  95 dp where its longest line needs 133, and both quiet lines wrapped while the hero grew 36 dp.
-  **And the row only fits at the ordinary text size.** It has 22 dp of slack at 1,0 and none above
-  it: at 1,1 the column already wraps, at 2,0 it is left 19,5 dp and wraps to about one letter a
-  line, 435 dp tall. Past `HeroRowMaxFontScale` the two stack — reading first, quiet lines under it,
-  still right-aligned. A threshold of 1,2 was written here first on the strength of an estimate and
-  measuring it proved the estimate wrong; every scale in between was tried on the phone.
-  **The line was straight, before the reading grew, because it was aligned by baseline, not by size.** Matching the type was the
-  first half — the reading was `bodyMedium` against the column's `labelSmall`, 3 dp taller, enough
-  to make the row look bent — but matching sizes is not enough on its own, because the badge beside
-  it is a pill and *its* height is what the row would otherwise be measured by. `alignByBaseline`
-  holds at any font scale where a computed offset would not, and the badge and the reading are their
-  own inner row so the badge centres on **them**: at a 2x font scale the line opposite wraps to
-  three lines and the row grows to 77 dp, and a badge centred in that floats in the middle of the
-  hero, detached from the reading it belongs to. Checked at 1,0 and 2,0.
-  **Both quiet lines live in one `Column`**, which is what makes the reading sit opposite the *pair*
-  rather than opposite the first of them. Keeping only the first line in the shared row and letting
-  the rest fall below looked the same in a screenshot and was not: the badge makes that row 19 dp
-  tall, so the next line began after it and 5,7 dp opened between two lines that belong together.
-  `alignByBaseline` on the `Column` carries its first child's baseline out to the row, so the
-  grouping costs nothing.
-  The rain line sits above that row rather than in it — it is the only line there that is weather
-  rather than provenance, it is the one worth reading first, and it is not always present.
+- **The hero carries no feels-like reading and no agreement badge.** Under the condition word it
+  says where the number came from and when it was fetched, as two plain lines on the left; the rain
+  line ("Regen ab …") is the one line that is weather rather than provenance and keeps the right edge
+  under the icon. The badge still lives in the hour and day sheets. The side-by-side row this
+  replaced only fitted at font scale 1,0 and needed a stacked fallback above it; one column needs
+  neither.
 - **The hero's icon is centred in the space left after the temperature** (`HeroLine`), and the
   `Row` of two equally weighted children it replaced was not that, though its comment said so. A
   weighted child's slot is a fixed half of the line, but children are *placed* one after another at
@@ -817,7 +791,9 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   after the number runs 142 to 360 and its middle is 251, and it drifted with the temperature,
   which is exactly what the old comment claimed it would not do. It is 254 now against a target of
   251; the 3 dp left over is the cloud glyph's own ink sitting slightly right in its box, which is
-  per-drawing and not worth chasing. Centring it on the *card* was tried first and is a different
+  per-drawing and not worth chasing. On top of that centre it now sits `HeroIconNudge` (16 dp)
+  further right, because exactly centred it was asked to move slightly right; it still stops at the
+  far edge. Centring it on the *card* was tried first and is a different
   request — it puts the icon at 199 dp, true to the middle of the line but leaving the right third
   of the hero empty and the icon crowded against the number.
 - **The weather icons are normalised by `tools/svg2vector.py`, not drawn at Meteocons' own sizes.**

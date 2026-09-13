@@ -13,7 +13,6 @@
     <string name="cond_snow">Snow</string>
     <string name="cond_heavy_snow">Heavy snow</string>
     <string name="cond_thunderstorm">Thunderstorm</string>
-    <string name="feels_like">Feels like %1$s</string>
     <string name="now_from_station">Now: station %1$s, %2$s</string>
     <string name="updated_at">Updated %1$s</string>
     <string name="source_silent_one">A source is not answering: %1$s</string>

@@ -13,7 +13,6 @@
     <string name="cond_snow">Neve</string>
     <string name="cond_heavy_snow">Neve forte</string>
     <string name="cond_thunderstorm">Temporale</string>
-    <string name="feels_like">Percepita %1$s</string>
     <string name="now_from_station">Ora: stazione %1$s, %2$s</string>
     <string name="updated_at">Aggiornato %1$s</string>
     <string name="source_silent_one">Una fonte non risponde: %1$s</string>

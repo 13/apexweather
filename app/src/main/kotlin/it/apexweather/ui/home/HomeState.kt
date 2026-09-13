@@ -52,7 +52,6 @@ data class HomeUiState(
     val visibleSun: Map<LocalDate, Pair<Instant, Instant>> = emptyMap(),
     val palette: SkyPalette = SkyPaletteSelector.select(Condition.PARTLY_CLOUDY, SunPhase.DAY, 0.0),
     val heroTempC: Double? = null,
-    val heroFeelsLikeC: Double? = null,
     val heroCondition: Condition = Condition.PARTLY_CLOUDY,
     val bandHalfWidth: Double? = null,
     val currentHour: ConsensusHour? = null,
@@ -251,7 +250,6 @@ object HomeStateBuilder {
             palette = SkyPaletteSelector.select(heroCondition, phase, current?.precipMm ?: 0.0),
             heroTempC = heroFromStation ?: current?.tempC ?: obs?.tempC,
             heroAdjustmentC = adjustment?.takeIf { heroFromStation != null },
-            heroFeelsLikeC = current?.feelsLikeC,
             heroCondition = heroCondition,
             // The ensemble's own spread where it reaches this hour, the models' disagreement otherwise.
             bandHalfWidth = current?.let { it.ensembleHalfWidthC ?: (it.tempMaxC - it.tempMinC) / 2.0 },

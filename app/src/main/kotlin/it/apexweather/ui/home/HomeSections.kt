@@ -136,30 +136,10 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
                 ?: stringResource(R.string.now_from_station, obs.stationName, at)
         } ?: pluralStringResource(R.plurals.now_from_consensus, sourceCount, sourceCount)
 
-        // Everything the hero says quietly moves to the right, under the icon, and shares a row with
-        // what it qualifies. Measured before: the two footnote lines reached 157 and 123 dp of a
-        // 360 dp card and had their own rows, so a third of the width carried them and two thirds
-        // carried nothing — directly under an icon that also leaves the right of the line empty.
-        // Beside the feels-like reading instead, the block is about 25 dp shorter and the dead space
-        // under the icon is where it lives.
-        //
-        // `Top` rather than centred: the right column is usually taller than the left one, and the
-        // first thing in it should line up with the reading it qualifies rather than float against
-        // the middle of it.
-        // One straight line across the hero: the feels-like reading at the margin and the line that
-        // says where the number came from at the far edge, **aligned by their baselines**.
-        //
-        // The reading was `bodyMedium` against the column's `labelSmall` — 3 dp taller, enough to
-        // make the row look bent — and matching the sizes was not enough on its own, because the
-        // badge beside it is a pill and its height, not the text's, is what the row would otherwise
-        // be measured by. `alignByBaseline` sidesteps that and keeps holding at any font scale,
-        // where a hand-computed offset would not. The badge is centred on the line, which is what a
-        // pill on a line looks like.
-        //
-        // The rain line sits above this row rather than in it: it is the only line here that is
-        // weather rather than provenance, it is the one worth reading first, and it is not always
-        // there. Everything quiet is right-aligned under the icon, where the hero had a third of
-        // its width carrying nothing.
+        // The rain line is weather rather than provenance and the one worth reading first, so it
+        // keeps the right edge under the icon. Where the number came from and when it was fetched
+        // sit on the left as two plain lines: the hero carries no feels-like reading and no spread
+        // badge, so nothing competes with them for the width.
         state.minutelyStart?.let {
             Text(
                 stringResource(R.string.rain_starts_at, Format.time(it, SouthTyrol.ZONE, formats)),
@@ -169,35 +149,7 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
             )
             Spacer(Modifier.height(4.dp))
         }
-        // Side by side only while there is room for it.
-        //
-        // The reading is set so its one line stands as tall as the two opposite it — 22 sp against
-        // their 11, about 26 dp against their pair's 26,3 — and the two blocks are **centred on each
-        // other** rather than aligned by baseline. Baselines were right while both sides were the
-        // same type; with one at 22 sp and one at 11 a shared baseline puts two 26 dp blocks 6 dp
-        // out of step, because the baseline of a large line sits much lower in its box.
-        //
-        // **The badge keeps its own size**, which is a measurement rather than a preference. Grown
-        // to match the reading its pill is 101 dp wide against 51, leaving the column opposite 95 dp
-        // where "Konsens aus 7 Modellen" needs 133: both quiet lines wrapped and the hero grew 36 dp,
-        // the opposite of what moving them there was for. At 19 dp the pill sits comfortably inside
-        // the 26 dp line instead of setting its height.
-        //
-        // And above [HeroRowMaxFontScale] the two stack instead. At a 2x font scale the reading
-        // alone is 192 dp of a 336 dp card and the badge takes it to 284, which left the column
-        // opposite 19,5 dp — "Konsens aus 7 Modellen" wrapped to roughly one letter a line and stood
-        // 435 dp tall. No arrangement rescues that; they simply do not fit beside each other once
-        // the text doubles.
-        if (LocalDensity.current.fontScale > HeroRowMaxFontScale) {
-            HeroReading(state, formats)
-            HeroQuiet(state, formats, source)
-        } else {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                HeroReading(state, formats)
-                Spacer(Modifier.width(12.dp))
-                HeroQuiet(state, formats, source, Modifier.weight(1f))
-            }
-        }
+        HeroQuiet(state, formats, source)
     }
 }
 
@@ -565,6 +517,12 @@ private val DayRowMinHeight = 44.dp
  * A [Layout] rather than a chain of modifiers because the rule needs both measured widths at once,
  * and writing it out is shorter than the arrangement that would fake it.
  */
+/**
+ * How far right of that centre the icon sits: centred exactly, it read as a little too close to the
+ * number, so it was asked to move slightly right. Still capped at the far edge.
+ */
+private val HeroIconNudge = 16.dp
+
 @Composable
 private fun HeroLine(temperature: @Composable () -> Unit, icon: @Composable () -> Unit) {
     Layout(contents = listOf(temperature, icon)) { (temperatureMeasurables, iconMeasurables), constraints ->
@@ -577,7 +535,7 @@ private fun HeroLine(temperature: @Composable () -> Unit, icon: @Composable () -
         // room left than the icon needs — a wide reading at a large font scale — it sits at the far
         // edge and stops, rather than being pushed off it.
         val remaining = (width - temp.width).coerceAtLeast(0)
-        val x = (temp.width + (remaining - wx.width) / 2).coerceIn(temp.width, (width - wx.width).coerceAtLeast(0))
+        val x = (temp.width + (remaining - wx.width) / 2 + HeroIconNudge.roundToPx()).coerceIn(temp.width, (width - wx.width).coerceAtLeast(0))
         layout(width, height) {
             temp.place(0, (height - temp.height) / 2)
             wx.place(x, (height - wx.height) / 2)
@@ -586,53 +544,8 @@ private fun HeroLine(temperature: @Composable () -> Unit, icon: @Composable () -
 }
 
 /**
- * The feels-like reading's type, chosen so its single line is as tall as the two quiet lines it sits
- * opposite: 22 sp for a line of about 26 dp, against 11 sp lines of 13,2 that make 26,3 as a pair.
- *
- * It puts the reading just under the condition word above it, which is 26 sp — a deliberate
- * consequence and the reason this is a constant with a name rather than a number in the middle of a
- * composable.
- */
-private val HeroReadingSize = 22.sp
-private val HeroReadingLineHeight = 26.sp
-
-/**
- * The feels-like reading and the spread badge: one line, set large enough to stand as tall as the
- * two quiet lines it sits opposite. See the call site for why the badge is not enlarged with it.
- */
-@Composable
-private fun HeroReading(state: HomeUiState, formats: it.apexweather.ui.common.Formats) {
-    val readingStyle = MaterialTheme.typography.labelSmall.copy(
-        fontSize = HeroReadingSize,
-        lineHeight = HeroReadingLineHeight,
-    )
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        state.heroFeelsLikeC?.let {
-            Text(
-                stringResource(R.string.feels_like, Format.temp(it, formats)),
-                style = readingStyle,
-                color = Color.White.copy(alpha = 0.8f),
-            )
-        }
-        state.bandHalfWidth?.let {
-            Spacer(Modifier.width(10.dp))
-            AgreementBadge(
-                it, state.currentHour?.agreement ?: 0.5f,
-                sourceCount = state.currentHour?.sourceCount ?: 0,
-                ensembleBacked = state.currentHour?.ensembleHalfWidthC != null,
-            )
-        }
-    }
-}
-
-/**
- * Where the number came from, when it was fetched, and which sources never answered — right-aligned
- * under the icon, where the hero had a third of its width carrying nothing.
- *
- * All of it in one column, so the lines stack against each other rather than against whatever row
- * they are in. Keeping only the first in the shared row and letting the rest fall below put 5,7 dp
- * between them — the badge makes that row 19 dp tall and the next line began after it — which broke
- * apart two lines that belong together.
+ * Where the number came from, when it was fetched, and which sources never answered — on the left,
+ * one line under another.
  */
 @Composable
 private fun HeroQuiet(
@@ -641,19 +554,19 @@ private fun HeroQuiet(
     source: String,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+    Column(modifier.fillMaxWidth()) {
         Text(
             source,
             style = MaterialTheme.typography.labelSmall,
             color = Color.White.copy(alpha = 0.65f),
-            textAlign = TextAlign.End,
+            modifier = Modifier.testTag("hero_source"),
         )
         state.updatedAt?.let {
             Text(
                 stringResource(R.string.updated_at, Format.timestamp(it, SouthTyrol.ZONE, state.now, formats)),
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.5f),
-                textAlign = TextAlign.End,
+                modifier = Modifier.testTag("hero_updated"),
             )
         }
         // A source that never answers is otherwise invisible: the consensus simply has one model
@@ -670,26 +583,8 @@ private fun HeroQuiet(
                 text,
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFFFFD166).copy(alpha = 0.85f),
-                textAlign = TextAlign.End,
                 modifier = Modifier.testTag("silent_sources"),
             )
         }
     }
 }
-
-/**
- * The text size past which the reading and the quiet column stop sharing a line.
- *
- * **One, and that is measured rather than chosen.** The row is tight even at the ordinary size: the
- * reading and its badge take 169 dp of the 336 the card has, and "Konsens aus 7 Modellen" needs 133
- * of the 155 left — 22 dp of slack. Every scale above it was tried on the phone and none of them
- * fit: at 1,1 the reading is 124 dp and the column wraps to two lines, at 1,5 it is left 105 dp
- * where it needs 200, and at 2,0 it gets 19,5 dp and wraps to roughly one letter a line, 435 dp
- * tall. A threshold of 1,2 was written here first on the strength of an estimate, and measuring it
- * proved the estimate wrong.
- *
- * So the tall row is the default size's layout and nothing else's. Above it the two stack — reading
- * first, quiet lines under it and still right-aligned — which is a worse row and a perfectly good
- * screen. Anyone who has made the text *smaller* keeps the row.
- */
-private const val HeroRowMaxFontScale = 1.0f

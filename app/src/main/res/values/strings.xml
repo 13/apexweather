@@ -13,7 +13,6 @@
     <string name="cond_snow">Schnee</string>
     <string name="cond_heavy_snow">Starker Schneefall</string>
     <string name="cond_thunderstorm">Gewitter</string>
-    <string name="feels_like">Gefühlt %1$s</string>
     <string name="now_from_station">Jetzt: Station %1$s, %2$s</string>
     <string name="updated_at">Aktualisiert %1$s</string>
     <string name="source_silent_one">Quelle antwortet nicht: %1$s</string>
