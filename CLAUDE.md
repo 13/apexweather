@@ -609,9 +609,15 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   (-4 → -3 sp, the same -3,6 % of the size). Measured after: the day list starts 61 dp higher and
   shows **four days instead of three**, the hour strip shows **seven hours instead of five and a
   half**, and the hero is 252 → 200 dp.
-  **The day rows themselves cannot be tightened and that is a floor, not a preference**: their pitch
-  measured 48,0 dp, which is Android's minimum touch target, held there by `heightIn(min = 48.dp)`
-  over content only 16,7 dp tall. They open the day sheet, so they stay tappable, so they stay 48.
+  **The day rows sit 4 dp under Android's minimum touch target, on purpose.** Their pitch was 48,0 dp
+  — the minimum — held there by `heightIn` over content only 16,7 dp tall, and it was written here
+  as a floor. `DayRowMinHeight` is 44 now, which was asked for after the trade-off was put plainly
+  and is worth 56 dp over the fourteen rows, more than a whole extra row on screen. What makes it
+  defensible rather than merely smaller: the row is the **full width of the card**, so the target is
+  44 dp by about 320, and a vertical miss between two rows opens the day above or the day below —
+  both harmless. It is not a 44 dp square and it is not beside anything destructive. It cannot go
+  much further: the stacked amount-over-chance column is about 26 dp and with 6 dp of padding either
+  side the content wants 38, so below about 42 the rows have no air left at all.
   **The hero's footnote went from three lines to two** by dropping what was already on the screen:
   `now_from_station_adjusted` no longer says "Jetzt" or names the place it converted *to* — the
   place is the first line of the block and the number directly above is plainly the current one —

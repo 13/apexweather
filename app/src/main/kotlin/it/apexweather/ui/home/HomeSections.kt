@@ -377,8 +377,8 @@ fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate
             Row(
                 Modifier.fillMaxWidth()
                     .clickable(onClickLabel = openLabel) { onDayClick(d.date) }
-                    .heightIn(min = 48.dp) // the row's own content is well under the minimum touch target
-                    .padding(vertical = 8.dp)
+                    .heightIn(min = DayRowMinHeight)
+                    .padding(vertical = 6.dp)
                     .testTag("day_row_$i"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -486,3 +486,23 @@ fun AttributionFooter() {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
     )
 }
+
+/**
+ * How tall a row of the day list is, and the one measurement in this app deliberately under a
+ * guideline.
+ *
+ * Android's minimum touch target is 48 dp and the rows open the day sheet, so 48 is what they were:
+ * measured on the phone, the pitch was exactly 48,0 dp, held there by this minimum over content
+ * only 16,7 dp tall. Forty-four is a choice to sit 4 dp under that, taken deliberately and worth
+ * 56 dp over the fourteen rows — more than a whole extra row on screen.
+ *
+ * What makes it defensible rather than merely smaller: the row is the **full width of the card**, so
+ * the target is 44 dp by about 320, and a miss is only possible vertically between two rows that
+ * both do something harmless — open the day above or the day below. It is not a 44 dp square, and it
+ * is not next to anything destructive.
+ *
+ * It cannot go much further. The tallest thing in the row is the stacked amount-over-chance column
+ * at about 26 dp, and with 6 dp of padding either side the content itself wants 38; below about
+ * 42 the rows stop having any air in them at all and the minimum stops doing anything.
+ */
+private val DayRowMinHeight = 44.dp
