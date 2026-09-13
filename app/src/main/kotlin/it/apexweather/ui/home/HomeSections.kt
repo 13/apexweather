@@ -31,6 +31,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
@@ -98,29 +99,24 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
         // them, which is what the reader asked for and what the hero can carry.
         val tempStyle = MaterialTheme.typography.displayLarge
         val iconSize = with(LocalDensity.current) { (tempStyle.fontSize * 1.05f).toDp() }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = state.heroTempC?.let { Format.temp(it, formats) } ?: "–",
-                style = tempStyle,
-                color = Color.White,
-                // Without a weight a wide reading at a large font/display scale fills the row and the
-                // icon is measured against zero width left over — it just disappears. The number
-                // yields space before the icon does, and fill = false keeps it from stretching short
-                // readings to fill the row.
-                modifier = Modifier.weight(1f, fill = false).testTag("hero_temp"),
-            )
-            // The icon is centred in what is left of the line, so the space between it and the
-            // number matches the space between it and the margin. A fixed gap cannot hold both
-            // equal: "-12°" is a far wider number than "8°", and the icon would move with it.
-            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+        HeroLine(
+            temperature = {
+                Text(
+                    text = state.heroTempC?.let { Format.temp(it, formats) } ?: "–",
+                    style = tempStyle,
+                    color = Color.White,
+                    modifier = Modifier.testTag("hero_temp"),
+                )
+            },
+            icon = {
                 Icon(
                     painterResource(state.heroCondition.iconRes(state.phase)),
                     contentDescription = null,
                     tint = Color.fromArgb(state.palette.accent),
                     modifier = Modifier.size(iconSize).testTag("hero_condition_icon"),
                 )
-            }
-        }
+            },
+        )
         Text(state.heroCondition.label(), style = MaterialTheme.typography.headlineMedium, color = Color.White)
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -506,3 +502,42 @@ fun AttributionFooter() {
  * 42 the rows stop having any air in them at all and the minimum stops doing anything.
  */
 private val DayRowMinHeight = 44.dp
+
+/**
+ * The hero's number and its picture: the number at the margin, the icon **centred in the space that
+ * is left between the number and the far edge**.
+ *
+ * It was a `Row` of two equally weighted children, which is not that and only looks like it. A
+ * weighted child's slot is a fixed half of the line, but children are *placed* one after another at
+ * their measured widths — so the icon's box began wherever the number happened to end and then
+ * extended a full half-width past it, and the icon was centred in that. Measured off the phone: the
+ * icon's ink centre sat at 233 dp where the space after the number runs 142 to 360 and its middle is
+ * 251. It drifted with the temperature, which is exactly what the old comment claimed it would not
+ * do.
+ *
+ * Centring it on the *card* was tried first and is a different request: it put the icon at 199 dp,
+ * true to the middle of the line but leaving the right third of the hero empty and the icon crowded
+ * against the number.
+ *
+ * A [Layout] rather than a chain of modifiers because the rule needs both measured widths at once,
+ * and writing it out is shorter than the arrangement that would fake it.
+ */
+@Composable
+private fun HeroLine(temperature: @Composable () -> Unit, icon: @Composable () -> Unit) {
+    Layout(contents = listOf(temperature, icon)) { (temperatureMeasurables, iconMeasurables), constraints ->
+        val loose = constraints.copy(minWidth = 0)
+        val temp = temperatureMeasurables.first().measure(loose)
+        val wx = iconMeasurables.first().measure(loose)
+        val width = constraints.maxWidth
+        val height = maxOf(temp.height, wx.height)
+        // Centred in what is left after the number, which is the whole rule. Where there is less
+        // room left than the icon needs — a wide reading at a large font scale — it sits at the far
+        // edge and stops, rather than being pushed off it.
+        val remaining = (width - temp.width).coerceAtLeast(0)
+        val x = (temp.width + (remaining - wx.width) / 2).coerceIn(temp.width, (width - wx.width).coerceAtLeast(0))
+        layout(width, height) {
+            temp.place(0, (height - temp.height) / 2)
+            wx.place(x, (height - wx.height) / 2)
+        }
+    }
+}

@@ -777,6 +777,17 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   the range into four and rounding each tick is what labelled two gridlines "0" on a day with no
   rain in it. The step is never finer than half a unit, because at 0,04 mm the labels all read "0,0"
   instead. It is pure, so the cases live in `ChartAxisTest` rather than on a phone.
+- **The hero's icon is centred in the space left after the temperature** (`HeroLine`), and the
+  `Row` of two equally weighted children it replaced was not that, though its comment said so. A
+  weighted child's slot is a fixed half of the line, but children are *placed* one after another at
+  their measured widths — so the icon's box started wherever the number happened to end and ran a
+  full half-width past it. Measured off the phone: the ink centre sat at 233 dp where the space
+  after the number runs 142 to 360 and its middle is 251, and it drifted with the temperature,
+  which is exactly what the old comment claimed it would not do. It is 254 now against a target of
+  251; the 3 dp left over is the cloud glyph's own ink sitting slightly right in its box, which is
+  per-drawing and not worth chasing. Centring it on the *card* was tried first and is a different
+  request — it puts the icon at 199 dp, true to the middle of the line but leaving the right third
+  of the hero empty and the icon crowded against the number.
 - **The weather icons are normalised by `tools/svg2vector.py`, not drawn at Meteocons' own sizes.**
   Those differ by more than a factor of two — a crescent moon inks 0.47 of the canvas, a sun 0.88, a
   sun behind a cloud 1.14 — so the same dp box gave wildly different icons and the hero's changed
