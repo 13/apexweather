@@ -13,6 +13,9 @@ Three upstreams are combined:
   * SIAG /api/v2/station            — the candidate weather stations, if any is close enough.
   * Open-Meteo ICON-D2, once per municipality — which of those candidates actually stands in the
     same air as the village. See stability(); this is what makes the run take minutes.
+  * SRTM elevation tiles, through tools/horizons.py — the skyline around each place and each chosen
+    station, so the app can say when the sun actually clears the ridge rather than when a horizon
+    with no mountains in it would have had it rise.
 
 The weather district is the one datum no upstream provides: /api/v2/district lists the seven
 districts by name and nothing about their membership, the municipality record's Region is an
@@ -21,6 +24,7 @@ instead, from the tourism region each municipality belongs to, with an override 
 municipalities where the two divisions disagree. That is far less to review than 116 hand-typed
 rows, and the overrides are where the judgement actually lives.
 """
+import horizons
 import json
 import math
 import pathlib
@@ -329,6 +333,12 @@ def main():
             file=sys.stderr,
         )
         sys.exit(1)
+
+    # The skylines, last, because they need the chosen stations. A catalogue must never be written
+    # without them: a place with no `horizon` silently falls back to a flat horizon, which in this
+    # province is the horizon of somewhere else entirely. See tools/horizons.py.
+    print("\nmeasuring skylines", file=sys.stderr)
+    horizons.fill(places)
 
     out = pathlib.Path("app/src/main/assets/places.json")
     out.parent.mkdir(parents=True, exist_ok=True)

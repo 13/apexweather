@@ -37,6 +37,8 @@
     <string name="stat_precip">Precipitation</string>
     <string name="stat_wind">Wind</string>
     <string name="stat_humidity">Humidity</string>
+    <string name="stat_snow">Fresh snow</string>
+    <string name="duration_hm">%1$d h %2$02d min</string>
     <!-- Eight compass points, in each language's own abbreviations: German O for Ost, Italian O for Ovest. -->
     <string name="compass_n">N</string>
     <string name="compass_ne">NE</string>
@@ -99,6 +101,7 @@
     <string name="open_day_details">Open day details</string>
     <string name="section_day_hours">HOUR BY HOUR</string>
     <string name="day_sun">Sunrise %1$s · Sunset %2$s</string>
+    <string name="day_sun_here">Sun here %1$s – %2$s</string>
     <string name="day_precip_total">Precipitation %1$s</string>
     <string name="agreement_short">Agreement %1$d %%</string>
     <string name="compare_cell_desc">%1$s, %2$s: %3$s to %4$s, %5$s, %6$s</string>
@@ -193,6 +196,8 @@
     <string name="station_humidity">Humidity</string>
     <string name="station_pressure">Pressure</string>
     <string name="station_precip">Precipitation today</string>
+    <string name="station_snow_depth">Snow depth</string>
+    <string name="station_sunshine">Sunshine today</string>
     <string name="wind_with_dir">%1$s from %2$s</string>
     <string name="unit_percent">%1$d %%</string>
     <string name="unit_hpa">%1$s hPa</string>
@@ -229,12 +234,17 @@
     <string name="setting_notif_grant">Allow</string>
 
     <!-- The station stands 270 m below the village, so its reading is carried up before it is quoted. -->
-    <string name="now_from_station_adjusted">Now: %1$s station, %2$s · adjusted to %4$s (%3$s)</string>
+    <string name="now_from_station_adjusted">%1$s station, %2$s · adjusted (%3$s)</string>
 
     <!-- Choosing which of the province's 116 municipalities the app is about. -->
     <string name="place_title">Choose a place</string>
     <string name="place_search">Search municipalities</string>
     <string name="place_none">No municipality found</string>
+    <string name="place_favourites">PINNED</string>
+    <string name="place_all">ALL MUNICIPALITIES</string>
+    <string name="place_pinned">pinned</string>
+    <string name="place_pin">Pin %1$s</string>
+    <string name="place_unpin">Unpin %1$s</string>
     <string name="place_meta">%1$s · %2$s</string>
     <string name="place_row_desc">%1$s, %2$s, %3$s district</string>
     <string name="place_selected">Currently chosen</string>

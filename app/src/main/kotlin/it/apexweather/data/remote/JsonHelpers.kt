@@ -35,3 +35,19 @@ internal fun parseOffset(s: String): Instant = OffsetDateTime.parse(s).toInstant
  */
 internal fun String?.siagDouble(): Double? =
     this?.trim()?.takeIf { it != "--" && it.isNotEmpty() }?.replace(',', '.')?.toDoubleOrNull()
+
+/**
+ * SIAG's sunshine duration, "05:05", as minutes since midnight's worth of sun.
+ *
+ * The one value on the station row that is not a decimal at all, so [siagDouble] would read "05:05"
+ * as null and the row would silently never appear. Anything that is not two numbers around a colon
+ * is nothing rather than a guess.
+ */
+internal fun String?.siagMinutes(): Int? {
+    val text = this?.trim()?.takeIf { it != "--" && it.isNotEmpty() } ?: return null
+    val (h, m) = text.split(':').takeIf { it.size == 2 } ?: return null
+    val hours = h.toIntOrNull() ?: return null
+    val minutes = m.toIntOrNull() ?: return null
+    if (hours < 0 || minutes < 0 || minutes > 59) return null
+    return hours * 60 + minutes
+}

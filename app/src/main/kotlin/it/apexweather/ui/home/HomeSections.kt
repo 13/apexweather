@@ -42,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.apexweather.R
@@ -146,10 +147,15 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
         val sourceCount = state.currentHour?.sourceCount ?: 0
         // A moved reading has to say it was moved, and by how much: it is still a measurement, but
         // not one taken where the reader is standing.
+        // It no longer names the place it was converted *to*, and it no longer says "Jetzt".
+        // Both were true and both were already on the screen: the place is the first line of this
+        // block and the number directly above this line is plainly the current one. With them in,
+        // the sentence wrapped to two lines at 384 dp and the hero carried three lines of footnote;
+        // without them it is one line, and the block is a row shorter for nothing given up.
         val source = state.observation?.let { obs ->
             val at = Format.timestamp(obs.time, SouthTyrol.ZONE, state.now, formats)
             state.heroAdjustmentC
-                ?.let { stringResource(R.string.now_from_station_adjusted, obs.stationName, at, Format.tempDelta(it, formats), state.place?.name(locale).orEmpty()) }
+                ?.let { stringResource(R.string.now_from_station_adjusted, obs.stationName, at, Format.tempDelta(it, formats)) }
                 ?: stringResource(R.string.now_from_station, obs.stationName, at)
         } ?: pluralStringResource(R.plurals.now_from_consensus, sourceCount, sourceCount)
         Text(source, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.65f))
@@ -214,7 +220,22 @@ fun AgreementBadge(
     }
 }
 
-private val HourColumnWidth = 58.dp
+/**
+ * How wide one hour of the strip is at the system's normal text size.
+ *
+ * Forty-six rather than fifty-eight. The widest thing a column ever holds is its millimetre label —
+ * "0,2 mm" is about 32 dp at 10 sp — so 46 leaves a real gutter and fits **seven** columns in the
+ * 320 dp the card has, against five and a half before. Measured on the phone at 384 x 832 dp.
+ *
+ * It is a *base*, and [hourColumnWidth] widens it with the reader's text size, which the flat
+ * constant never did: at a 2x font scale that same label is already wider than fifty-eight, so the
+ * old number was not a safe width either — it was an unsafe one that happened to be larger.
+ */
+private val HourColumnBaseWidth = 46.dp
+
+/** [HourColumnBaseWidth] in step with the reader's text size, never narrower than the base. */
+@Composable
+private fun hourColumnWidth(): Dp = HourColumnBaseWidth * maxOf(1f, LocalDensity.current.fontScale)
 
 @Composable
 fun HourlySection(hours: List<ConsensusHour>, phaseAt: (Instant) -> SunPhase, onHourClick: (Instant) -> Unit) {
@@ -252,6 +273,7 @@ fun HourStrip(
     if (hours.isEmpty()) return
     val scroll = rememberScrollState()
     val formats = LocalFormats.current
+    val columnWidth = hourColumnWidth()
     Column(modifier.horizontalScroll(scroll)) {
         val openLabel = stringResource(R.string.open_hour_details)
         Row {
@@ -261,12 +283,15 @@ fun HourStrip(
                 val spoken = stringResource(
                     R.string.hour_column_desc, Format.hour(h.time, SouthTyrol.ZONE, formats),
                     h.condition.label(), Format.temp(h.tempC, formats), h.precipProb,
-                    Format.mm(h.precipMm, formats),
+                    // Whatever the column prints, so the spoken hour and the drawn one cannot
+                    // disagree about whether it is eight centimetres or eight tenths of a millimetre.
+                    if (PrecipScale.showsSnow(h.snowCm, h.condition)) Format.cm(h.snowCm!!, formats)
+                    else Format.mm(h.precipMm, formats),
                 )
                 val behaviour = if (onHourClick == null) Modifier.semantics(mergeDescendants = true) { contentDescription = spoken }
                 else Modifier.clickable(onClickLabel = openLabel) { onHourClick(h.time) }
                 Column(
-                    Modifier.width(HourColumnWidth).then(behaviour)
+                    Modifier.width(columnWidth).then(behaviour)
                         .padding(vertical = 6.dp).testTag("${tagPrefix}_$i"),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -279,7 +304,7 @@ fun HourStrip(
                     Spacer(Modifier.height(6.dp))
                     Text(Format.temp(h.tempC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
-                    PrecipBar(h.precipMm, h.precipProb, h.condition)
+                    PrecipBar(h.precipMm, h.snowCm, h.precipProb, h.condition)
                 }
             }
         }
@@ -291,8 +316,18 @@ fun HourStrip(
  * See [PrecipScale] for the scale and why it is not linear.
  */
 @Composable
-private fun PrecipBar(mm: Double, prob: Int, condition: Condition) {
+private fun PrecipBar(mm: Double, snowCm: Double?, prob: Int, condition: Condition) {
     val formats = LocalFormats.current
+    // A frozen hour is drawn and printed in centimetres of snow, not in the millimetres of water it
+    // would melt down to. Both scales fill the same track at roughly the same weather — see
+    // PrecipScale.FULL_SCALE_CM — so a full bar goes on meaning the same thing in either season.
+    val snow = PrecipScale.showsSnow(snowCm, condition)
+    val fraction = if (snow) PrecipScale.snowFillFraction(snowCm!!) else PrecipScale.fillFraction(mm)
+    val amount = when {
+        snow -> Format.cm(snowCm!!, formats)
+        PrecipScale.hasAmount(mm) -> Format.mm(mm, formats)
+        else -> ""
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             Modifier.width(18.dp).height(PrecipTrackHeight)
@@ -300,11 +335,11 @@ private fun PrecipBar(mm: Double, prob: Int, condition: Condition) {
                 .background(PrecipScale.TRACK),
             contentAlignment = Alignment.BottomCenter,
         ) {
-            if (PrecipScale.hasAmount(mm)) {
+            if (snow || PrecipScale.hasAmount(mm)) {
                 Box(
                     Modifier.fillMaxWidth()
                         // The floor keeps the smallest printed amount from rounding away to nothing.
-                        .height((PrecipTrackHeight * PrecipScale.fillFraction(mm)).coerceAtLeast(3.dp))
+                        .height((PrecipTrackHeight * fraction).coerceAtLeast(3.dp))
                         .clip(RoundedCornerShape(4.dp))
                         .background(PrecipScale.fillColor(mm, condition)),
                 )
@@ -312,7 +347,7 @@ private fun PrecipBar(mm: Double, prob: Int, condition: Condition) {
         }
         Spacer(Modifier.height(3.dp))
         Text(
-            if (PrecipScale.hasAmount(mm)) Format.mm(mm, formats) else "",
+            amount,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
             color = Color.White,
             fontWeight = FontWeight.Medium,
@@ -354,7 +389,26 @@ fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate
                 )
                 Icon(painterResource(d.condition.iconRes(SunPhase.DAY)), contentDescription = d.condition.label(), tint = Color.White, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(if (d.precipMm >= 0.5) Format.mm(d.precipMm, formats) else "", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5), modifier = Modifier.width(48.dp))
+                // Amount over chance, the same two facts in the same order the hour columns put
+                // them in. The chance is what the row was missing: it had "how much" and left "will
+                // it rain on Saturday" to be guessed off the icon. See ConsensusDay.precipProb.
+                Column(Modifier.width(48.dp)) {
+                    val frozen = PrecipScale.showsSnow(d.snowCm, d.condition)
+                    Text(
+                        when {
+                            frozen -> Format.cm(d.snowCm!!, formats)
+                            d.precipMm >= 0.5 -> Format.mm(d.precipMm, formats)
+                            else -> ""
+                        },
+                        style = MaterialTheme.typography.labelSmall, color = Color(0xFFB9D2F5),
+                    )
+                    Text(
+                        if (d.precipProb > 0) stringResource(R.string.unit_percent, d.precipProb) else "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFB9D2F5).copy(alpha = 0.7f),
+                        modifier = Modifier.testTag("day_precip_prob_$i"),
+                    )
+                }
                 Text(Format.temp(d.minC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.width(36.dp))
                 RangeBar(d.minC, d.maxC, globalMin, globalMax, accent, Modifier.weight(1f).height(6.dp))
                 Spacer(Modifier.width(8.dp))

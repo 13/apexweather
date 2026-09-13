@@ -31,6 +31,9 @@ class SettingsRepositoryTest {
         repo.setAnimations(true)
         repo.setCompareSources(Source.entries.toSet())
         repo.setCompareVariable(CompareVariable.TEMPERATURE)
+        // Pins are a list on the same shared file, so they leak between methods exactly as the rest
+        // would: a test that pins four places would otherwise decide what the next one sees.
+        repo.settings.first().favouritePlaces.forEach { repo.setFavourite(it, false) }
     }
 
     @Test
@@ -179,5 +182,55 @@ class SettingsRepositoryTest {
     fun `a blank stored place falls back to the default`() = runTest {
         repo.setPlace("")
         assertEquals(SouthTyrol.DEFAULT_ISTAT, repo.settings.first().placeIstat)
+    }
+
+    /**
+     * A pin is what the reader said; the recents are what the app observed. Keeping them apart is
+     * the point — a single list ordered by use would quietly drop the pin the moment three other
+     * places were visited, which is exactly the case pins exist for.
+     */
+    @Test
+    fun `pinning a place keeps it in the cache whatever the recents do`() = runTest {
+        repo.setFavourite("021008", true)
+        repo.setPlace("021051")
+        repo.setPlace("021077")
+        repo.setPlace("021113")
+        val s = repo.settings.first()
+        assertEquals(listOf("021008"), s.favouritePlaces)
+        assertFalse("three visits push it out of the recents", "021008" in s.recentPlaces)
+        assertTrue("but the cache still keeps it", "021008" in s.keptPlaces)
+        assertEquals("and the place on screen is always first", "021113", s.keptPlaces.first())
+    }
+
+    @Test
+    fun `unpinning removes it and pinning twice does not duplicate`() = runTest {
+        repo.setFavourite("021008", true)
+        repo.setFavourite("021008", true)
+        assertEquals(listOf("021008"), repo.settings.first().favouritePlaces)
+        repo.setFavourite("021008", false)
+        assertEquals(emptyList<String>(), repo.settings.first().favouritePlaces)
+    }
+
+    /**
+     * Past the cap the new pin is refused rather than the oldest one silently evicted: a list this
+     * short makes "that one did not stick" a smaller surprise than "one of mine vanished".
+     */
+    @Test
+    fun `the pin list stops at its cap rather than evicting`() = runTest {
+        val codes = listOf("021008", "021051", "021077", "021113", "021001")
+        codes.forEach { repo.setFavourite(it, true) }
+        val kept = repo.settings.first().favouritePlaces
+        assertEquals(SettingsRepository.MAX_FAVOURITE_PLACES, kept.size)
+        assertEquals(codes.take(SettingsRepository.MAX_FAVOURITE_PLACES), kept)
+    }
+
+    /** Every kept place is a full set of model runs, so the list the cache reads has a ceiling. */
+    @Test
+    fun `the kept list is capped and never repeats a place`() = runTest {
+        listOf("021008", "021051", "021077", "021113").forEach { repo.setFavourite(it, true) }
+        repo.setPlace("021008")
+        val kept = repo.settings.first().keptPlaces
+        assertEquals(kept.distinct(), kept)
+        assertTrue(kept.size <= SettingsRepository.MAX_KEPT_PLACES)
     }
 }

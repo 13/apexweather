@@ -31,7 +31,13 @@ fun GlassCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
             .clip(shape)
             .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.22f), Color.Black.copy(alpha = 0.12f))))
             .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)), shape)
-            .padding(16.dp),
+            // Twelve, not sixteen. Every card pays this twice over on the vertical axis and two
+            // adjacent cards pay it four times, so on the home screen the trough between the
+            // 48-hour strip and the day list measured 52 dp — card bottom, spacer, card top — for
+            // a boundary that needs to read as a boundary and nothing else. Measured on the phone
+            // at 384 x 832 dp: this and the list's own spacing give back about 48 dp, which is one
+            // whole day row. The horizontal side has room to spare either way.
+            .padding(12.dp),
         content = content,
     )
 }

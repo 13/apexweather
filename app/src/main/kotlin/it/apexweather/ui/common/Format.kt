@@ -67,6 +67,19 @@ object Format {
 
     fun mm(mm: Double, f: Formats): String = "${mmValue(mm, f)} mm"
 
+    /** The centimetres alone, for a column whose header says "cm". */
+    fun cmValue(cm: Double, f: Formats): String = when {
+        abs(cm) < 0.05 -> f.whole(0)
+        cm < 10 -> f.oneDecimal(cm)
+        else -> f.whole(cm.roundToInt())
+    }
+
+    /**
+     * Fresh snow. The unit is not decoration: this exists so an hour of snow stops being reported as
+     * the 0,8 mm of water it would melt down to. See [it.apexweather.domain.model.HourlyPoint.snowCm].
+     */
+    fun cm(cm: Double, f: Formats): String = "${cmValue(cm, f)} cm"
+
     /**
      * A height above sea level. Rounded to 50 m: the models do not agree to better than that, and a
      * freezing level quoted to the metre would claim a precision nobody has.

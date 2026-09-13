@@ -44,11 +44,13 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import it.apexweather.BuildConfig
 import it.apexweather.R
+import it.apexweather.ui.common.CompactLabel
 import it.apexweather.data.AppSettings
 import it.apexweather.data.LanguageSetting
 import it.apexweather.data.WindUnit
@@ -176,8 +178,16 @@ fun SettingsContent(
             Text(stringResource(R.string.setting_language), style = MaterialTheme.typography.labelSmall)
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 LanguageSetting.entries.forEachIndexed { i, l ->
-                    SegmentedButton(selected = settings.language == l, onClick = { onLanguage(l) }, shape = SegmentedButtonDefaults.itemShape(i, LanguageSetting.entries.size)) {
-                        Text(when (l) { LanguageSetting.SYSTEM -> stringResource(R.string.lang_system); LanguageSetting.DE -> "DE"; LanguageSetting.IT -> "IT"; LanguageSetting.EN -> "EN" })
+                    // icon = {} for the reason given on the comparison screen's row: the reserved
+                    // tick costs every segment about 24 dp, and the fill already says which is on.
+                    SegmentedButton(selected = settings.language == l, onClick = { onLanguage(l) }, shape = SegmentedButtonDefaults.itemShape(i, LanguageSetting.entries.size), icon = {}) {
+                        // "System" beside three two-letter codes; see CompactLabel.
+                        CompactLabel {
+                            Text(
+                                when (l) { LanguageSetting.SYSTEM -> stringResource(R.string.lang_system); LanguageSetting.DE -> "DE"; LanguageSetting.IT -> "IT"; LanguageSetting.EN -> "EN" },
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             }
@@ -185,8 +195,8 @@ fun SettingsContent(
             Text(stringResource(R.string.setting_wind), style = MaterialTheme.typography.labelSmall)
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 WindUnit.entries.forEachIndexed { i, u ->
-                    SegmentedButton(selected = settings.windUnit == u, onClick = { onWindUnit(u) }, shape = SegmentedButtonDefaults.itemShape(i, WindUnit.entries.size)) {
-                        Text(if (u == WindUnit.KMH) "km/h" else "m/s")
+                    SegmentedButton(selected = settings.windUnit == u, onClick = { onWindUnit(u) }, shape = SegmentedButtonDefaults.itemShape(i, WindUnit.entries.size), icon = {}) {
+                        CompactLabel { Text(if (u == WindUnit.KMH) "km/h" else "m/s", maxLines = 1) }
                     }
                 }
             }

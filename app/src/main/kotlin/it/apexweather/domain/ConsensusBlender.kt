@@ -19,6 +19,18 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
+/**
+ * The values a model actually published, keyed by the model — dropping the ones that published
+ * nothing rather than standing a null in for them.
+ *
+ * Every weighted statistic in here needs the *sources* alongside the numbers, because the weight
+ * comes from which other models are in the same company; collapsing to a bare list of values
+ * throws that away. This keeps the two together through the filter.
+ */
+private inline fun <V> Map<Source, it.apexweather.domain.model.HourlyPoint>.mapNotNullValues(
+    select: (it.apexweather.domain.model.HourlyPoint) -> V?,
+): Map<Source, V> = mapNotNull { (source, point) -> select(point)?.let { source to it } }.toMap()
+
 class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
 
     /**
@@ -72,7 +84,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
                 HourlyPoint(
                     time = h.time, tempC = h.tempC, precipMm = h.precipMm, precipProb = h.precipProb,
                     windKmh = h.windKmh, gustKmh = h.gustKmh, freezingLevelM = h.freezingLevelM,
-                    condition = h.condition,
+                    snowCm = h.snowCm, condition = h.condition,
                 )
             },
             zone, sunTimes,
@@ -81,6 +93,12 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             val agreements = hoursOfDay.map { it.agreement }
             ConsensusDay(
                 date = d.date, minC = d.minC, maxC = d.maxC, precipMm = d.precipMm,
+                snowCm = d.snowCm,
+                // The likeliest daylight hour, not the average of them — see ConsensusDay.precipProb
+                // for why the mean and the independent-hours product are both worse answers to
+                // "will it rain on Saturday".
+                precipProb = DailyAggregator.daylight(hoursOfDay, zone) { it.time }
+                    .maxOfOrNull { it.precipProb } ?: 0,
                 condition = d.condition,
                 // Days are built from these hours, so the list is never empty; guarded anyway because
                 // an empty average is NaN and NaN would reach the screen as a blank badge.
@@ -141,9 +159,13 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         leadHours: Long,
     ): ConsensusHour {
         val values = points.values
-        val temps = values.map { it.tempC }
-        val tMin = temps.min()
-        val tMax = temps.max()
+        // What each model's word is worth here, given how many of the others share its core. The
+        // company is recomputed per quantity below, because "the models that publish wind" is a
+        // different set from "the models that publish anything", and a family of four that only two
+        // of whom publish humidity is a family of two for the purpose of humidity.
+        val temps = points.mapValues { it.value.tempC }
+        val tMin = temps.values.min()
+        val tMax = temps.values.max()
         // The ensemble measures uncertainty; the spread between models only stands in for it. Where
         // the ensemble reaches this hour it is the better number, and it is doubled to compare like
         // with like — one is a half-width, the other a full range.
@@ -159,7 +181,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         // forecast. That is what put a rain cloud over a blank amount at 19:00 on 2026-09-10 —
         // three of six models wet, at 0,1, 0,2 and 0,5 mm, and a median of 0,05. The mean of those
         // six is 0,13 mm, which is what the hour actually amounts to.
-        val precip = values.map { it.precipMm }.average()
+        val precip = weightedMean(points.mapValues { it.value.precipMm })
 
         // The **mean**, for the same reason the amount above is: a probability is the other
         // zero-inflated quantity here, and averaging is what the number actually means. Asked
@@ -174,25 +196,33 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         //
         // The fallback, for an hour no model publishes a probability for, is already this same
         // average, of ones and zeroes.
-        val probs = values.mapNotNull { it.precipProb }
-        val precipProb = if (probs.isNotEmpty()) probs.average().roundToInt()
-        else (100.0 * values.count { it.precipMm > 0.1 } / values.size).roundToInt()
+        val probs = points.mapNotNullValues { it.precipProb?.toDouble() }
+        val precipProb = if (probs.isNotEmpty()) weightedMean(probs).roundToInt()
+        else (100.0 * weightedShare(points.keys) { points.getValue(it).precipMm > 0.1 }).roundToInt()
 
-        val feels = values.mapNotNull { it.feelsLikeC }
+        // Snow is the third zero-inflated quantity on this list and takes the mean for the reason
+        // the two above it do: the moment half the models say the hour is dry, a median throws away
+        // every model that saw the centimetres. It is null rather than zero where nobody publishes
+        // it — see HourlyPoint.snowCm — so an hour no model has an answer for prints nothing
+        // instead of promising a bare hillside.
+        val snow = points.mapNotNullValues { it.snowCm }
+
+        val feels = points.mapNotNullValues { it.feelsLikeC }
         val gusts = values.mapNotNull { it.gustKmh }
-        val winds = values.mapNotNull { it.windKmh }
-        val freezing = values.mapNotNull { it.freezingLevelM }
-        val humidity = values.mapNotNull { it.humidityPct }
+        val winds = points.mapNotNullValues { it.windKmh }
+        val freezing = points.mapNotNullValues { it.freezingLevelM }
+        val humidity = points.mapNotNullValues { it.humidityPct?.toDouble() }
 
         return ConsensusHour(
             time = time,
-            tempC = median(temps),
+            tempC = weightedMedian(temps),
             tempMinC = tMin,
             tempMaxC = tMax,
-            feelsLikeC = feels.takeIf { it.isNotEmpty() }?.let(::median),
+            feelsLikeC = feels.takeIf { it.isNotEmpty() }?.let(::weightedMedian),
             precipMm = precip,
+            snowCm = snow.takeIf { it.isNotEmpty() }?.let(::weightedMean),
             precipProb = precipProb,
-            windKmh = winds.takeIf { it.isNotEmpty() }?.let(::median),
+            windKmh = winds.takeIf { it.isNotEmpty() }?.let(::weightedMedian),
             // Deliberately the maximum rather than the median every other quantity uses: a gust is a
             // peak, and one nobody was warned about is worse than one that did not arrive. This is
             // now the only maximum left here — the precipitation probability was one too, and is
@@ -200,10 +230,14 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             // not an oversight; change it only on purpose.
             gustKmh = gusts.maxOrNull(),
             windDirDeg = meanDirectionDeg(values.mapNotNull { it.windDirDeg }),
-            humidityPct = humidity.takeIf { it.isNotEmpty() }?.let { median(it.map(Int::toDouble)).roundToInt() },
-            freezingLevelM = freezing.takeIf { it.isNotEmpty() }?.let(::median),
+            humidityPct = humidity.takeIf { it.isNotEmpty() }?.let { weightedMedian(it).roundToInt() },
+            freezingLevelM = freezing.takeIf { it.isNotEmpty() }?.let(::weightedMedian),
             ensembleHalfWidthC = ensembleHalfWidth,
-            condition = voteCondition(values.map { it.condition }, precip, cloudPct = values.mapNotNull { it.cloudPct }),
+            condition = voteCondition(
+                points.mapValues { it.value.condition },
+                precip,
+                cloudPct = points.mapNotNullValues { it.cloudPct },
+            ),
             agreement = agreement,
             sourceCount = values.size,
             perSource = points,
@@ -249,6 +283,80 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             val s = xs.sorted()
             val n = s.size
             return if (n % 2 == 1) s[n / 2] else (s[n / 2 - 1] + s[n / 2]) / 2.0
+        }
+
+        /**
+         * How much one model's word is worth, given the company it keeps: one over the square root
+         * of how many of the models being blended share its [ModelFamily].
+         *
+         * The consensus is a median, and a median counts votes. Four of the regional sources are
+         * ICON — CH1, CH2, 2I and D2 — so on any hour where all eight regional models report, ICON
+         * casts four of the eight votes and decides every close call on its own. That is not four
+         * models agreeing; it is one dynamical core being asked four times. The same objection is
+         * what bought KNMI and DMI their place on the list, and until now it had been acted on in
+         * what the app fetches and not in what it does with it.
+         *
+         * **1/sqrt(n), not 1/n, and the difference is the whole judgement here.** Full
+         * de-duplication would say the four ICONs are one model, which is false in a way that
+         * matters: they run at different resolutions over different domains with different
+         * assimilation at four different centres, and ICON-CH1 at 1 km is the best-resolved thing
+         * this app has for a valley 2 km wide. Counting them as one would throw that away to fix a
+         * double-count. 1/sqrt(n) is the standard treatment of partially correlated members and
+         * lands between the two: on the full regional eight, ICON's share goes from 50 % to 37 %,
+         * HARMONIE's from 25 % to 26 %, and AROME and KMOS gain. Neither endpoint is defensible and
+         * this is deliberately in the middle of them.
+         *
+         * Grouping is by **core, not institution**, which is why the two ECMWF runs are not one
+         * family: IFS solves equations, AIFS is machine-learned, and the entire reason AIFS is on
+         * the list is that it fails differently. Sharing a letterhead is not sharing a core.
+         *
+         * [among] is whoever publishes the quantity being blended, not whoever is present at all: a
+         * family of four of whom only two publish humidity is a family of two for humidity.
+         */
+        fun weightOf(source: Source, among: Set<Source>): Double {
+            val kin = among.count { it.family == source.family }.coerceAtLeast(1)
+            return 1.0 / sqrt(kin.toDouble())
+        }
+
+        fun weights(among: Set<Source>): Map<Source, Double> = among.associateWith { weightOf(it, among) }
+
+        /**
+         * The median with [weightOf]'s weights: the value at which half the weight lies below and
+         * half above.
+         *
+         * With equal weights it is exactly [median], including the average of the two middle values
+         * for an even count — that equivalence is what [ConsensusBlenderTest] pins, because it is
+         * the only way to know the weighting changed nothing except what it was meant to change.
+         */
+        fun weightedMedian(values: Map<Source, Double>): Double {
+            require(values.isNotEmpty()) { "no values to take a median of" }
+            val w = weights(values.keys)
+            val sorted = values.entries.sortedBy { it.value }
+            val half = w.values.sum() / 2.0
+            var cumulative = 0.0
+            sorted.forEachIndexed { i, entry ->
+                cumulative += w.getValue(entry.key)
+                // Exactly half the weight below this value means the answer sits between it and the
+                // next one, which is what makes four equally weighted models average their middle
+                // pair rather than pick the lower of them.
+                if (cumulative == half && i + 1 < sorted.size) return (entry.value + sorted[i + 1].value) / 2.0
+                if (cumulative >= half) return entry.value
+            }
+            return sorted.last().value
+        }
+
+        /** The mean with the same weights. Used for the zero-inflated quantities; see [blendHour]. */
+        fun weightedMean(values: Map<Source, Double>): Double {
+            require(values.isNotEmpty()) { "no values to take a mean of" }
+            val w = weights(values.keys)
+            return values.entries.sumOf { it.value * w.getValue(it.key) } / w.values.sum()
+        }
+
+        /** The share of the weight, 0..1, whose model satisfies [predicate]. */
+        fun weightedShare(among: Set<Source>, predicate: (Source) -> Boolean): Double {
+            if (among.isEmpty()) return 0.0
+            val w = weights(among)
+            return among.filter(predicate).sumOf { w.getValue(it) } / w.values.sum()
         }
 
         /**
@@ -310,21 +418,68 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             else -> Condition.CLOUDY
         }
 
+        /**
+         * The vote with every model counting for one — which is what a caller holding bare labels
+         * and no idea who said them can honestly do.
+         *
+         * The blender itself never takes this path: it knows which model said what and uses the
+         * overload below, where a family of four does not out-vote a family of one four times over.
+         * This one stays because equal weights are still a case worth having and worth testing, and
+         * because a caller that has lost the sources has lost the only thing weights can be built
+         * from.
+         */
         fun voteCondition(
             conditions: List<Condition>,
             precipMm: Double,
             stationSaturated: Boolean = false,
             cloudPct: List<Int> = emptyList(),
+        ): Condition = voteCondition(
+            conditions = conditions.mapIndexed { i, c -> i to c }.toMap(),
+            weightOf = { 1.0 },
+            precipMm = precipMm,
+            stationSaturated = stationSaturated,
+            cloudPct = cloudPct.mapIndexed { i, c -> i to c }.toMap(),
+        )
+
+        /**
+         * The same vote, with each model's word worth [weightOf] — see that function for why four
+         * ICON runs are not four independent opinions about whether it is cloudy.
+         *
+         * Every threshold below is a *share* rather than a count, so none of them had to move: a
+         * third of the models is a third of the weight, and with equal weights the two are the same
+         * number.
+         */
+        fun voteCondition(
+            conditions: Map<Source, Condition>,
+            precipMm: Double,
+            stationSaturated: Boolean = false,
+            cloudPct: Map<Source, Int> = emptyMap(),
+        ): Condition = voteCondition(
+            conditions = conditions,
+            weightOf = weights(conditions.keys)::getValue,
+            precipMm = precipMm,
+            stationSaturated = stationSaturated,
+            cloudPct = cloudPct,
+        )
+
+        private fun <K> voteCondition(
+            conditions: Map<K, Condition>,
+            weightOf: (K) -> Double,
+            precipMm: Double,
+            stationSaturated: Boolean,
+            cloudPct: Map<K, Int>,
         ): Condition {
             if (conditions.isEmpty()) return Condition.CLOUDY
-            val wet = conditions.filter { it.isPrecipitation }
-            val dry = conditions.filterNot { it.isPrecipitation }
-            val fog = conditions.count { it == Condition.FOG }
+            fun weight(of: Map<K, Condition>) = of.keys.sumOf(weightOf)
+            val total = weight(conditions)
+            val wet = conditions.filterValues { it.isPrecipitation }
+            val dry = conditions.filterValues { !it.isPrecipitation }
+            val fog = weight(conditions.filterValues { it == Condition.FOG })
             // A saturated station is ground truth against a forecast, so it lowers the bar to a
             // single source having seen the fog. It never invents fog on its own: something has to
             // have forecast it first. See StationFog.
             val fogWins = fog > 0 && precipMm <= FOG_LOSES_ABOVE_MM &&
-                (stationSaturated || fog * WET_SHARE_DENOMINATOR >= conditions.size)
+                (stationSaturated || fog * WET_SHARE_DENOMINATOR >= total)
             if (fogWins) return Condition.FOG
             if (precipMm < WET_MIN_MM && dry.isNotEmpty()) {
                 // The **median of the cloud the models publish**, not a plurality over the words
@@ -338,13 +493,28 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
                 // cloud +0,59, and of the 37 places the instruments called clear or nearly so the
                 // plurality called twenty of them overcast where the median called six. One
                 // afternoon and one weather regime, but the mechanism does not depend on either.
-                if (cloudPct.size >= MIN_CLOUD_SOURCES) return fromCloudCover(median(cloudPct.map { it.toDouble() }))
-                return plurality(dry)
+                if (cloudPct.size >= MIN_CLOUD_SOURCES) {
+                    return fromCloudCover(weightedMedianBy(cloudPct.mapValues { it.value.toDouble() }, weightOf))
+                }
+                return plurality(dry, weightOf)
             }
             // The mildest wet answer the models actually gave, not the worst: a third of them
             // saying so is reason to call it drizzle, not reason to promise heavy rain.
-            val pool = if (wet.isNotEmpty() && wet.size * WET_SHARE_DENOMINATOR >= conditions.size) wet else conditions
-            return plurality(pool)
+            val pool = if (wet.isNotEmpty() && weight(wet) * WET_SHARE_DENOMINATOR >= total) wet else conditions
+            return plurality(pool, weightOf)
+        }
+
+        /** [weightedMedian] over anything that can be weighed, not only over sources. */
+        private fun <K> weightedMedianBy(values: Map<K, Double>, weightOf: (K) -> Double): Double {
+            val sorted = values.entries.sortedBy { it.value }
+            val half = values.keys.sumOf(weightOf) / 2.0
+            var cumulative = 0.0
+            sorted.forEachIndexed { i, entry ->
+                cumulative += weightOf(entry.key)
+                if (cumulative == half && i + 1 < sorted.size) return (entry.value + sorted[i + 1].value) / 2.0
+                if (cumulative >= half) return entry.value
+            }
+            return sorted.last().value
         }
 
         /**
@@ -359,9 +529,11 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         const val PARTLY_ABOVE_PCT = 50.0
         const val OVERCAST_ABOVE_PCT = 87.5
 
-        private fun plurality(conditions: List<Condition>): Condition =
-            conditions.groupingBy { it }.eachCount().entries
-                .sortedWith(compareByDescending<Map.Entry<Condition, Int>> { it.value }.thenByDescending { it.key })
+        /** The heaviest answer by weight; ties resolved toward the more severe condition. */
+        private fun <K> plurality(conditions: Map<K, Condition>, weightOf: (K) -> Double): Condition =
+            conditions.entries.groupBy({ it.value }, { weightOf(it.key) })
+                .mapValues { (_, ws) -> ws.sum() }.entries
+                .sortedWith(compareByDescending<Map.Entry<Condition, Double>> { it.value }.thenByDescending { it.key })
                 .first().key
     }
 }

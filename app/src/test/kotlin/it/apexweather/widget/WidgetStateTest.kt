@@ -109,4 +109,46 @@ class WidgetStateTest {
         assertEquals(null, w.warningTypeRes)
         assertEquals(null, w.warningLevelRes)
     }
+
+    /**
+     * The tall widget carries days, and stops where the day list is still a full consensus.
+     *
+     * Past about day five only the globals reach, and the app says so on screen with a badge a
+     * reader can ask about. A widget has neither the room for that badge nor anywhere to put the
+     * explanation, so it stops before it would have to draw one.
+     */
+    @Test
+    fun `the tall widget carries five days with their chance of rain`() {
+        val home = homeWithDays()
+        val state = WidgetStateBuilder.build(home, SouthTyrol.ZONE, formats)
+        assertEquals(WidgetStateBuilder.TALL_DAYS, state.days.size)
+        assertEquals("today needs no label; the temperature above it already says so", "", state.days.first().label)
+        assertTrue(state.days.drop(1).all { it.label.isNotBlank() })
+        assertEquals("60 %", state.days.first().probText)
+    }
+
+    /** A day nothing is likely on prints no percentage rather than a zero. */
+    @Test
+    fun `a dry day shows no chance at all`() {
+        val home = homeWithDays(prob = 0)
+        val state = WidgetStateBuilder.build(home, SouthTyrol.ZONE, formats)
+        assertEquals("", state.days.first().probText)
+    }
+
+    /**
+     * Eight days of one model, so the list is long enough for the cap to be the thing that stops it
+     * rather than the data running out.
+     */
+    private fun homeWithDays(prob: Int = 60): HomeUiState {
+        val f = mapOf(
+            Source.ICON_D2 to forecast(
+                Source.ICON_D2,
+                (0 until 8 * 24).map { point(it, 12.0 + (it % 12), prob = prob, condition = Condition.CLOUDY) },
+            ),
+        )
+        val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = f, lastSuccessfulRefresh = hour(0))
+        return HomeStateBuilder.build(
+            DORF_TIROL, snapshot, AppSettings(), ConsensusBlender().blend(f), hour(0).plusSeconds(30),
+        )
+    }
 }

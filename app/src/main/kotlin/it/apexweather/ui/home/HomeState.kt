@@ -9,6 +9,7 @@ import it.apexweather.domain.SunPhase
 import it.apexweather.domain.SunPhaseCalculator
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.DailyAggregator
+import it.apexweather.domain.Horizon
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.StationDownscale
 import it.apexweather.domain.StationFog
@@ -39,6 +40,16 @@ data class HomeUiState(
     val phase: SunPhase = SunPhase.DAY,
     val sunrise: Instant? = null,
     val sunset: Instant? = null,
+    /**
+     * When the sun actually clears and loses this place's own skyline, per local day, for as many
+     * days as the 48-hour strip reaches.
+     *
+     * These are the times a reader can check by looking out of the window, and in this province they
+     * are nothing like the astronomical pair above: Dorf Tirol gets the sun 70 minutes after
+     * "sunrise" in September and loses it 54 minutes before "sunset", and 86 minutes before it at
+     * the winter solstice. Empty where the catalogue has no skyline for the place — see [Horizon].
+     */
+    val visibleSun: Map<LocalDate, Pair<Instant, Instant>> = emptyMap(),
     val palette: SkyPalette = SkyPaletteSelector.select(Condition.PARTLY_CLOUDY, SunPhase.DAY, 0.0),
     val heroTempC: Double? = null,
     val heroFeelsLikeC: Double? = null,
@@ -90,8 +101,13 @@ data class HomeUiState(
      * sunrise/sunset and finally to the calculator's 07–19 local rule.
      */
     fun phaseAt(t: Instant): SunPhase {
-        val day = days.firstOrNull { it.date == t.atZone(SouthTyrol.ZONE).toLocalDate() }
-        return SunPhaseCalculator.phase(t, day?.sunrise ?: sunrise, day?.sunset ?: sunset, SouthTyrol.ZONE)
+        val date = t.atZone(SouthTyrol.ZONE).toLocalDate()
+        val day = days.firstOrNull { it.date == date }
+        val visible = visibleSun[date]
+        return SunPhaseCalculator.phase(
+            t, day?.sunrise ?: sunrise, day?.sunset ?: sunset, SouthTyrol.ZONE,
+            visible?.first, visible?.second,
+        )
     }
 
     /**
@@ -135,8 +151,24 @@ object HomeStateBuilder {
         val thisHour = now.truncatedTo(ChronoUnit.HOURS)
         val upcomingRaw = consensus.hourly.filter { !it.time.isBefore(thisHour) }.take(48)
         val rawCurrent = upcomingRaw.firstOrNull()
-        val today = consensus.daily.firstOrNull { it.date == now.atZone(SouthTyrol.ZONE).toLocalDate() }
-        val phase = SunPhaseCalculator.phase(now, today?.sunrise, today?.sunset, SouthTyrol.ZONE)
+        val todayDate = now.atZone(SouthTyrol.ZONE).toLocalDate()
+        val today = consensus.daily.firstOrNull { it.date == todayDate }
+        // The sun's own times for this place, ridge included, for the days the strip actually
+        // reaches — three at most. Walking a day costs 720 closed-form solar positions, which is
+        // nothing, but walking all fourteen every minute for no reader would be waste.
+        val skyline = place?.horizon?.takeIf(Horizon::usable)
+        val visibleSun = if (skyline == null || place == null) emptyMap() else {
+            (listOf(todayDate) + upcomingRaw.map { it.time.atZone(SouthTyrol.ZONE).toLocalDate() })
+                .distinct()
+                .mapNotNull { date ->
+                    Horizon.visibleDaylight(skyline, date, SouthTyrol.ZONE, place.lat, place.lon)
+                        ?.let { date to it }
+                }.toMap()
+        }
+        val phase = SunPhaseCalculator.phase(
+            now, today?.sunrise, today?.sunset, SouthTyrol.ZONE,
+            visibleSun[todayDate]?.first, visibleSun[todayDate]?.second,
+        )
         val obs = snapshot.observation?.takeIf { Duration.between(it.time, now) <= OBSERVATION_MAX_AGE && it.tempC != null }
         // The station stands somewhere else, and in this province mostly somewhere lower, so its
         // thermometer is only worth quoting once it has been carried up; where it cannot be, the
@@ -162,11 +194,15 @@ object HomeStateBuilder {
             val voted = if (StationFog.impliesFog(snapshot.observation, now, h)) {
                 Condition.FOG
             } else {
+                // Keyed by source rather than flattened to labels, so the re-vote weighs the four
+                // ICON runs the same way the blend that produced this hour did. Flattening here
+                // would have the hero and the strip disagree for no reason but which overload was
+                // reached for.
                 ConsensusBlender.voteCondition(
-                    h.perSource.values.map { it.condition },
+                    h.perSource.mapValues { it.value.condition },
                     h.precipMm,
                     stationSaturated = StationFog.saturated(snapshot.observation, now),
-                    cloudPct = h.perSource.values.mapNotNull { it.cloudPct },
+                    cloudPct = h.perSource.mapNotNull { (s, p) -> p.cloudPct?.let { s to it } }.toMap(),
                 )
             }
             // And then held to what the sunlight actually arriving allows. This runs last because
@@ -174,7 +210,9 @@ object HomeStateBuilder {
             // the humidity says — and because it can only ever lighten the answer, so it is safe to
             // apply to whatever the lines before it settled on. See StationSun.
             val revoted = snapshot.observation?.let { obs ->
-                place?.station?.let { st -> StationSun.corrected(voted, obs, st.lat, st.lon, now, h) }
+                // The *station's* skyline, not the village's: the pyranometer is where the question
+                // is asked, and in this province it is usually much lower and much more hemmed in.
+                place?.station?.let { st -> StationSun.corrected(voted, obs, st.lat, st.lon, now, h, st.horizon) }
             } ?: voted
             if (revoted == h.condition) h else h.copy(condition = revoted)
         }
@@ -209,6 +247,7 @@ object HomeStateBuilder {
             phase = phase,
             sunrise = today?.sunrise,
             sunset = today?.sunset,
+            visibleSun = visibleSun,
             palette = SkyPaletteSelector.select(heroCondition, phase, current?.precipMm ?: 0.0),
             heroTempC = heroFromStation ?: current?.tempC ?: obs?.tempC,
             heroAdjustmentC = adjustment?.takeIf { heroFromStation != null },

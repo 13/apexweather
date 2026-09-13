@@ -373,9 +373,50 @@ class HomeStateBuilderTest {
         assertEquals(Condition.PARTLY_CLOUDY, HomeStateBuilder.build(DORF_TIROL, blind, AppSettings(), consensus, t0).heroCondition)
     }
 
-    /** A dry station leaves the vote exactly as the models cast it. */
+    /**
+     * A dry station leaves the vote exactly as the models cast it — and a lone voice inside one
+     * family is still a lone voice.
+     *
+     * This used to assert the same thing about AROME against three ICON runs, and the weighting in
+     * [ConsensusBlender.weightOf] deliberately changed that answer: three runs of one core are not
+     * three opinions, so AROME's fog now carries 37 % of the weight rather than 25 % of the count
+     * and clears the third the fog rule asks for. That is the rule working, not slipping. What has
+     * to stay impossible is one member of a family outvoting the rest of it, which is what this
+     * pins instead — four ICON runs, one of them foggy, and the weights inside a family are equal,
+     * so the share is exactly the 25 % it always was.
+     */
     @Test
-    fun `without a saturated station one fog source does not carry the hour`() {
+    fun `one fog source inside a family does not carry the hour`() {
+        val t0 = hour(0)
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 15.0, condition = Condition.CLOUDY))),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(point(0, 15.0, condition = Condition.CLOUDY))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 15.0, condition = Condition.CLOUDY))),
+            Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 15.0, condition = Condition.FOG))),
+        )
+        val snapshot = WeatherSnapshot.EMPTY.copy(
+            forecasts = f,
+            observation = StationObservation(
+                stationName = "Meran", time = t0, tempC = 15.9, humidityPct = 60, windKmh = null,
+                windDir = null, gustKmh = null, precipTodayMm = null, pressureHpa = null,
+            ),
+        )
+        val state = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), ConsensusBlender().blend(f), t0)
+        assertEquals(Condition.CLOUDY, state.heroCondition)
+    }
+
+    /**
+     * And the case the rename above gave up: the only non-ICON regional model on the list says fog,
+     * and it is heard.
+     *
+     * Worth its own test because it is the behaviour that changed and because fog is the condition
+     * this app has historically been worst at — on 2026-09-10 it was foggy in Dorf Tirol and not
+     * one of the ten sources said so. AROME is the source that was given a FOG branch precisely so
+     * that it could vote for it; being outvoted three-to-one by one dynamical core is how that vote
+     * was being spent.
+     */
+    @Test
+    fun `the one model outside the family carries its own fog`() {
         val t0 = hour(0)
         val f = mapOf(
             Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 15.0, condition = Condition.CLOUDY))),
@@ -391,7 +432,7 @@ class HomeStateBuilderTest {
             ),
         )
         val state = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), ConsensusBlender().blend(f), t0)
-        assertEquals(Condition.CLOUDY, state.heroCondition)
+        assertEquals(Condition.FOG, state.heroCondition)
     }
 
     /**

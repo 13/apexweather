@@ -59,6 +59,13 @@ fun StationSection(
         station.humidityPct?.let { add(R.string.station_humidity to stringResource(R.string.unit_percent, it)) }
         station.pressureHpa?.let { add(R.string.station_pressure to stringResource(R.string.unit_hpa, Format.hPa(it, formats))) }
         station.precipTodayMm?.let { add(R.string.station_precip to Format.mm(it, formats)) }
+        // Both of these are absent for most of the year and both are the first thing anyone asks in
+        // the half of it where they are not. Absent stays absent: a station with no snow sensor must
+        // not be made to report a bare hillside, which is why neither falls back to a zero.
+        station.snowDepthCm?.let { add(R.string.station_snow_depth to Format.cm(it, formats)) }
+        station.sunshineTodayMinutes?.let {
+            add(R.string.station_sunshine to stringResource(R.string.duration_hm, it / 60, it % 60))
+        }
     }
     if (rows.isEmpty()) return
 

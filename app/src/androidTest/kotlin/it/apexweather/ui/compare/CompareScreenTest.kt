@@ -55,6 +55,11 @@ class CompareScreenTest {
         rule.setContent { ApexTheme { CompareContent(broken, {}, {}) } }
         scrollTo("no_station_record")
         rule.onNodeWithTag("no_station_record").assertIsDisplayed()
+        // Its own scroll: the two lines sit one under the other at the bottom of a list that is as
+        // long as the source list, and with thirteen sources in it the second no longer happens to
+        // be on screen once the first is. It was passing on the height of the list, which is not
+        // what it is testing.
+        scrollTo("never_checkable")
         rule.onNodeWithTag("never_checkable").assertIsDisplayed()
     }
 

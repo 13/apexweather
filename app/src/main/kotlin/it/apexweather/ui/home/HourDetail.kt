@@ -127,6 +127,19 @@ fun HourDetail(hour: ConsensusHour, state: HomeUiState, onClose: () -> Unit = {}
                     tag = "hour_stat_precip",
                 )
             )
+            // Beside the millimetres rather than instead of them: the sheet is where the reader has
+            // come for the detail, and the water equivalent is the number the models actually agree
+            // on while the depth depends on how the snow packs. The strip above prints one or the
+            // other because a column has room for one; here there is room for both.
+            hour.snowCm?.takeIf { hour.condition.isFrozen && it >= PrecipScale.MIN_PRINTED_CM }?.let {
+                add(
+                    Stat(
+                        label = stringResource(R.string.stat_snow),
+                        value = Format.cm(it, formats),
+                        tag = "hour_stat_snow",
+                    )
+                )
+            }
             // The direction belongs beside the speed rather than in a tile of its own: "aus NW" is
             // not a quantity, it is what the speed means. Absent where the models point every way at
             // once — see ConsensusBlender.meanDirectionDeg — and the speed still stands alone then.

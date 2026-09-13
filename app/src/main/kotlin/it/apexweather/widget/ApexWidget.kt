@@ -69,7 +69,7 @@ interface WidgetEntryPoint {
 
 class ApexWidget : GlanceAppWidget() {
 
-    override val sizeMode: SizeMode = SizeMode.Responsive(setOf(SMALL, MEDIUM))
+    override val sizeMode: SizeMode = SizeMode.Responsive(setOf(SMALL, MEDIUM, TALL))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val ep = EntryPointAccessors.fromApplication(context, WidgetEntryPoint::class.java)
@@ -101,6 +101,16 @@ class ApexWidget : GlanceAppWidget() {
     companion object {
         val SMALL = androidx.compose.ui.unit.DpSize(110.dp, 50.dp)
         val MEDIUM = androidx.compose.ui.unit.DpSize(250.dp, 110.dp)
+
+        /**
+         * Four cells high, which is where the day list starts earning its space.
+         *
+         * The widget stopped at 250 x 110 and so did the information in it: the hero, six hours, and
+         * nothing about tomorrow. A reader who wants to know whether Saturday is worth planning had
+         * to open the app for a fact that fits in five rows. This is the same content the medium
+         * widget has with [WidgetStateBuilder.TALL_DAYS] days under it.
+         */
+        val TALL = androidx.compose.ui.unit.DpSize(250.dp, 250.dp)
     }
 }
 
@@ -109,6 +119,7 @@ private fun WidgetContent(state: WidgetState, background: Bitmap) {
     val size = LocalSize.current
     val white = ColorProvider(Color.White)
     val isMedium = size.height >= ApexWidget.MEDIUM.height
+    val isTall = size.height >= ApexWidget.TALL.height
     Box(GlanceModifier.fillMaxSize().cornerRadius(24.dp).clickable(actionStartActivity<MainActivity>())) {
         Image(ImageProvider(background), contentDescription = null, contentScale = ContentScale.FillBounds, modifier = GlanceModifier.fillMaxSize())
         Column(GlanceModifier.fillMaxSize().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -148,6 +159,19 @@ private fun WidgetContent(state: WidgetState, background: Bitmap) {
                             androidx.glance.LocalContext.current.getString(R.string.updated_at, state.updatedText),
                             style = TextStyle(color = ColorProvider(Color.White.copy(alpha = if (state.isStale) 0.95f else 0.7f)), fontSize = 11.sp),
                         )
+                    }
+                }
+            }
+            if (isTall && state.hasData && state.days.isNotEmpty()) {
+                Spacer(GlanceModifier.height(8.dp))
+                state.days.forEach { d ->
+                    Row(GlanceModifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(d.label, style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.75f)), fontSize = 12.sp), modifier = GlanceModifier.width(40.dp))
+                        Image(ImageProvider(d.iconRes), contentDescription = null, colorFilter = ColorFilter.tint(white), modifier = GlanceModifier.size(18.dp))
+                        Spacer(GlanceModifier.width(8.dp))
+                        Text(d.probText, style = TextStyle(color = ColorProvider(Color(0xFFB9D2F5)), fontSize = 11.sp), modifier = GlanceModifier.defaultWeight())
+                        Text(d.minText, style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.7f)), fontSize = 12.sp), modifier = GlanceModifier.width(34.dp))
+                        Text(d.maxText, style = TextStyle(color = white, fontSize = 12.sp, fontWeight = FontWeight.Medium), modifier = GlanceModifier.width(34.dp))
                     }
                 }
             }

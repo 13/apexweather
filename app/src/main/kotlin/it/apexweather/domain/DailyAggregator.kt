@@ -15,6 +15,21 @@ object DailyAggregator {
     private const val DAY_START_HOUR = 6
     private const val DAY_END_HOUR = 22 // exclusive
 
+    /**
+     * The hours of a day the reader is actually out in, which is the window [worstCondition] has
+     * always voted the day's icon in.
+     *
+     * It is shared rather than repeated because the day's icon and the day's chance of rain have to
+     * be describing the same day: a row whose cloud says one thing about the afternoon and whose
+     * percentage says another about four in the morning is two answers to one question. Where a day
+     * has no hours inside the window at all — the far end of the list, or a day the models only
+     * reach the tail of — every hour it does have stands in, on the same terms as below.
+     */
+    fun <T> daylight(points: List<T>, zone: ZoneId, time: (T) -> Instant): List<T> {
+        val inWindow = points.filter { time(it).atZone(zone).hour in DAY_START_HOUR until DAY_END_HOUR }
+        return inWindow.ifEmpty { points }
+    }
+
     fun aggregate(
         hourly: List<HourlyPoint>,
         zone: ZoneId,
@@ -29,6 +44,10 @@ object DailyAggregator {
                     minC = points.minOf { it.tempC },
                     maxC = points.maxOf { it.tempC },
                     precipMm = points.sumOf { it.precipMm },
+                    // Null rather than zero where no hour of the day carried a figure: a day nobody
+                    // published snowfall for has not been forecast to be bare, it has not been
+                    // asked. See HourlyPoint.snowCm.
+                    snowCm = points.mapNotNull { it.snowCm }.takeIf { it.isNotEmpty() }?.sum(),
                     condition = worstCondition(points.map { it.time.atZone(zone).hour to it.condition }),
                     sunrise = sunTimes[date]?.first,
                     sunset = sunTimes[date]?.second,

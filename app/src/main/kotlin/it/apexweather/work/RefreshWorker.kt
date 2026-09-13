@@ -56,7 +56,7 @@ class RefreshWorker @AssistedInject constructor(
             // After the refresh, from settings read then: the reader may have changed place while
             // it ran, and a list worked out beforehand would evict the place they are now looking at.
             val current = settings.settings.first()
-            val keep = (listOf(current.placeIstat) + current.recentPlaces).distinct()
+            val keep = current.keptPlaces
             repository.evictAllBut(keep, keep.mapNotNull { catalogue.byIstat(it)?.district }.distinct())
         } catch (e: CancellationException) {
             throw e

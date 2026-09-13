@@ -86,7 +86,12 @@ class ConsensusBlenderTest {
         val f = (wet + dry).associate { (source, prob) ->
             source to forecast(source, listOf(point(0, 10.0, prob = prob)))
         }
-        assertEquals(23, blender.blend(f).hourly.single().precipProb)
+        // Twenty-eight rather than the sixty the maximum used to print, which is the point of the
+        // test. It is not the flat 23 % that eight models counted one for one would give either:
+        // the three that see the shower are KMOS, AROME and one ICON — three separate cores — while
+        // four of the five dry ones are the rest of that same ICON family at half a vote each. See
+        // ConsensusBlender.weightOf.
+        assertEquals(28, blender.blend(f).hourly.single().precipProb)
     }
 
     /**
@@ -686,7 +691,70 @@ class ConsensusBlenderTest {
         val h = blender.blend(f).hourly.single()
         // The median of these six is 0,05 — which prints as "0,0 mm", and is what put a rain cloud
         // over a blank amount. The mean is what the hour actually comes to.
-        assertEquals(0.1333, h.precipMm, 1e-3)
+        //
+        // 0,16 rather than the 0,13 six models counted one for one would give, and the gap is
+        // ConsensusBlender.weightOf doing exactly what it is for: the three dry models are all ICON,
+        // so they are one core answering three times at half a vote each, while the wet side holds
+        // both HARMONIE runs and the fourth ICON. Two families seeing rain against one not seeing it
+        // is a wetter hour than three votes against three.
+        assertEquals(0.1596, h.precipMm, 1e-3)
         assertTrue("an hour with rain in it should say so", h.condition.isPrecipitation)
+    }
+
+    /**
+     * Snow is measured in centimetres on the ground, not in the millimetres of water it melts to.
+     *
+     * An hour of snow worth 0,8 mm of water puts something like eight centimetres down, and the
+     * strip used to print "0,8 mm" for it — the right number in the wrong unit, off by an order of
+     * magnitude in the one the reader thinks in.
+     */
+    @Test
+    fun `snow is carried in centimetres and blended as a mean`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, -2.0, precip = 0.8, snowCm = 8.0, condition = Condition.SNOW))),
+            Source.GEOSPHERE_AROME to forecast(Source.GEOSPHERE_AROME, listOf(point(0, -2.0, precip = 0.8, condition = Condition.SNOW))),
+            Source.KNMI_HARMONIE to forecast(Source.KNMI_HARMONIE, listOf(point(0, -2.0, precip = 0.4, snowCm = 4.0, condition = Condition.SNOW))),
+        )
+        val h = ConsensusBlender().blend(f).hourly.single()
+        // AROME publishes water equivalent and no depth, so it is absent from this average rather
+        // than counted as a bare hillside — see GeoSphereMapper.
+        assertEquals(6.0, h.snowCm!!, 1e-6)
+    }
+
+    /** An hour no model publishes snowfall for says nothing, rather than saying none. */
+    @Test
+    fun `an hour with no published snowfall has no depth at all`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 12.0, precip = 1.0, condition = Condition.RAIN))),
+        )
+        assertNull(ConsensusBlender().blend(f).hourly.single().snowCm)
+    }
+
+    /**
+     * The day's chance of rain is the likeliest daylight hour, and the two rejected alternatives are
+     * both visible in this one day: the mean of the hours is 4 %, and one minus the product of the
+     * dry chances is 97 %. See ConsensusDay.precipProb.
+     */
+    @Test
+    fun `the day takes the chance of its likeliest daylight hour`() {
+        val hours = (0 until 24).map { i ->
+            point(i, 15.0, prob = if (i == 16) 90 else 5, condition = Condition.CLOUDY)
+        }
+        val f = mapOf(Source.ICON_CH1 to forecast(Source.ICON_CH1, hours))
+        val day = ConsensusBlender().blend(f).daily.first()
+        assertEquals(90, day.precipProb)
+    }
+
+    /**
+     * And it is read off the daylight window the day's icon is voted in, so the two lines of a row
+     * cannot end up describing different days.
+     */
+    @Test
+    fun `a shower in the small hours does not become the day's chance`() {
+        val hours = (0 until 24).map { i ->
+            point(i, 15.0, prob = if (i == 3) 95 else 10, condition = Condition.CLOUDY)
+        }
+        val f = mapOf(Source.ICON_CH1 to forecast(Source.ICON_CH1, hours))
+        assertEquals(10, ConsensusBlender().blend(f).daily.first().precipProb)
     }
 }

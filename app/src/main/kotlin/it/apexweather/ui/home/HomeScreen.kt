@@ -85,7 +85,7 @@ fun HomeContent(
         when {
             state.loading -> Box(Modifier.fillMaxSize())
             state.isEmpty -> EmptyState(state.place?.name(LocalConfiguration.current.locales[0]).orEmpty(), onRefresh, Modifier.fillMaxSize())
-            else -> LazyColumn(Modifier.fillMaxSize().testTag("home_list"), contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            else -> LazyColumn(Modifier.fillMaxSize().testTag("home_list"), contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(HomeCardSpacing)) {
                 if (state.offline) item { OfflineBanner(state) }
                 // Above the hero: a warning that has to be scrolled to is a warning that was missed.
                 if (state.visibleWarnings.isNotEmpty()) {
@@ -134,7 +134,21 @@ fun HomeContent(
 
     // Warnings expire while the sheet is open; the last one going closes it rather than leaving an empty sheet.
     if (warningsOpen && state.warnings.isNotEmpty()) {
-        ModalBottomSheet(onDismissRequest = { warningsOpen = false }, containerColor = MaterialTheme.colorScheme.surface, modifier = Modifier.testTag("warning_sheet")) {
+        ModalBottomSheet(
+            onDismissRequest = { warningsOpen = false },
+            // Full height, for the reason the day sheet is: a bad day in the mountains can put four
+            // or five warnings in force, and at a large text size a *single* warning card is taller
+            // than the half-height sheet's viewport — so the last one could be scrolled to and still
+            // never be wholly on screen. Caught by HomeScreenTest at a 2x font scale, which is the
+            // only reason anybody would have found it.
+            //
+            // Safe here for the reason given in CLAUDE.md: skipPartiallyExpanded hands a downward
+            // drag to the inner scroll first, so a sheet that uses it needs a cross to close by.
+            // This one has always had one.
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.testTag("warning_sheet"),
+        ) {
             WarningDetail(state.warnings, state.now, state::isDismissed, onDismissWarning, onRestoreWarning)
         }
     }
@@ -174,3 +188,13 @@ private fun EmptyState(placeName: String, onRetry: () -> Unit, modifier: Modifie
         Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
     }
 }
+
+/**
+ * The gap between two cards on the home screen.
+ *
+ * Ten rather than fourteen, and it is only a third of what a boundary actually costs: each
+ * [it.apexweather.ui.common.GlassCard] adds its own padding on both sides of it, so the trough
+ * between the 48-hour strip and the day list measured 52 dp on the phone. Ten here and twelve
+ * there leaves a boundary that still reads as one, and gives the day list back a row.
+ */
+private val HomeCardSpacing = 10.dp

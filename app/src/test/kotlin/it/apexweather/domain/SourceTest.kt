@@ -55,4 +55,23 @@ class SourceTest {
     fun `every source has a positive stale threshold`() {
         assertEquals(emptyList<Source>(), Source.entries.filter { it.staleAfterHours <= 0 })
     }
+
+    /**
+     * The chart legend and the table header label columns by [Source.shortName], and two columns
+     * under one name is a screen that cannot be read.
+     *
+     * It used to be `displayName.substringAfter(' ')`, and two names broke it — both live on the
+     * phone before anyone wrote this down. "Met Office UM" came out as "Office UM", which merely
+     * reads badly; "KNMI HARMONIE" and "DMI HARMONIE" both came out as "HARMONIE", which is two
+     * differently coloured columns with the same heading.
+     */
+    @Test
+    fun `every short name is distinct and fits its column`() {
+        val names = Source.entries.map { it.shortName }
+        assertEquals("two sources cannot share a column heading", names.size, names.toSet().size)
+        Source.entries.forEach {
+            assertTrue("${it.name} has no short name", it.shortName.isNotBlank())
+            assertTrue("${it.shortName} will not fit the legend", it.shortName.length <= 9)
+        }
+    }
 }

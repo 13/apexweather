@@ -6,6 +6,7 @@ import it.apexweather.domain.model.HourlyPoint
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.StationObservation
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -131,5 +132,50 @@ class StationSunTest {
     fun `a stale reading says nothing`() {
         val later = at.plus(StationSun.FRESH_FOR).plusSeconds(60)
         assertNull(StationSun.clearSkyIndex(observation(834.0), lat, lon, later))
+    }
+
+    /**
+     * The sun being up by the ephemeris is not the same as the sun being on the pyranometer.
+     *
+     * [StationSun.MIN_ELEVATION_DEG] was this rule with the horizon assumed flat, which in this
+     * province it never is: the thermometer Dorf Tirol reads has 33° of ridge to its west. Between
+     * ten degrees of elevation and that, the index is the ratio of diffuse shade to full sun, which
+     * is not a measurement of cloud. It was always harmless — a low index lightens nothing — but it
+     * was never an answer either, and absent is what it was.
+     */
+    @Test
+    fun `no index is computed while the sun is behind the station's own ridge`() {
+        val walled = List(Horizon.BEARINGS) { 600 } // 60° of mountain all the way round
+        val open = List(Horizon.BEARINGS) { 0 }
+        val noon = Instant.parse("2026-09-13T11:00:00Z") // 13:00 local, sun at about 45°
+        val reading = StationObservation(
+            stationName = "Meran", time = noon, tempC = 24.4, humidityPct = 57, windKmh = null,
+            windDir = null, gustKmh = null, precipTodayMm = null, pressureHpa = null,
+            radiationWm2 = 834.0,
+        )
+        assertNotNull(
+            "with nothing in the way the reading is about the sky",
+            StationSun.clearSkyIndex(reading, 46.688, 11.1366, noon, open),
+        )
+        assertNull(
+            "behind sixty degrees of ridge it is about a mountain",
+            StationSun.clearSkyIndex(reading, 46.688, 11.1366, noon, walled),
+        )
+        assertNotNull(
+            "and a catalogue with no skyline behaves exactly as it did before",
+            StationSun.clearSkyIndex(reading, 46.688, 11.1366, noon, null),
+        )
+    }
+
+    /** A profile of the wrong length is a generator that moved, and is ignored rather than misread. */
+    @Test
+    fun `an unusable profile is not read at the wrong stride`() {
+        val noon = Instant.parse("2026-09-13T11:00:00Z")
+        val reading = StationObservation(
+            stationName = "Meran", time = noon, tempC = 24.4, humidityPct = 57, windKmh = null,
+            windDir = null, gustKmh = null, precipTodayMm = null, pressureHpa = null,
+            radiationWm2 = 834.0,
+        )
+        assertNotNull(StationSun.clearSkyIndex(reading, 46.688, 11.1366, noon, List(36) { 600 }))
     }
 }

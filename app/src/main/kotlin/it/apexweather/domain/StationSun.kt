@@ -47,10 +47,27 @@ object StationSun {
     val FRESH_FOR: Duration = Duration.ofMinutes(90)
 
     /**
-     * Below this the denominator is small enough that ordinary haze, a ridge, or a minute's error
-     * in the sun's position swamp the answer. Nothing is concluded near sunrise, sunset or at night.
+     * Below this the denominator is small enough that ordinary haze or a minute's error in the sun's
+     * position swamp the answer. Nothing is concluded near sunrise, sunset or at night.
      */
     const val MIN_ELEVATION_DEG = 10.0
+
+    /**
+     * And how far clear of the station's own skyline the sun has to stand before the reading is
+     * about the sky rather than about a mountain.
+     *
+     * [MIN_ELEVATION_DEG] was this rule with the horizon assumed flat, which in this province it
+     * never is: the pyranometer Dorf Tirol reads has 33° of ridge to its west and 29° to its
+     * north-west, so on a December afternoon the sun spends an hour between ten degrees and the
+     * skyline — up, by the ephemeris, and set, in fact. The index computed there was the ratio of
+     * diffuse shade to full sun, which is not a cloud measurement; it has always been harmless,
+     * because [cloudCeiling] can only ever lighten and a low index lightens nothing, but it was
+     * never an answer either. Now it is absent, which is what it was.
+     *
+     * Five degrees of margin rather than zero, because the profile is sampled every five degrees of
+     * bearing and the last minutes before a ridge are the ones it is least sure about.
+     */
+    const val MIN_ABOVE_SKYLINE_DEG = 5.0
 
     /**
      * A plain clear-sky model: the solar constant knocked down by what a clean atmosphere lets
@@ -82,11 +99,20 @@ object StationSun {
         lat: Double,
         lon: Double,
         now: Instant,
+        skyline: List<Int>? = null,
     ): Double? {
         val measured = observation?.radiationWm2 ?: return null
         if (Duration.between(observation.time, now) > FRESH_FOR) return null
         val elevation = SunPhaseCalculator.elevationDegrees(observation.time, lat, lon)
         if (elevation < MIN_ELEVATION_DEG) return null
+        // And clear of the ground as well as of the ephemeris, where the ground is known.
+        if (Horizon.usable(skyline)) {
+            val ridge = Horizon.elevationAt(
+                skyline!!,
+                SunPhaseCalculator.azimuthDegrees(observation.time, lat, lon),
+            )
+            if (elevation < ridge + MIN_ABOVE_SKYLINE_DEG) return null
+        }
         val clearSky = SOLAR_CONSTANT_WM2 * ATMOSPHERIC_TRANSMITTANCE * sin(Math.toRadians(elevation))
         if (clearSky <= 0.0) return null
         return measured / clearSky
@@ -105,9 +131,10 @@ object StationSun {
         lon: Double,
         now: Instant,
         hour: ConsensusHour?,
+        skyline: List<Int>? = null,
     ): Condition? {
         if (hour == null || hour.precipMm >= WET_ABOVE_MM) return null
-        val index = clearSkyIndex(observation, lat, lon, now) ?: return null
+        val index = clearSkyIndex(observation, lat, lon, now, skyline) ?: return null
         return when {
             index >= CLEAR_INDEX -> Condition.MOSTLY_CLEAR
             index >= PARTLY_INDEX -> Condition.PARTLY_CLOUDY
@@ -129,11 +156,12 @@ object StationSun {
         lon: Double,
         now: Instant,
         hour: ConsensusHour?,
+        skyline: List<Int>? = null,
     ): Condition {
         // Precipitation is none of this rule's business, and neither is anything else past it in
         // the severity order — thunder included.
         if (voted.isPrecipitation) return voted
-        val ceiling = cloudCeiling(observation, lat, lon, now, hour) ?: return voted
+        val ceiling = cloudCeiling(observation, lat, lon, now, hour, skyline) ?: return voted
         return if (voted.ordinal > ceiling.ordinal) ceiling else voted
     }
 }

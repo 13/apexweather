@@ -32,7 +32,15 @@ val ApexColors = darkColorScheme(
 )
 
 val ApexTypography = Typography(
-    displayLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Light, fontSize = 112.sp, lineHeight = 112.sp, letterSpacing = (-4).sp, fontFeatureSettings = "tnum"),
+    // The hero temperature, and the single largest thing on the home screen by a long way.
+    //
+    // Eighty-eight rather than a hundred and twelve. At 112 sp the two digits and the degree sign
+    // stood 131 dp tall on a 832 dp screen, and the hero block around them took 252 dp — a third of
+    // everything above the bottom bar — to show one number. At 88 sp it is 103 dp, still more than
+    // three times the size of anything else on the screen, and the day list starts a row and a half
+    // higher. The tracking moves with it: -4 sp was -3.6 % of the size, and -3 sp is the same
+    // fraction of this one, so the digits keep the spacing they were drawn with.
+    displayLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Light, fontSize = 88.sp, lineHeight = 88.sp, letterSpacing = (-3).sp, fontFeatureSettings = "tnum"),
     headlineMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, letterSpacing = (-0.5).sp),
     titleMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 17.sp),
     bodyLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 16.sp, lineHeight = 24.sp),

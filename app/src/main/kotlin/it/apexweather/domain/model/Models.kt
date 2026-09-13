@@ -4,22 +4,82 @@ import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.time.LocalDate
 
-/** Forecast sources. [regional] sources always take part in the consensus; ECMWF only fills gaps. */
-enum class Source(val displayName: String, val regional: Boolean) {
-    SIAG_KMOS("Südtirol KMOS", true),
-    GEOSPHERE_AROME("GeoSphere AROME", true),
-    ICON_CH1("MeteoSwiss ICON-CH1", true),
-    ICON_CH2("MeteoSwiss ICON-CH2", true),
-    ICON_2I("ARPAE ICON-2I", true),
-    ICON_D2("DWD ICON-D2", true),
+/**
+ * What a model shares with the other models on the list — its dynamical core, not its institution.
+ *
+ * This exists because the consensus is a median over models, and a median counts votes. Four of the
+ * regional sources are ICON: ICON-CH1 and ICON-CH2 from MeteoSwiss, ICON-2I from ARPAE, ICON-D2
+ * from DWD. They are genuinely different runs — different domains, resolutions, assimilation and
+ * centres — but they share a dynamical core, and a core's habits are not evidence four times over.
+ * Counted one for one, ICON is four votes of eight in the regional half and decides every close
+ * hour on its own. That is the same objection that bought KNMI and DMI their place on the list,
+ * stated in the blend rather than in the shopping.
+ *
+ * Grouping is by core, which is why the two ECMWF runs are *not* one family: IFS solves equations
+ * and AIFS is a machine-learned model trained on reanalysis, and the whole reason AIFS was added is
+ * that it fails differently. Sharing a letterhead is not sharing a core.
+ *
+ * See [ConsensusBlender.weightOf] for what is done with this, and why the weight is 1/sqrt(n)
+ * rather than 1/n.
+ */
+enum class ModelFamily { ICON, HARMONIE, AROME, KMOS, IFS, AIFS, GFS, UM, GEM }
+
+/** Forecast sources. [regional] sources always take part in the consensus; globals only fill gaps. */
+enum class Source(
+    val displayName: String,
+    val regional: Boolean,
+    val family: ModelFamily,
+    /**
+     * The name in a chart legend or a table header, where there is room for about nine characters
+     * and the institution is the half worth dropping.
+     *
+     * Spelled out rather than derived. It used to be `displayName.substringAfter(' ')`, which is a
+     * rule that happens to work until a name does not fit it, and two of them did not: **"Met Office
+     * UM" came out as "Office UM"**, and — worse, because it was silent — **"KNMI HARMONIE" and
+     * "DMI HARMONIE" both came out as "HARMONIE"**, so the comparison screen drew two differently
+     * coloured columns under one name and the reader had no way to tell which run was which. Both
+     * were on the phone before this was written down.
+     */
+    val shortName: String,
+) {
+    SIAG_KMOS("Südtirol KMOS", true, ModelFamily.KMOS, "KMOS"),
+    GEOSPHERE_AROME("GeoSphere AROME", true, ModelFamily.AROME, "AROME"),
+    ICON_CH1("MeteoSwiss ICON-CH1", true, ModelFamily.ICON, "ICON-CH1"),
+    ICON_CH2("MeteoSwiss ICON-CH2", true, ModelFamily.ICON, "ICON-CH2"),
+    ICON_2I("ARPAE ICON-2I", true, ModelFamily.ICON, "ICON-2I"),
+    ICON_D2("DWD ICON-D2", true, ModelFamily.ICON, "ICON-D2"),
     // Two independent HARMONIE-AROME runs at about 2 km. They matter because without them the
     // regional half of the consensus is four flavours of ICON, and four models that share a core
     // agreeing with each other is not the same thing as four models being right.
-    KNMI_HARMONIE("KNMI HARMONIE", true),
-    DMI_HARMONIE("DMI HARMONIE", true),
-    ECMWF("ECMWF IFS", false),
+    KNMI_HARMONIE("KNMI HARMONIE", true, ModelFamily.HARMONIE, "KNMI-HAR"),
+    DMI_HARMONIE("DMI HARMONIE", true, ModelFamily.HARMONIE, "DMI-HAR"),
+    ECMWF("ECMWF IFS", false, ModelFamily.IFS, "IFS"),
     /** ECMWF's machine-learned model: the same institution, an entirely different way of forecasting. */
-    ECMWF_AIFS("ECMWF AIFS", false);
+    ECMWF_AIFS("ECMWF AIFS", false, ModelFamily.AIFS, "AIFS"),
+
+    // The three globals below exist for the far end of the day list and nothing else. Past about
+    // day five only a global reaches, and until they were added the only two that did were ECMWF
+    // IFS and ECMWF AIFS — one centre, one analysis, two ways of extrapolating it. A fortnight-out
+    // forecast resting on that is a single institution wearing two hats, and the badge beside it
+    // said "the models agree" when what it had measured was ECMWF agreeing with itself.
+    //
+    // They cost one request between them, because Open-Meteo takes the whole model list in the call
+    // that already goes out: 20,6 kB gzipped for the eight, 29,9 kB for the eleven, measured on the
+    // real 14-day call on 2026-09-13. None of them changes the near end, where [regional] sources
+    // number two or more and the globals are dropped before the blend ever sees them.
+    //
+    // Reach, measured on the same call: GFS 336 h, GEM 243 h, UKMO 171 h, against ECMWF's 336.
+    // So the fortnight is three models and the second week is four.
+    //
+    // **MET Norway's `metno_seamless` was measured and left out.** It is MET Nordic inside the
+    // Nordic domain and ECMWF IFS outside it, and this province is outside: against ECMWF IFS over
+    // the same fortnight it ran +0,69 K mean with a standard deviation of 1,15 K, the tightest of
+    // the four candidates by some way (UKMO 1,76, GEM 3,38). A fourth vote for an analysis already
+    // on the list twice is the exact thing [ModelFamily] exists to prevent, and the cheapest way to
+    // not have that problem is to not fetch it.
+    GFS("NOAA GFS", false, ModelFamily.GFS, "GFS"),
+    UKMO("Met Office UM", false, ModelFamily.UM, "UKMO-UM"),
+    GEM("ECCC GEM", false, ModelFamily.GEM, "GEM");
 
     /** True when [SourceStatus.Ok.issuedAt] really is the model run time. Open-Meteo does not report a
      * run time, so for those sources the timestamp is only when we fetched the data. */
@@ -30,7 +90,7 @@ enum class Source(val displayName: String, val regional: Boolean) {
      * the only way `station_history` can be filled and therefore the only way
      * [it.apexweather.domain.BiasCorrector] can ever correct it.
      *
-     * True of nine of the ten: the eight Open-Meteo models take coordinates in the request that
+     * True of all but one: the eleven Open-Meteo models take coordinates in the request that
      * already exists, and GeoSphere AROME takes coordinates in a second one. [SIAG_KMOS] is the
      * exception and always will be — it is addressed by ISTAT code, and there is no municipality
      * whose forecast is a forecast for a thermometer. Its absence from the record is a fact about
@@ -60,15 +120,18 @@ enum class Source(val displayName: String, val regional: Boolean) {
      * any moment is between eleven and twenty-three hours old. Sixteen hours excluded the province's
      * own forecast for something like seven hours a day.
      *
-     * The eight Open-Meteo models are unaffected either way: [hasRunTime] is false for them, so
-     * their timestamp is the fetch and they cannot go stale while fetching works.
+     * The Open-Meteo models are unaffected either way: [hasRunTime] is false for them, so their
+     * timestamp is the fetch and they cannot go stale while fetching works.
      */
     val staleAfterHours: Int get() = when (this) {
         // 12 h cadence, 11 h lag, margin for one late file.
         SIAG_KMOS -> 26
         // 3 h cadence, up to ~6,5 h until the newest run is superseded, margin for one skipped run.
         GEOSPHERE_AROME -> 10
-        ECMWF, ECMWF_AIFS -> 12
+        // The globals run six-hourly and are stamped with the fetch, so this only has to outlast a
+        // refresh interval; it is longer than the regional six because a global is the only thing
+        // holding the far end of the list and losing one there costs a week of days, not an hour.
+        ECMWF, ECMWF_AIFS, GFS, UKMO, GEM -> 12
         else -> 6
     }
 }
@@ -79,6 +142,15 @@ enum class Condition {
     SLEET, SNOW, HEAVY_SNOW, THUNDERSTORM;
 
     val isPrecipitation: Boolean get() = ordinal >= DRIZZLE.ordinal
+
+    /**
+     * Precipitation that arrives as something other than water, and therefore gets measured in
+     * centimetres on the ground rather than millimetres in a gauge.
+     *
+     * Sleet is in, because an hour of it puts the same useless slush on the road that snow does and
+     * the models that call it sleet publish centimetres for it.
+     */
+    val isFrozen: Boolean get() = this == SLEET || this == SNOW || this == HEAVY_SNOW
 }
 
 @Serializable
@@ -97,6 +169,21 @@ data class HourlyPoint(
     /** Height of the 0 °C isotherm in metres above sea level. Null where the model does not publish it;
      * ECMWF IFS via Open-Meteo is one such model. */
     val freezingLevelM: Double? = null,
+    /**
+     * Fresh snow in **centimetres**, which is not [precipMm] in other clothes.
+     *
+     * [precipMm] is water equivalent, and an hour of snow that amounts to 0,8 mm of it is something
+     * like eight centimetres on the ground. Reporting that hour as "0,8 mm" is not a rounding
+     * difference, it is the wrong order of magnitude in the unit the reader actually thinks in —
+     * and the app knew the hour was frozen all along, because [PrecipScale] has been painting it
+     * pale since the strip was drawn.
+     *
+     * Null where the model publishes no snowfall at all: SIAG KMOS publishes a letter code and
+     * nothing else, and GeoSphere AROME is deliberately absent — see
+     * [it.apexweather.data.remote.GeoSphereMapper.map], which has an accumulated `snow_acc` in
+     * `kg m-2` and no honest way to turn water into depth.
+     */
+    val snowCm: Double? = null,
     val condition: Condition,
 )
 
@@ -119,6 +206,8 @@ data class DailyPoint(
     val minC: Double,
     val maxC: Double,
     val precipMm: Double,
+    /** The day's fresh snow in centimetres, where the model publishes any. See [HourlyPoint.snowCm]. */
+    val snowCm: Double? = null,
     val condition: Condition,
     @Serializable(with = InstantSerializer::class) val sunrise: Instant? = null,
     @Serializable(with = InstantSerializer::class) val sunset: Instant? = null,
@@ -235,6 +324,24 @@ data class StationObservation(
      * the sun is plainly out.
      */
     val radiationWm2: Double? = null,
+    /**
+     * Snow lying at the station, in centimetres — SIAG's `hs`, which nothing read until now.
+     *
+     * It is seasonal in the most literal way: one of the 57 stations reported it on 2026-09-11 and
+     * most of them report it in February. That is the argument for showing it rather than against
+     * — it is absent exactly when nobody wants it and present exactly when it is the first thing
+     * anyone here asks. Absent is absent, never zero: a station that does not measure snow depth
+     * must not be made to say there is none.
+     */
+    val snowDepthCm: Double? = null,
+    /**
+     * Minutes of sunshine since midnight, from SIAG's `sd` — published as "05:05" and reported by
+     * 49 of the 57 stations, the same 49 that publish [radiationWm2].
+     *
+     * A measurement rather than a forecast, like everything else on this card, and the one that
+     * answers "has it actually been a nice day" better than any hourly icon can.
+     */
+    val sunshineTodayMinutes: Int? = null,
 )
 
 sealed interface SourceStatus {
@@ -329,6 +436,11 @@ data class ConsensusHour(
     val tempMaxC: Double,
     val feelsLikeC: Double?,
     val precipMm: Double,
+    /**
+     * Fresh snow this hour in centimetres, across the models that publish one — null where none
+     * does. See [HourlyPoint.snowCm] for why this is not [precipMm] rescaled.
+     */
+    val snowCm: Double? = null,
     val precipProb: Int,
     /** Null when not one contributing model publishes wind. */
     val windKmh: Double?,
@@ -361,6 +473,31 @@ data class ConsensusDay(
     val minC: Double,
     val maxC: Double,
     val precipMm: Double,
+    /** The day's fresh snow in centimetres, where any model publishes it. See [HourlyPoint.snowCm]. */
+    val snowCm: Double? = null,
+    /**
+     * The chance of precipitation on this day, as a percentage — the highest any of its daylight
+     * hours carries, not the average of them.
+     *
+     * The day list had an amount and no chance at all, which answers "how much" and leaves "will it
+     * rain on Saturday" — the question people actually open a day list to ask — to be guessed from
+     * an icon. Three ways to build it, and the other two are worse:
+     *
+     * - *The mean of the hours* is what the hourly figure is across models, and it is the wrong
+     *   statistic across hours: a day with one certain thunderstorm at four and twenty-three dry
+     *   hours averages to 4 %, which is a confident no to a question whose answer is yes.
+     * - *One minus the product of the dry chances* is the textbook combination and assumes the
+     *   hours are independent. They are conspicuously not — weather arrives in fronts, not in
+     *   hourly coin flips — and on any real day it returns something close to 100 %, which is no
+     *   answer either.
+     *
+     * So it is the likeliest hour, which is a statement that survives being read literally: on this
+     * day, at its worst moment, this is the chance. Daylight hours only, by the same window
+     * [it.apexweather.domain.DailyAggregator.worstCondition] picks the day's icon from — rain at
+     * three in the morning is a different fact from rain at three in the afternoon, and the two
+     * lines of the row should not be able to disagree about which day they are describing.
+     */
+    val precipProb: Int = 0,
     val condition: Condition,
     val agreement: Float,
     /**

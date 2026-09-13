@@ -80,4 +80,38 @@ class PrecipScaleTest {
     fun `a thunderstorm is coloured by its amount like any other rain`() {
         assertEquals(PrecipScale.HEAVY, PrecipScale.fillColor(6.0, Condition.THUNDERSTORM))
     }
+
+    /**
+     * Snow is drawn and printed in centimetres, and the two scales meet at the same weather: a
+     * centimetre of ordinary snow melts to about a millimetre of water, so ten of either fills the
+     * track and a full bar goes on meaning "as much as this gets" in both seasons.
+     */
+    @Test
+    fun `the snow scale and the rain scale fill the track at the same weather`() {
+        assertEquals(PrecipScale.fillFraction(10.0), PrecipScale.snowFillFraction(10.0), 1e-6f)
+        assertEquals(PrecipScale.fillFraction(2.5), PrecipScale.snowFillFraction(2.5), 1e-6f)
+        assertEquals("past the cap the bar is simply full", 1f, PrecipScale.snowFillFraction(40.0), 1e-6f)
+    }
+
+    /**
+     * Four centimetres of snow draws two thirds of the track where the 0,4 mm of water it melts to
+     * would have drawn a fifth — which is the whole reason the bar changes scale rather than only
+     * the number under it. Four centimetres is not a fifth of anything a reader here cares about.
+     */
+    @Test
+    fun `a snowy hour is not drawn as the water it melts to`() {
+        assertTrue(PrecipScale.snowFillFraction(4.0) > 0.6f)
+        assertTrue(PrecipScale.fillFraction(0.4) < 0.25f)
+    }
+
+    @Test
+    fun `an hour shows snow only when it is frozen and there is enough of it to name`() {
+        assertTrue(PrecipScale.showsSnow(3.0, Condition.SNOW))
+        assertTrue("sleet puts the same slush on the road", PrecipScale.showsSnow(3.0, Condition.SLEET))
+        assertFalse("a trace of snowfall on a rainy hour must not whiten the column",
+            PrecipScale.showsSnow(3.0, Condition.RAIN))
+        assertFalse("and there is no point printing a depth finer than it is measured to",
+            PrecipScale.showsSnow(0.2, Condition.SNOW))
+        assertFalse("a model that publishes no depth says nothing", PrecipScale.showsSnow(null, Condition.SNOW))
+    }
 }

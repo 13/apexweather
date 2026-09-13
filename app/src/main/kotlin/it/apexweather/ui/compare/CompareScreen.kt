@@ -46,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -54,6 +55,7 @@ import it.apexweather.data.CompareVariable
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceStatus
+import it.apexweather.ui.common.CompactLabel
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.GlassCard
@@ -89,8 +91,14 @@ fun CompareContent(
                     SegmentedButton(
                         selected = state.variable == v, onClick = { onVariable(v) },
                         shape = SegmentedButtonDefaults.itemShape(i, CompareVariable.entries.size),
+                        // No tick. Material reserves room for one in every segment whether it is
+                        // shown or not, and those ~24 dp are what pushed "Niederschlag" into an
+                        // ellipsis at a large text size. The selected segment is already filled
+                        // with the accent colour, so the tick was saying it twice.
+                        icon = {},
                         modifier = Modifier.testTag("variable_${v.name}"),
-                    ) { Text(variableLabel(v)) }
+                        // "Niederschlag" is 12 characters in a third of the screen; see CompactLabel.
+                    ) { CompactLabel { Text(variableLabel(v), maxLines = 1, overflow = TextOverflow.Ellipsis) } }
                 }
             }
         }
@@ -150,7 +158,7 @@ fun CompareContent(
                     Row {
                         Text("", Modifier.width(52.dp))
                         Text(stringResource(R.string.consensus), Modifier.width(84.dp), style = MaterialTheme.typography.labelSmall, color = Color.White)
-                        state.selectedInOrder.forEach { s -> Text(s.displayName.substringAfter(' ').take(9), Modifier.width(84.dp), style = MaterialTheme.typography.labelSmall, color = SourceColors.of(s)) }
+                        state.selectedInOrder.forEach { s -> Text(s.shortName, Modifier.width(84.dp), style = MaterialTheme.typography.labelSmall, color = SourceColors.of(s)) }
                     }
                     state.dayRows.forEach { row ->
                         // IntrinsicSize.Max so a missing source's one-line placeholder does not leave
@@ -307,7 +315,7 @@ private fun ChartReadout(state: CompareUiState, selectedHour: Instant?, unitLabe
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(8.dp).clip(CircleShape).background(SourceColors.of(source)))
                     Text(
-                        "${source.displayName.substringAfter(' ').take(9)} ${value?.let { "${it.roundToInt()}$unitLabel" } ?: MISSING}",
+                        "${source.shortName} ${value?.let { "${it.roundToInt()}$unitLabel" } ?: MISSING}",
                         style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f),
                     )
                 }

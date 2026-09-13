@@ -75,6 +75,13 @@ internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
         stationAt = Triple(latitude, longitude, elevation)
         requirePlausible(latitude, longitude)
         if (fail) throw IOException("open-meteo down")
+        // Recorded with a wider past window than the live request asks for (`past_days=3`, not 1),
+        // and deliberately so: the station fixture and `siag_stations.json` have to describe the
+        // same moment or `station_history` has an observation for an hour the models were never
+        // asked about, and the SIAG recording is the anchor because the numbers on it — 834 W/m² at
+        // Meran on the clear afternoon of 2026-09-11 — are the case StationSun is documented and
+        // calibrated against. Nothing else about the request differs, so this is still a recording
+        // of what the app sends; only the window is longer. Re-record both together.
         return Fixtures.json.decodeFromString(OpenMeteoStationResponse.serializer(), Fixtures.read("openmeteo_station.json"))
     }
 

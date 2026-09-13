@@ -9,3 +9,4 @@ local.properties
 .superpowers/
 keystore/
 __pycache__/
+tools/.dem-cache/

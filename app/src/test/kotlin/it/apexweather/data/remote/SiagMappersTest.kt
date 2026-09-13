@@ -129,4 +129,36 @@ class SiagMappersTest {
         val row = resp.rows.first { it.code == MERAN.code }
         assertEquals(row.n.siagDouble(), obs.precipTodayMm)
     }
+
+    /**
+     * Two values that sat on the row unread: snow depth and sunshine duration.
+     *
+     * Both are seasonal in opposite directions and both are what anybody here asks first in their
+     * own season. `hs` is absent for 56 of the 57 stations in a September recording — Karerpass, at
+     * 1752 m, is the one with anything to report — and absent has to stay absent: a station with no
+     * snow sensor must not be made to say the hillside is bare.
+     */
+    @Test
+    fun `snow depth and sunshine are read off the station row`() {
+        val resp = Fixtures.json.decodeFromString(SiagStationsResponse.serializer(), Fixtures.read("siag_stations.json"))
+        val meran = SiagMappers.mapObservation(resp, MERAN)!!
+        assertNull("Meran has no snow in September and says nothing rather than zero", meran.snowDepthCm)
+        // "05:31" — the one value on this row that is not a decimal.
+        assertEquals(5 * 60 + 31, meran.sunshineTodayMinutes)
+
+        val snowy = resp.rows.first { it.hs.siagDouble() != null }
+        val up = SiagMappers.mapObservation(resp, NearbyStation(snowy.code!!, snowy.name!!, 46.4, 11.6, 1752, 0.0))!!
+        assertEquals(snowy.hs.siagDouble(), up.snowDepthCm)
+    }
+
+    @Test
+    fun `sunshine duration is minutes, and anything that is not a clock is nothing`() {
+        assertEquals(0, "00:00".siagMinutes())
+        assertEquals(5 * 60 + 5, "05:05".siagMinutes())
+        assertEquals(13 * 60 + 45, "13:45".siagMinutes())
+        assertNull("--".siagMinutes())
+        assertNull(null.siagMinutes())
+        assertNull("5.5".siagMinutes())
+        assertNull("05:75".siagMinutes())
+    }
 }

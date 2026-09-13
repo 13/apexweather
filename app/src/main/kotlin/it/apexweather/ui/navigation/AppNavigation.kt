@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
@@ -49,6 +50,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import it.apexweather.R
+import it.apexweather.ui.common.CompactLabel
 import it.apexweather.data.LanguageSetting
 import it.apexweather.ui.bulletin.BulletinScreen
 import it.apexweather.ui.compare.CompareScreen
@@ -143,7 +145,15 @@ fun ApexApp() {
                             selected = selected,
                             onClick = { nav.openTopLevel(item.route) },
                             icon = { Icon(item.icon, null) },
-                            label = { Text(stringResource(item.labelRes)) },
+                            // Five items share the width whatever the reader's text size, so the
+                            // label is held to CompactLabel's ceiling; the icon above it still
+                            // grows the whole way. maxLines is the backstop: if that ceiling is
+                            // ever raised the label clips rather than wrapping into its neighbour.
+                            label = {
+                                CompactLabel {
+                                    Text(stringResource(item.labelRes), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                            },
                             colors = barColors,
                             modifier = Modifier.testTag("nav_${item.tag}"),
                         )
@@ -156,7 +166,14 @@ fun ApexApp() {
                         selected = settingsSelected,
                         onClick = { nav.openTopLevel(SettingsRoute) },
                         icon = { Icon(Icons.Rounded.Settings, null) },
-                        label = { Text(stringResource(R.string.nav_settings)) },
+                        // The same ceiling as the four above it. It is outside their loop, so it
+                        // has to say so itself — and at a 2x font scale a "Mehr" a third larger
+                        // than every label beside it is the one thing worse than all five being.
+                        label = {
+                            CompactLabel {
+                                Text(stringResource(R.string.nav_settings), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        },
                         colors = barColors,
                         modifier = Modifier.testTag("settings_button"),
                     )

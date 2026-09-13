@@ -38,6 +38,7 @@ import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.iconRes
 import it.apexweather.ui.common.label
 import it.apexweather.ui.theme.fromArgb
+import java.time.Duration
 
 /**
  * The whole of one day: its headline numbers, how the hours run, and what each model says on its
@@ -109,6 +110,28 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState, onClose: () -> Unit = {}) {
                 style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.65f),
             )
         }
+        // And the times a reader can check by looking out of the window, under the almanac's and
+        // labelled as a different thing rather than replacing it. Both are true and neither answers
+        // the other's question: the astronomical pair is when the sky lights and darkens, this is
+        // when the sun is on this village. In Dorf Tirol they are over an hour apart each morning.
+        // Only where the two differ enough to be worth two lines — a place on an open plain would
+        // otherwise print the same clock twice.
+        state.visibleSun[day.date]?.let { (up, down) ->
+            val differs = Duration.between(day.sunrise, up) >= VISIBLE_SUN_WORTH_SAYING ||
+                Duration.between(down, day.sunset) >= VISIBLE_SUN_WORTH_SAYING
+            if (day.sunrise != null && day.sunset != null && differs) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    stringResource(
+                        R.string.day_sun_here,
+                        Format.time(up, SouthTyrol.ZONE, formats),
+                        Format.time(down, SouthTyrol.ZONE, formats),
+                    ),
+                    style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.65f),
+                    modifier = Modifier.testTag("day_sun_here"),
+                )
+            }
+        }
 
         if (hours.isNotEmpty()) {
             Spacer(Modifier.height(18.dp))
@@ -154,3 +177,10 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState, onClose: () -> Unit = {}) {
         }
     }
 }
+
+/**
+ * Below this the ridge is not worth a second line: the profile is sampled every five degrees of
+ * bearing, which is twenty minutes of the sun's travel, so a difference smaller than a quarter of an
+ * hour is inside what the measurement can resolve.
+ */
+private val VISIBLE_SUN_WORTH_SAYING: Duration = Duration.ofMinutes(15)

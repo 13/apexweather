@@ -19,6 +19,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -56,6 +59,7 @@ fun PlacePickerScreen(onBack: () -> Unit, viewModel: PlacePickerViewModel = hilt
         state = state,
         onQuery = viewModel::onQuery,
         onPick = { viewModel.pick(it); onBack() },
+        onFavourite = viewModel::setFavourite,
         onBack = onBack,
     )
 }
@@ -71,6 +75,7 @@ fun PlacePickerContent(
     state: PlacePickerUiState,
     onQuery: (String) -> Unit,
     onPick: (String) -> Unit,
+    onFavourite: (String, Boolean) -> Unit = { _, _ -> },
     onBack: () -> Unit,
 ) {
     val locale = LocalConfiguration.current.locales[0]
@@ -111,30 +116,71 @@ fun PlacePickerContent(
             return@Column
         }
 
+        val pinned = state.favourites.map { it.istat }.toSet()
         LazyColumn(Modifier.fillMaxSize()) {
+            if (state.favourites.isNotEmpty()) {
+                item(key = "favourites_header") {
+                    SectionHeader(stringResource(R.string.place_favourites))
+                }
+                items(state.favourites, key = { "fav_" + it.istat }) { place ->
+                    PlaceRow(
+                        place, locale, selected = place.istat == state.selected,
+                        pinned = true, canPin = true, onPick = onPick, onFavourite = onFavourite,
+                        tagPrefix = "place_fav_row",
+                    )
+                }
+                item(key = "all_header") { SectionHeader(stringResource(R.string.place_all)) }
+            }
             items(state.places, key = { it.istat }) { place ->
-                PlaceRow(place, locale, selected = place.istat == state.selected, onPick = onPick)
+                PlaceRow(
+                    place, locale, selected = place.istat == state.selected,
+                    pinned = place.istat in pinned,
+                    // A star that would be refused is drawn dim rather than absent: "you have used
+                    // your four" is a different message from "this cannot be pinned".
+                    canPin = state.canPinMore || place.istat in pinned,
+                    onPick = onPick, onFavourite = onFavourite,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun PlaceRow(place: Place, locale: java.util.Locale, selected: Boolean, onPick: (String) -> Unit) {
+private fun SectionHeader(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f),
+        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun PlaceRow(
+    place: Place,
+    locale: java.util.Locale,
+    selected: Boolean,
+    pinned: Boolean = false,
+    canPin: Boolean = true,
+    onPick: (String) -> Unit,
+    onFavourite: (String, Boolean) -> Unit = { _, _ -> },
+    tagPrefix: String = "place_row",
+) {
     val formats = LocalFormats.current
     val name = place.name(locale)
     val altitude = stringResource(R.string.unit_metres, Format.metres(place.altitudeM.toDouble(), formats))
     val district = stringResource(districtRes(place.district))
+    val pinLabel = stringResource(if (pinned) R.string.place_unpin else R.string.place_pin, name)
     // Merged into one spoken node: three fragments read out separately are not a place.
     val spoken = stringResource(R.string.place_row_desc, name, altitude, district) +
-        if (selected) ", " + stringResource(R.string.place_selected) else ""
+        (if (selected) ", " + stringResource(R.string.place_selected) else "") +
+        (if (pinned) ", " + stringResource(R.string.place_pinned) else "")
     Row(
         Modifier.fillMaxWidth()
             .clickable { onPick(place.istat) }
             .heightIn(min = 56.dp)
-            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .padding(start = 20.dp, end = 8.dp, top = 10.dp, bottom = 10.dp)
             .semantics(mergeDescendants = true) { contentDescription = spoken }
-            .testTag("place_row_${place.istat}"),
+            .testTag("${tagPrefix}_${place.istat}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -154,6 +200,23 @@ private fun PlaceRow(place: Place, locale: java.util.Locale, selected: Boolean, 
             Icon(
                 Icons.Filled.Check, contentDescription = null, tint = Color.White,
                 modifier = Modifier.size(20.dp).testTag("place_selected_${place.istat}"),
+            )
+        }
+        // Its own button rather than part of the row's tap target: the row chooses a place and this
+        // keeps one, which are different enough that sharing a gesture would be a trap. `clearAndSet`
+        // rather than the row's merge, or the star's own label is swallowed by the place's.
+        IconButton(
+            onClick = { onFavourite(place.istat, !pinned) },
+            enabled = canPin,
+            modifier = Modifier.clearAndSetSemantics {
+                contentDescription = pinLabel
+            }.testTag("place_pin_${place.istat}"),
+        ) {
+            Icon(
+                if (pinned) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                contentDescription = null,
+                tint = if (pinned) Color.White else Color.White.copy(alpha = if (canPin) 0.45f else 0.2f),
+                modifier = Modifier.size(20.dp),
             )
         }
     }

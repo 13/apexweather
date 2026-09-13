@@ -38,6 +38,8 @@
     <string name="stat_precip">Precipitazioni</string>
     <string name="stat_wind">Vento</string>
     <string name="stat_humidity">Umidità</string>
+    <string name="stat_snow">Neve fresca</string>
+    <string name="duration_hm">%1$d h %2$02d min</string>
     <!-- Eight compass points, in each language's own abbreviations: German O for Ost, Italian O for Ovest. -->
     <string name="compass_n">N</string>
     <string name="compass_ne">NE</string>
@@ -100,6 +102,7 @@
     <string name="open_day_details">Apri i dettagli del giorno</string>
     <string name="section_day_hours">ANDAMENTO ORARIO</string>
     <string name="day_sun">Alba %1$s · Tramonto %2$s</string>
+    <string name="day_sun_here">Sole qui %1$s – %2$s</string>
     <string name="day_precip_total">Precipitazioni %1$s</string>
     <string name="agreement_short">Accordo %1$d %%</string>
     <string name="compare_cell_desc">%1$s, %2$s: da %3$s a %4$s, %5$s, %6$s</string>
@@ -199,6 +202,8 @@
     <string name="station_humidity">Umidità</string>
     <string name="station_pressure">Pressione</string>
     <string name="station_precip">Precipitazioni oggi</string>
+    <string name="station_snow_depth">Altezza neve</string>
+    <string name="station_sunshine">Sole oggi</string>
     <string name="wind_with_dir">%1$s da %2$s</string>
     <string name="unit_percent">%1$d %%</string>
     <string name="unit_hpa">%1$s hPa</string>
@@ -235,12 +240,17 @@
     <string name="setting_notif_grant">Consenti</string>
 
     <!-- La stazione sta 270 m sotto il paese: il valore viene riportato in quota prima di mostrarlo. -->
-    <string name="now_from_station_adjusted">Ora: stazione %1$s, %2$s · riportato a %4$s (%3$s)</string>
+    <string name="now_from_station_adjusted">Stazione %1$s, %2$s · riportato (%3$s)</string>
 
     <!-- La scelta del comune, fra i 116 della provincia. -->
     <string name="place_title">Scegli il comune</string>
     <string name="place_search">Cerca comune</string>
     <string name="place_none">Nessun comune trovato</string>
+    <string name="place_favourites">PREFERITI</string>
+    <string name="place_all">TUTTI I COMUNI</string>
+    <string name="place_pinned">preferito</string>
+    <string name="place_pin">Aggiungi %1$s ai preferiti</string>
+    <string name="place_unpin">Togli %1$s dai preferiti</string>
     <string name="place_meta">%1$s · %2$s</string>
     <string name="place_row_desc">%1$s, %2$s, distretto %3$s</string>
     <string name="place_selected">Attualmente scelto</string>

@@ -54,7 +54,32 @@ data class AppSettings(
      * here is deleted after the next refresh, so its length is the number of places the app keeps.
      */
     val recentPlaces: List<String> = emptyList(),
+    /**
+     * Places the reader has pinned, in the order they pinned them.
+     *
+     * The app has always had exactly one place and three cached ones, which is right for somebody
+     * who lives in one valley and wrong for everybody here in the other half of their life: home,
+     * and the hut they are walking to on Saturday. A pin is the smallest thing that fixes it — the
+     * picker puts them at the top, and, more usefully, [keptPlaces] keeps them cached, so a pinned
+     * place opens instantly and works with no signal, which is the state a mountain is usually in.
+     *
+     * Deliberately not a reordering of [recentPlaces]: recency is what the app observed and a pin is
+     * what the reader said, and a list that mixed the two would quietly lose the second.
+     */
+    val favouritePlaces: List<String> = emptyList(),
 ) {
+    /**
+     * Every place the cache is to keep: the one on screen, the pins, then the most recent.
+     *
+     * One list, because two callers evict — the resume hook and the hourly worker — and they must
+     * never disagree about what is worth keeping. Capped, because each place is a full set of model
+     * runs and an unbounded pin list is an unbounded database.
+     */
+    val keptPlaces: List<String>
+        get() = (listOf(placeIstat) + favouritePlaces + recentPlaces)
+            .distinct()
+            .take(SettingsRepository.MAX_KEPT_PLACES)
+
     val anyNotification: Boolean get() = notifySummary || notifyRain || notifyWarnings
 
     /** Language used for the SIAG bulletin: explicit setting, else system language, else German. */
@@ -91,6 +116,9 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         // A comma-joined list rather than a string set: the order is the whole point of it, and
         // DataStore's set preference does not keep one.
         val recentPlaces = stringPreferencesKey("recent_places")
+        // Comma-joined, like the recents and for the same reason: the reader's own order is the
+        // point of it, and DataStore's set preference does not keep one.
+        val favouritePlaces = stringPreferencesKey("favourite_places")
     }
 
     val settings: Flow<AppSettings> = context.settingsStore.data.catch { e ->
@@ -111,6 +139,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             notifyWarnings = p[Keys.notifyWarnings] ?: false,
             placeIstat = p[Keys.placeIstat]?.takeIf { it.isNotBlank() } ?: SouthTyrol.DEFAULT_ISTAT,
             recentPlaces = p[Keys.recentPlaces].orEmpty().split(',').filter { it.isNotBlank() },
+            favouritePlaces = p[Keys.favouritePlaces].orEmpty().split(',').filter { it.isNotBlank() },
         )
     }
 
@@ -125,6 +154,21 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     suspend fun setNotifySummaryHour(v: Int) = context.settingsStore.edit { it[Keys.notifySummaryHour] = v.coerceIn(0, 23) }
     suspend fun setNotifyRain(v: Boolean) = context.settingsStore.edit { it[Keys.notifyRain] = v }
     suspend fun setNotifyWarnings(v: Boolean) = context.settingsStore.edit { it[Keys.notifyWarnings] = v }
+
+    /**
+     * Pins or unpins a place, keeping the reader's own order and refusing to grow without bound.
+     *
+     * A pin past [MAX_FAVOURITE_PLACES] is dropped rather than silently evicting something the
+     * reader also asked for: the list is short enough that "the oldest pin quietly vanished" would
+     * be a worse surprise than "that one did not stick".
+     */
+    suspend fun setFavourite(istat: String, favourite: Boolean) = context.settingsStore.edit { prefs ->
+        val current = prefs[Keys.favouritePlaces].orEmpty().split(',').filter { it.isNotBlank() }
+        val next = if (!favourite) current.filterNot { it == istat }
+        else if (istat in current || current.size >= MAX_FAVOURITE_PLACES) current
+        else current + istat
+        prefs[Keys.favouritePlaces] = next.joinToString(",")
+    }
 
     /**
      * Chooses a place and moves it to the head of the recent list, which is what the cache keeps.
@@ -146,6 +190,22 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     internal companion object {
         /** How many places the cache keeps, and therefore how many are worth remembering. */
         const val RECENT_PLACES = 3
+
+        /**
+         * How many places may be pinned.
+         *
+         * Four: home, work, and the two valleys anyone actually goes to. It is a cap on the cache as
+         * much as on the list — every kept place is eleven model runs, a bulletin and an
+         * observation, refreshed on the hour.
+         */
+        const val MAX_FAVOURITE_PLACES = 4
+
+        /**
+         * And the ceiling on everything the cache keeps at once: the current place, the pins and the
+         * recents together. One more than the pins, so pinning four still leaves room for the place
+         * being looked at right now.
+         */
+        const val MAX_KEPT_PLACES = MAX_FAVOURITE_PLACES + RECENT_PLACES
 
         /**
          * The sources switched off, read from what is stored.

@@ -48,6 +48,9 @@
     <string name="compass_nw">NW</string>
     <string name="stat_gust">Böen %1$s</string>
     <string name="stat_chance">%1$d %%</string>
+    <string name="stat_snow">Neuschnee</string>
+    <!-- Sonnenscheindauer der Station, aus "05:05" gelesen. -->
+    <string name="duration_hm">%1$d h %2$02d min</string>
     <string name="col_model">Modell</string>
     <string name="col_temp">Temp</string>
     <string name="col_precip">mm</string>
@@ -99,6 +102,7 @@
     <string name="open_day_details">Tagesdetails öffnen</string>
     <string name="section_day_hours">STUNDENVERLAUF</string>
     <string name="day_sun">Sonnenaufgang %1$s · Sonnenuntergang %2$s</string>
+    <string name="day_sun_here">Sonne hier %1$s – %2$s</string>
     <string name="day_precip_total">Niederschlag %1$s</string>
     <string name="agreement_short">Übereinstimmung %1$d %%</string>
     <string name="compare_cell_desc">%1$s, %2$s: %3$s bis %4$s, %5$s, %6$s</string>
@@ -195,6 +199,8 @@
     <string name="station_humidity">Luftfeuchte</string>
     <string name="station_pressure">Luftdruck</string>
     <string name="station_precip">Niederschlag heute</string>
+    <string name="station_snow_depth">Schneehöhe</string>
+    <string name="station_sunshine">Sonnenschein heute</string>
     <string name="wind_with_dir">%1$s aus %2$s</string>
     <string name="unit_percent">%1$d %%</string>
     <string name="unit_hpa">%1$s hPa</string>
@@ -231,12 +237,17 @@
     <string name="setting_notif_grant">Erlauben</string>
 
     <!-- The station stands 270 m below the village, so its reading is carried up before it is quoted. -->
-    <string name="now_from_station_adjusted">Jetzt: Station %1$s, %2$s · auf %4$s umgerechnet (%3$s)</string>
+    <string name="now_from_station_adjusted">Station %1$s, %2$s · umgerechnet (%3$s)</string>
 
     <!-- Choosing which of the province's 116 municipalities the app is about. -->
     <string name="place_title">Ort wählen</string>
     <string name="place_search">Gemeinde suchen</string>
     <string name="place_none">Keine Gemeinde gefunden</string>
+    <string name="place_favourites">GEMERKT</string>
+    <string name="place_all">ALLE GEMEINDEN</string>
+    <string name="place_pinned">gemerkt</string>
+    <string name="place_pin">%1$s merken</string>
+    <string name="place_unpin">%1$s nicht mehr merken</string>
     <string name="place_meta">%1$s · %2$s</string>
     <string name="place_row_desc">%1$s, %2$s, Bezirk %3$s</string>
     <string name="place_selected">Aktuell gewählt</string>

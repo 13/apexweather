@@ -85,17 +85,32 @@ object OpenMeteoMapper {
         Source.DMI_HARMONIE to "dmi_harmonie_arome_europe",
         Source.ECMWF to "ecmwf_ifs025",
         Source.ECMWF_AIFS to "ecmwf_aifs025_single",
+        // Three more globals, for the far end of the day list alone — see the comment on
+        // [Source.GFS]. Reach measured on the real call on 2026-09-13: GFS 336 h, GEM 243 h,
+        // UKMO 171 h. They add 9,3 kB gzipped between them and change nothing inside two days,
+        // where the regional models outnumber them and the blender drops globals outright.
+        Source.GFS to "gfs_seamless",
+        Source.UKMO to "ukmo_global_deterministic_10km",
+        Source.GEM to "gem_global",
     )
     /**
-     * Two weeks, although only ECMWF reaches past day five. Every other model returns nulls for the
+     * Two weeks, although nothing regional reaches past day five. Every model returns nulls for the
      * hours it does not cover and the mapper drops those, so the extra days cost nothing but a longer
      * array of nulls — 2.7 kB more over the wire once gzipped, measured against the seven-day call.
      */
     const val FORECAST_DAYS = 14
+
+    /**
+     * `snowfall` is the newest of these and is in **centimetres**, which is the whole reason it is
+     * asked for: `precipitation` is water equivalent, and an hour of snow worth 0,8 mm of it puts
+     * something like eight centimetres on the ground. It costs 0,4 kB gzipped across the eleven
+     * models, measured on the same call.
+     */
     const val HOURLY_VARS = "temperature_2m,apparent_temperature,precipitation,precipitation_probability," +
         "weather_code,cloud_cover,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m," +
-        "freezing_level_height"
-    const val DAILY_VARS = "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,sunrise,sunset"
+        "freezing_level_height,snowfall"
+    const val DAILY_VARS = "temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum," +
+        "weather_code,sunrise,sunset"
 
     /** Twelve hours of quarter-hours. Beyond that the resolution is a claim nobody can support. */
     const val MINUTELY_STEPS = 48
@@ -121,6 +136,10 @@ object OpenMeteoMapper {
             val dir = h.ints("wind_direction_10m_$key")
             // ECMWF IFS publishes no freezing level through Open-Meteo; the column comes back all null.
             val freezing = h.doubles("freezing_level_height_$key")
+            // Centimetres of fresh snow, straight from the upstream; no conversion is applied or
+            // wanted. A model that publishes none leaves an empty column and the hours carry null,
+            // which is a different thing from a column of zeroes.
+            val snow = h.doubles("snowfall_$key")
             // Only the regional models: a 25 km global returns a quarter-hourly series when asked,
             // but it is interpolated from its own hourly one and would only add false precision to
             // the question this series exists to answer — when exactly the rain starts.
@@ -145,6 +164,7 @@ object OpenMeteoMapper {
                     cloudPct = cloud.getOrNull(i),
                     humidityPct = hum.getOrNull(i),
                     freezingLevelM = freezing.getOrNull(i),
+                    snowCm = snow.getOrNull(i),
                     condition = WmoCodes.toCondition(code.getOrNull(i)),
                 )
             }
@@ -153,6 +173,7 @@ object OpenMeteoMapper {
             val tmax = d.doubles("temperature_2m_max_$key")
             val tmin = d.doubles("temperature_2m_min_$key")
             val psum = d.doubles("precipitation_sum_$key")
+            val ssum = d.doubles("snowfall_sum_$key")
             val dcode = d.ints("weather_code_$key")
             val sunrise = d.strings("sunrise_$key")
             val sunset = d.strings("sunset_$key")
@@ -164,6 +185,7 @@ object OpenMeteoMapper {
                     minC = min,
                     maxC = max,
                     precipMm = psum.getOrNull(i) ?: 0.0,
+                    snowCm = ssum.getOrNull(i),
                     condition = dcode.getOrNull(i)?.let(WmoCodes::toCondition) ?: run {
                         val hoursOfDay = hourly.filter { it.time.atZone(zone).toLocalDate() == dayDates[i] }
                             .map { it.time.atZone(zone).hour to it.condition }

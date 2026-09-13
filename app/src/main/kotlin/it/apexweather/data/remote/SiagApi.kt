@@ -119,6 +119,16 @@ data class SiagStationRow(
     val n: String? = null,
     /** Global solar radiation in W/m2. The one thing on this row that is about the sky. */
     val gs: String? = null,
+    /**
+     * Snow lying at the station, in centimetres. Seasonal: one of the 57 stations published a
+     * figure on 2026-09-11, and in winter most of them do.
+     */
+    val hs: String? = null,
+    /**
+     * Sunshine since midnight, as "HH:mm" rather than a number — the only value on this row that is
+     * not a decimal, which is why it needs [siagMinutes] instead of [siagDouble].
+     */
+    val sd: String? = null,
     val lastUpdated: String? = null,
     /** Comma-decimal strings, as everything numeric from this endpoint is. */
     val latitude: String? = null,
@@ -235,6 +245,8 @@ object SiagMappers {
             precipTodayMm = row.n.siagDouble(),
             pressureHpa = row.p.siagDouble(),
             radiationWm2 = row.gs.siagDouble(),
+            snowDepthCm = row.hs.siagDouble(),
+            sunshineTodayMinutes = row.sd.siagMinutes(),
         )
     }
 }

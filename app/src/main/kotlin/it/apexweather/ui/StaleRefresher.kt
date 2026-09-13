@@ -95,7 +95,7 @@ class StaleRefresher @Inject constructor(
 
     private suspend fun evictStalePlaces() {
         val settings = settingsRepository.settings.first()
-        val keep = (listOf(settings.placeIstat) + settings.recentPlaces).distinct()
+        val keep = settings.keptPlaces
         repository.evictAllBut(keep, keep.mapNotNull { catalogue.byIstat(it)?.district }.distinct())
     }
 

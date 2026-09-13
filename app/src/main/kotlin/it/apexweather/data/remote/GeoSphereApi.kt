@@ -55,6 +55,13 @@ object GeoSphereMapper {
         val t2m = series("t2m")
         if (t2m.none { it != null }) error("GeoSphere: missing t2m")
         val rrHourly = hourlyFromAccumulated(series("rr_acc"))
+        // Water equivalent, in kg m-2, which the dataset's own metadata says and which is why this
+        // series feeds the *condition* and never [HourlyPoint.snowCm]. Turning water into depth
+        // needs a ratio that runs from about 1:5 for wet snow near zero to 1:20 for cold dry snow,
+        // and depends on temperature, riming and wind — none of which AROME publishes here. The
+        // eleven Open-Meteo models publish centimetres directly; inventing a twelfth number to sit
+        // beside them, for the one quantity this change exists to stop misreporting, would be the
+        // same mistake wearing a different unit.
         val snowHourly = hourlyFromAccumulated(series("snow_acc"))
         val rh = series("rh2m")
         val u = series("u10m"); val v = series("v10m")
