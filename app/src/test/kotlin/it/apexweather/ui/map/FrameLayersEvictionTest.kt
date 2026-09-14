@@ -30,9 +30,9 @@ class FrameLayersEvictionTest {
     }
 
     @Test
-    fun `an outgoing frame is kept`() {
-        // t1 is not in the new list either, but it is still fading out on screen.
-        val evicted = framesToEvict(held = setOf(t1, t2), radarFrames = listOf(observed(t2)), protected = setOf(t1))
+    fun `an outgoing frame is kept alongside a different shown one`() {
+        // t1 is on screen and t2 is still fading out from under it; neither is in the new list.
+        val evicted = framesToEvict(held = setOf(t1, t2, t3), radarFrames = listOf(observed(t3)), protected = setOf(t1, t2))
         assertEquals(emptySet<Instant>(), evicted)
     }
 

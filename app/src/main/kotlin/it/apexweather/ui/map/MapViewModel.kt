@@ -58,7 +58,12 @@ class MapViewModel internal constructor(
         viewModelScope.launch {
             holder.home.collect { home ->
                 val changed = _state.value.place?.istat != home.place?.istat
-                _state.update { it.copy(place = home.place, animations = home.settings.animations) }
+                _state.update {
+                    val next = it.copy(place = home.place, animations = home.settings.animations)
+                    // The bars are the place's own rain: until the new place's refresh lands they
+                    // would describe the place just left, so the ribbon goes empty instead.
+                    if (changed) next.copy(nowBars = emptyList(), todayBars = emptyList()) else next
+                }
                 // The forecast covers a box around the place, so a new place needs a new one.
                 if (changed && home.place != null) refresh()
             }

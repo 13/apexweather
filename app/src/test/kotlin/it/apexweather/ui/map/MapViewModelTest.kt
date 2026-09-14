@@ -77,13 +77,22 @@ class MapViewModelTest {
 
     private val t0: Instant = Instant.parse("2026-09-08T14:00:00Z")
 
+    private companion object {
+        const val MERAN_ISTAT = "021051"
+    }
+
     /** Thirteen frames ten minutes apart, as RainViewer serves them. */
     private class FakeRainViewer(private val t0: Instant) : RainViewerApi {
         var frames: Int = 13
 
         /** Set to model a tile that has not answered yet, without ever actually answering it. */
         var tileDelayMs: Long = 0
-        override suspend fun weatherMaps() = RainViewerMaps(
+
+        /** Set to hold a refresh's first phase back, so the state before it lands can be read. */
+        var mapsDelayMs: Long = 0
+        override suspend fun weatherMaps(): RainViewerMaps {
+            if (mapsDelayMs > 0) delay(mapsDelayMs)
+            return RainViewerMaps(
             host = "https://example.invalid",
             radar = RainViewerRadar(
                 past = (0 until frames).map {
@@ -91,6 +100,7 @@ class MapViewModelTest {
                 },
             ),
         )
+        }
         override suspend fun tile(url: String): okhttp3.ResponseBody {
             if (tileDelayMs > 0) delay(tileDelayMs)
             throw java.io.IOException("no tiles in this test")
@@ -336,6 +346,23 @@ class MapViewModelTest {
         advanceTimeBy(1_000_000)
         runCurrent()
         assertEquals(6, vm.state.value.frames.size)
+    }
+
+    /**
+     * The bars are the place's own rain. After a switch they used to go on describing the place the
+     * reader had just left until the new place's refresh landed — a network round trip later.
+     */
+    @Test
+    fun `a place switch clears the ribbon until the new place's refresh lands`() = mapTest { vm ->
+        val before = vm.state.first { it.place?.istat == DORF_TIROL.istat && it.nowBars.isNotEmpty() }
+        assertTrue(before.nowBars.isNotEmpty())
+        // The next refresh refetches the frame list, and that fetch does not answer yet.
+        rainViewer.mapsDelayMs = 60_000
+        clock.now = clock.now.plus(java.time.Duration.ofMinutes(20))
+        settings.setPlace(MERAN_ISTAT)
+        val switched = vm.state.first { it.place?.istat == MERAN_ISTAT }
+        assertTrue("Jetzt's bars still describe the place just left", switched.nowBars.isEmpty())
+        assertTrue("Heute's bars still describe the place just left", switched.todayBars.isEmpty())
     }
 
     @Test

@@ -91,11 +91,11 @@ class RadarRepository internal constructor(
             val missing = mutex.withLock { current.filter { (it.time to pixel) !in readings } }
             if (missing.isNotEmpty()) {
                 val semaphore = Semaphore(MAX_PARALLEL_TILES)
-                val fetched = coroutineScope {
+                coroutineScope {
                     missing.map { frame ->
                         async {
-                            frame.time to semaphore.withPermit {
-                                runCatchingCancellable {
+                            semaphore.withPermit {
+                                val reading = runCatchingCancellable {
                                     val body = api.tile(frame.tileUrl(pixel.zoom, pixel.x, pixel.y))
                                     // Retrofit resumes on the caller's dispatcher, which is the
                                     // ViewModel's Main: reading the body, decoding the PNG and
@@ -105,12 +105,13 @@ class RadarRepository internal constructor(
                                         decoder.decode(bytes)?.let { RadarAtPlace.read(it.argb, it.width, pixel.px, pixel.py) }
                                     }
                                 }.getOrNull()
+                                // Written down the moment it arrives, not after every tile has: a
+                                // refresh is cancelled whenever a newer one starts, and readings held
+                                // back for the rest used to be thrown away with it and fetched again.
+                                if (reading != null) mutex.withLock { readings[frame.time to pixel] = reading }
                             }
                         }
                     }.awaitAll()
-                }
-                mutex.withLock {
-                    fetched.forEach { (time, reading) -> if (reading != null) readings[time to pixel] = reading }
                 }
             }
             mutex.withLock {

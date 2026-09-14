@@ -215,6 +215,27 @@ class RadarRepositoryTest {
         assertTrue("cancellation must stop it short of every frame", api.tileCalls < api.times.size)
     }
 
+    /**
+     * A refresh is cancelled whenever a newer one starts, and the readings it had already fetched
+     * used to go with it: they were written down only after every tile had answered, so the next
+     * refresh downloaded them again.
+     */
+    @Test
+    fun `a cancelled check keeps the readings that had already arrived`() = runTest {
+        val api = SlowApi()
+        val work = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)
+        val repo = RadarRepository(api, decoder, MovableClock(Instant.parse("2026-09-14T05:45:00Z")), work, work)
+        val first = launch { repo.readingsAt(lat, lon) }
+        runCurrent()
+        first.cancel()
+        advanceUntilIdle()
+        val calledBefore = api.tileCalls
+        val second = async { repo.readingsAt(lat, lon) }
+        advanceUntilIdle()
+        assertEquals(api.times.size, second.await().size)
+        assertEquals("the two tiles that had answered were fetched again", calledBefore + api.times.size - 2, api.tileCalls)
+    }
+
     /** The third dimension the old, strictly sequential fetch could not have: real concurrency. */
     private class ConcurrencyApi : RainViewerApi {
         val times = listOf("0430", "0440", "0450", "0500", "0510", "0520", "0530", "0540")
