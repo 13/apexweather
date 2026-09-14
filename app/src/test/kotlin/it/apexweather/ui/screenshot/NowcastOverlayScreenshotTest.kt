@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Point
 import android.view.View
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -20,6 +19,7 @@ import it.apexweather.ui.map.bitmapLayout
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.PointL
 import org.osmdroid.views.MapView
 import org.osmdroid.views.Projection
 import org.robolectric.annotation.Config
@@ -38,16 +38,20 @@ import kotlin.math.max
  * field to look at rather than an early return on an empty `placed` list.
  *
  * **Collisions were measured, not assumed away.** The obvious next question after adding
- * [bitmapLayout] was whether two grid cells could round into the same bitmap pixel — 61 of the
- * 801 do at zoom 9, because INCA's grid is its own projection resampled to lat/lon rather than an
- * axis-aligned rectangle, and one scalar pixel width cannot place every cell exactly. Shrinking
- * that width to spread them out (the brief's own suggested `side * 0.9f`, then `0.8f`, the first
- * value that reached zero) was tried and rejected on the evidence of the recorded PNG: it opens a
- * regular lattice of empty bitmap pixels through the field's *interior*, which showed up as a
- * visible mesh of dark seams cutting across the rain rather than a soft edge around it — worse
- * than the coincidence it was meant to fix. A collision between two adjacent, similarly-coloured
- * cells is invisible in the rendered field, so [collisions] measures it and asserts it stays the
- * small minority it was measured at, rather than chasing zero at the cost of the image.
+ * [bitmapLayout] was whether two grid cells could round into the same bitmap pixel — 61 of the 801
+ * did at zoom 9, against `Projection.toPixels`' int-truncated pixel position. Shrinking `side`
+ * to spread cells out (the brief's own suggested `side * 0.9f`, then `0.8f`, the first value that
+ * reached zero) was tried and rejected on the evidence of the recorded PNG: it opens a regular
+ * lattice of empty bitmap pixels through the field's *interior*, a visible mesh of dark seams
+ * cutting across the rain — worse than the coincidence it was meant to fix. The real cause was
+ * cheaper to fix than to work around: `Projection.toPixels` truncates to an `Int` before this
+ * overlay ever sees the position, and INCA's grid is its own projection resampled to lat/lon
+ * (measured against this fixture: no two of its 1 638 points share a latitude or a longitude), so
+ * two genuinely distinct cells less than a pixel apart truncated to the same integer. `projectPrecise`
+ * (mirroring `NowcastOverlay`'s own private method of the same name) uses `toProjectedPixels`'
+ * zoom-independent, high-precision Mercator position instead, converted to a full-precision screen
+ * float with the projection's own scale and offset rather than its own truncating `toPixels` — and
+ * [collisions] now measures **zero** at both zoom 9 (801 placed) and zoom 13 (104 placed).
  *
  * Record after a deliberate change with `./gradlew :app:recordRoborazziDebug`, and look at the
  * result before committing it — a golden nobody looked at proves nothing.
@@ -84,14 +88,21 @@ class NowcastOverlayScreenshotTest {
     }
 
     /**
-     * Reproduces `NowcastOverlay.cellSidePx` for INCA's one-kilometre grid, because that method is
-     * private to the overlay and this assertion needs the same pixel width its own bitmap maths
-     * used, not an independent guess at it.
+     * Reproduces `NowcastOverlay.cellSidePx`/`projectPrecise` for INCA's one-kilometre grid,
+     * because those are private to the overlay and this assertion needs the same sub-pixel
+     * placement its own bitmap maths uses, not an independent guess at it — `toPixels`' own
+     * int-truncated pixel would under-count exactly the collisions this test exists to catch.
      */
-    private fun cellSidePx(projection: Projection, lat: Double): Float {
-        val a = Point().also { projection.toPixels(GeoPoint(lat, 11.0), it) }
-        val b = Point().also { projection.toPixels(GeoPoint(lat, 11.0 + ONE_KM_OF_LON), it) }
-        return max(1f, abs(b.x - a.x).toFloat())
+    private fun projectPrecise(projection: Projection, lat: Double, lon: Double, reuse: PointL): Pair<Float, Float> {
+        projection.toProjectedPixels(lat, lon, reuse)
+        val power = projection.projectedPowerDifference
+        return (reuse.x / power + projection.offsetX).toFloat() to (reuse.y / power + projection.offsetY).toFloat()
+    }
+
+    private fun cellSidePx(projection: Projection, lat: Double, reuse: PointL): Float {
+        val (ax, _) = projectPrecise(projection, lat, 11.0, reuse)
+        val (bx, _) = projectPrecise(projection, lat, 11.0 + ONE_KM_OF_LON, reuse)
+        return max(1f, abs(bx - ax))
     }
 
     /**
@@ -102,8 +113,8 @@ class NowcastOverlayScreenshotTest {
     private fun collisions(map: MapView): Pair<Int, Int> {
         val projection = map.projection
         val bounds = map.boundingBox
-        val side = cellSidePx(projection, step.cells.first().lat)
-        val point = Point()
+        val reuse = PointL()
+        val side = cellSidePx(projection, step.cells.first().lat, reuse)
         val placed = step.cells.mapNotNull { cell ->
             if (cell.lat < bounds.latSouth || cell.lat > bounds.latNorth) return@mapNotNull null
             if (cell.lon < bounds.lonWest || cell.lon > bounds.lonEast) return@mapNotNull null
@@ -111,8 +122,7 @@ class NowcastOverlayScreenshotTest {
             val possible = if (solid != null) null
                 else (if (cell.unconfirmed) cell.mmPerHour else cell.upperMmPerHour)?.let(PrecipColors::forRate)
             if (solid == null && possible == null) return@mapNotNull null
-            projection.toPixels(GeoPoint(cell.lat, cell.lon), point)
-            point.x.toFloat() to point.y.toFloat()
+            projectPrecise(projection, cell.lat, cell.lon, reuse)
         }
         if (placed.isEmpty()) return 0 to 0
         val layout = bitmapLayout(placed.map { it.first }, placed.map { it.second }, side)
@@ -121,42 +131,31 @@ class NowcastOverlayScreenshotTest {
     }
 
     @Test
-    fun `zoom 9, the whole recorded field, soft on every edge and collisions a small minority`() {
+    fun `zoom 9, the whole recorded field, soft on every edge and no cell overwriting another`() {
         val map = mapAt(9.0)
         render(map).captureRoboImage("src/test/screenshots/map_nowcast_z9.png")
         val (placed, collided) = collisions(map)
         println("zoom 9: $placed cells placed, $collided collisions")
-        assertCollisionsStayRare(placed, collided)
+        assertNoCollisions(placed, collided)
     }
 
     @Test
-    fun `zoom 13, magnified, collisions still a small minority`() {
+    fun `zoom 13, magnified, still no cell overwriting another`() {
         val map = mapAt(13.0)
         render(map).captureRoboImage("src/test/screenshots/map_nowcast_z13.png")
         val (placed, collided) = collisions(map)
         println("zoom 13: $placed cells placed, $collided collisions")
-        assertCollisionsStayRare(placed, collided)
+        assertNoCollisions(placed, collided)
     }
 
-    /**
-     * A regression guard, not a claim that collisions cannot happen: see the class doc for why
-     * zero was tried and rejected. [COLLISION_FRACTION_CEILING] is double the 7,6 % measured at
-     * zoom 9 (0 % at zoom 13) against this fixture, room enough for a different recorded field
-     * without room enough to hide the old asymmetric-margin bug, which clipped far more than a
-     * tenth of the field.
-     */
-    private fun assertCollisionsStayRare(placed: Int, collided: Int) {
+    private fun assertNoCollisions(placed: Int, collided: Int) {
         org.junit.Assert.assertTrue("$placed cells placed but none had a colour to check", placed > 0)
-        org.junit.Assert.assertTrue(
-            "$collided of $placed placed cells shared a bitmap slot with another, more than the ${(COLLISION_FRACTION_CEILING * 100).toInt()} % ceiling",
-            collided <= placed * COLLISION_FRACTION_CEILING,
-        )
+        org.junit.Assert.assertEquals("$collided of $placed placed cells shared a bitmap slot with another", 0, collided)
     }
 
     private companion object {
         const val SIZE = 800
         const val ALPHA = 130
         const val ONE_KM_OF_LON = 0.01306
-        const val COLLISION_FRACTION_CEILING = 0.15
     }
 }

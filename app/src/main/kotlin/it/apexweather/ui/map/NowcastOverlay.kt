@@ -6,7 +6,7 @@ import androidx.core.graphics.createBitmap
 import androidx.core.graphics.set
 import it.apexweather.data.remote.NowcastKind
 import it.apexweather.data.remote.NowcastStep
-import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.PointL
 import org.osmdroid.views.MapView
 import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.Overlay
@@ -44,6 +44,10 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
      * second while it is the one on screen, and a bitmap the size of a few dozen pixels is cheap to
      * keep and expensive to keep re-creating. Reallocated only when the grid on screen changes
      * shape (a pan, a zoom, a new step); otherwise just erased and repainted.
+     *
+     * Freed in [onDetach], not before: that runs once, when the whole `MapView` is torn down, and
+     * an overlay simply dropped from the map's overlay list — the far more common case, on every
+     * step change — is released by garbage collection instead, taking this bitmap with it.
      */
     private var buffer: android.graphics.Bitmap? = null
 
@@ -55,7 +59,7 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
         val projection = map.projection
         val side = cellSidePx(projection, cells.first().lat, cellKm)
         val bounds = map.boundingBox
-        val point = android.graphics.Point()
+        val projected = PointL()
         // Project once, keep what is on screen and has a colour.
         val placed = cells.mapNotNull { cell ->
             if (cell.lat < bounds.latSouth || cell.lat > bounds.latNorth) return@mapNotNull null
@@ -64,26 +68,15 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
             val possible = if (solid != null) null
                 else (if (cell.unconfirmed) cell.mmPerHour else cell.upperMmPerHour)?.let(PrecipColors::forRate)
             val colour = solid ?: possible ?: return@mapNotNull null
-            projection.toPixels(GeoPoint(cell.lat, cell.lon), point)
+            val (x, y) = projectPrecise(projection, cell.lat, cell.lon, projected)
             val strength = if (solid != null) alpha else alpha * POSSIBLE_ALPHA_NUMERATOR / 10
-            Triple(point.x.toFloat(), point.y.toFloat(), colour.toArgb((strength * colour.alpha * fade).toInt()))
+            Triple(x, y, colour.toArgb((strength * colour.alpha * fade).toInt()))
         }
         if (placed.isEmpty()) return
         // One bitmap pixel per grid cell, drawn scaled with filtering: the edges soften and the grid
         // still reads as coarser than radar, where squares read as pixel blocks. A transparent
         // border cell on every side (not only the far and bottom ones) is what lets the filter
         // fade the edge out rather than clip it.
-        //
-        // A small number of cells can round into the same bitmap pixel as a neighbour: INCA's grid
-        // is its own projection resampled to lat/lon, not an axis-aligned rectangle, so `side` (one
-        // scalar pixel width) cannot place every cell exactly. This was measured against a recorded
-        // field with rain in it (`map-2026-09-14/inca-0500Z.json`, `NowcastOverlayScreenshotTest`)
-        // at 61 of 801 placed cells at zoom 9, and shrinking `side` to spread them out was tried and
-        // rejected: it fixes the count but opens a regular lattice of empty bitmap pixels through
-        // the *interior* of an otherwise continuous field — visible dark seams running through the
-        // rain, worse than the coincidence it was meant to prevent. A shared pixel between two
-        // adjacent, similarly-coloured cells is not visible in the rendered field; a grid of holes
-        // punched through it is.
         val layout = bitmapLayout(placed.map { it.first }, placed.map { it.second }, side)
         val bitmap = buffer.let { existing ->
             if (existing != null && existing.width == layout.cols && existing.height == layout.rows) {
@@ -105,7 +98,13 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
         )
     }
 
-    /** The reused bitmap belongs to this overlay alone; nothing else may hold on to it once gone. */
+    /**
+     * `Overlay.onDetach` runs once, at whole-`MapView` teardown (`MapView.onDetach()`), not every
+     * time this particular overlay is dropped from the overlay list — [FrameLayers] replaces the
+     * on-screen overlay on every step change far more often than the map itself is torn down, and
+     * an overlay removed that way is simply released by garbage collection, [buffer] with it. This
+     * is the backstop for the one case that matters: the map view itself going away.
+     */
     override fun onDetach(mapView: MapView?) {
         buffer?.recycle()
         buffer = null
@@ -114,9 +113,34 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
 
     /** [km] of ground, in pixels, measured off the projection at this latitude. */
     private fun cellSidePx(projection: Projection, lat: Double, km: Double): Float {
-        val a = android.graphics.Point().also { projection.toPixels(GeoPoint(lat, 11.0), it) }
-        val b = android.graphics.Point().also { projection.toPixels(GeoPoint(lat, 11.0 + ONE_KM_OF_LON * km), it) }
-        return max(1f, abs(b.x - a.x).toFloat())
+        val reuse = PointL()
+        val (ax, _) = projectPrecise(projection, lat, 11.0, reuse)
+        val (bx, _) = projectPrecise(projection, lat, 11.0 + ONE_KM_OF_LON * km, reuse)
+        return max(1f, abs(bx - ax))
+    }
+
+    /**
+     * [lat]/[lon] as a screen pixel at full precision, in place of [Projection.toPixels]' own
+     * int-truncated one.
+     *
+     * `toPixels` throws away the sub-pixel fraction before this overlay ever sees it — harmless
+     * for a single marker, but this overlay can place hundreds of grid cells a few pixels apart,
+     * and two cells whose true positions differ by less than a pixel then round to the exact same
+     * integer pixel and collide in [bitmapLayout]'s bitmap: measured at 61 of 801 placed cells at
+     * zoom 9 against a recorded field with rain in it (`map-2026-09-14/inca-0500Z.json`,
+     * `NowcastOverlayScreenshotTest`). `toProjectedPixels` gives a zoom-independent, high-precision
+     * Mercator position; dividing it by the projection's own zoom scale
+     * ([Projection.getProjectedPowerDifference]) and adding its own screen offset
+     * ([Projection.getOffsetX]/`getOffsetY`) is exactly the arithmetic
+     * `Projection.getLongPixelsFromProjected` does internally before its own final `(long)` cast —
+     * recovering the fraction osmdroid already computed and then discarded, using only its own
+     * public API. Skips the wraparound correction that method also applies, because a single
+     * place's forecast box never nears the antimeridian.
+     */
+    private fun projectPrecise(projection: Projection, lat: Double, lon: Double, reuse: PointL): Pair<Float, Float> {
+        projection.toProjectedPixels(lat, lon, reuse)
+        val power = projection.projectedPowerDifference
+        return (reuse.x / power + projection.offsetX).toFloat() to (reuse.y / power + projection.offsetY).toFloat()
     }
 
     private fun androidx.compose.ui.graphics.Color.toArgb(alpha: Int): Int =
