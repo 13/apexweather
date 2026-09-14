@@ -64,9 +64,11 @@ class MapViewModel @Inject constructor(
             val heldCheck = _state.value.check?.takeIf { place != null && it.lat == place.lat && it.lon == place.lon }
             val frames = MapUiState.timeline(past, ahead, heldCheck)
             val present = past.lastOrNull()?.time ?: ahead.firstOrNull()?.time
-            val outlook = held?.outlook.orEmpty()
+            val lastSeen = past.maxOfOrNull { it.time }
+            val hours = held?.outlook.orEmpty()
                 .filter { step -> present == null || (!step.time.isBefore(present.truncatedTo(ChronoUnit.HOURS)) && !step.time.isAfter(present.plus(MapUiState.TODAY_AHEAD))) }
-                .map(MapFrame::Forecast)
+            // Heute gets the same radar check as Jetzt, or the two zooms disagree about one hour.
+            val outlook = MapUiState.markUnconfirmed(hours, lastSeen, heldCheck).map(MapFrame::Forecast)
             _state.update { state ->
                 val next = state.copy(frames = frames, outlook = outlook, check = heldCheck)
                 next.copy(selected = state.selectionAfter(next.visible), loading = false)
@@ -78,8 +80,9 @@ class MapViewModel @Inject constructor(
                 // the place they left must never land on the one they are looking at now.
                 if (_state.value.place?.istat == place.istat) {
                     val checked = MapUiState.timeline(past, ahead, check)
+                    val checkedOutlook = MapUiState.markUnconfirmed(hours, lastSeen, check).map(MapFrame::Forecast)
                     _state.update { state ->
-                        val next = state.copy(frames = checked, check = check)
+                        val next = state.copy(frames = checked, outlook = checkedOutlook, check = check)
                         next.copy(selected = state.selectionAfter(next.visible))
                     }
                 }

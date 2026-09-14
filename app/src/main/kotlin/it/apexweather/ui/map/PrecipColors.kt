@@ -1,6 +1,7 @@
 package it.apexweather.ui.map
 
 import androidx.compose.ui.graphics.Color
+import it.apexweather.data.remote.NowcastMapper
 import it.apexweather.domain.RadarAtPlace
 
 /**
@@ -17,11 +18,16 @@ import it.apexweather.domain.RadarAtPlace
  */
 object PrecipColors {
 
-    /** Below this a forecast cell is not drawn at all. */
-    const val DRAWN_FROM_MM = 0.1
+    /** Below this a forecast cell is not drawn at all — the mapper's own floor, so the two cannot drift. */
+    const val DRAWN_FROM_MM = NowcastMapper.MIN_MM_PER_HOUR
 
-    /** 15 dBZ: the first colour the radar draws as rain. */
-    const val RAIN_FROM_MM = 0.3
+    /**
+     * 15 dBZ: the first colour the radar draws as rain, at Marshall–Palmer's 0,3158 mm/h.
+     *
+     * Derived rather than written as 0,3: [isRain] reads the ramp's first stop, and with a literal
+     * here a rate between the two was "bis 0,3 mm/h" in words beside the beige non-rain wash.
+     */
+    val RAIN_FROM_MM: Double = RadarAtPlace.rateOf(RadarAtPlace.RAIN_DBZ)
 
     /** 29 dBZ. */
     const val MODERATE_FROM_MM = 2.4
@@ -46,7 +52,7 @@ object PrecipColors {
     /** What the legend draws, light to heavy. Rain only; the wash is not on it. */
     val RAMP: List<Color> = STOPS.map { it.second }
 
-    fun isRain(mmPerHour: Double): Boolean = mmPerHour >= STOPS.first().first
+    fun isRain(mmPerHour: Double): Boolean = mmPerHour >= RAIN_FROM_MM
 
     /** The colour for a rate in millimetres per hour: nothing below [DRAWN_FROM_MM], the wash below rain. */
     fun forRate(mmPerHour: Double): Color? = when {

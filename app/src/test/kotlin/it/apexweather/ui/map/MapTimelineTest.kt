@@ -212,7 +212,54 @@ class MapTimelineTest {
         assertEquals(Instant.parse("2026-09-14T04:30:00Z"), state.radarDrySince)
     }
 
+    // --- The radar check reaches Heute too -------------------------------------------------
+
+    private fun cellStep(minutesAfter: Long, kind: NowcastKind) =
+        NowcastStep(instantOf("0540").plusSeconds(minutesAfter * 60), listOf(NowcastCell(lat, lon, 1.2)), kind)
+
+    private val dryNewest = PlaceCheck(lat, lon, mapOf(instantOf("0540") to RadarReading.NO_ECHO))
+
+    /**
+     * Jetzt could say "unsicher" for 06:00 while Heute's bar for the same hour at the same place read
+     * "leichter Regen": only the nowcast half of the timeline was ever checked against the radar.
+     */
+    @Test
+    fun `an outlook hour within the hour and five kilometres of a dry newest frame is marked`() {
+        val marked = MapUiState.markUnconfirmed(listOf(cellStep(20, NowcastKind.OUTLOOK)), instantOf("0540"), dryNewest)
+        assertTrue(marked.single().cells.single().unconfirmed)
+    }
+
+    @Test
+    fun `an outlook hour past the hour is not marked`() {
+        val marked = MapUiState.markUnconfirmed(listOf(cellStep(61, NowcastKind.OUTLOOK)), instantOf("0540"), dryNewest)
+        assertFalse(marked.single().cells.single().unconfirmed)
+    }
+
+    @Test
+    fun `exactly sixty minutes is still inside the window, for the outlook and the nowcast alike`() {
+        val outlook = MapUiState.markUnconfirmed(listOf(cellStep(60, NowcastKind.OUTLOOK)), instantOf("0540"), dryNewest)
+        assertTrue(outlook.single().cells.single().unconfirmed)
+        val nowcast = MapUiState.timeline(listOf(RadarFrame(instantOf("0540"), "x")), listOf(cellStep(60, NowcastKind.NOWCAST)), dryNewest)
+        assertTrue((nowcast.last() as MapFrame.Forecast).step.cells.single().unconfirmed)
+        val past = MapUiState.timeline(listOf(RadarFrame(instantOf("0540"), "x")), listOf(cellStep(61, NowcastKind.NOWCAST)), dryNewest)
+        assertFalse((past.last() as MapFrame.Forecast).step.cells.single().unconfirmed)
+    }
+
     // --- Zooms -----------------------------------------------------------------------------
+
+    /** Heute with no frame yet — the chip tapped before the outlook arrived — must not open 24 h out. */
+    @Test
+    fun `a first load in Heute opens on its first hour`() {
+        val opened = MapUiState(zoom = MapZoom.TODAY).selectionAfter(outlook(0, 1, 2, 3))
+        assertEquals(0, opened)
+    }
+
+    @Test
+    fun `a refresh while in Heute keeps the instant`() {
+        val before = MapUiState(outlook = outlook(0, 1, 2, 3), zoom = MapZoom.TODAY, selected = 2)
+        val after = outlook(1, 2, 3, 4)
+        assertEquals(t0.plusSeconds(2 * 3600), after[before.selectionAfter(after)].time)
+    }
 
     private fun outlook(vararg hours: Long) = hours.map { h ->
         MapFrame.Forecast(NowcastStep(t0.plusSeconds(h * 3600), listOf(NowcastCell(46.6, 11.1, 1.0)), NowcastKind.OUTLOOK))
@@ -291,6 +338,23 @@ class PrecipColorsTest {
         val indices = seen.map { PrecipColors.RAMP.indexOf(it) }
         assertEquals("the ramp must never step backwards", indices.sorted(), indices)
         assertTrue(indices.all { it >= 0 })
+    }
+
+    /**
+     * "bis 0,3 mm/h" is printed from [PrecipColors.RAIN_FROM_MM] and the colour from [PrecipColors.isRain];
+     * with the first at a literal 0,3 and the second at 15 dBZ's 0,3158 a rate between them was
+     * called rain in words and drawn as the beige wash.
+     */
+    @Test
+    fun `the rain threshold in words and in colour is the radar's 15 dBZ`() {
+        assertEquals(RadarAtPlace.rateOf(RadarAtPlace.RAIN_DBZ), PrecipColors.RAIN_FROM_MM, 0.0)
+        assertTrue(PrecipColors.isRain(PrecipColors.RAIN_FROM_MM))
+        assertFalse(PrecipColors.isRain(PrecipColors.RAIN_FROM_MM - 1e-9))
+    }
+
+    @Test
+    fun `the forecast mapper and the map agree on what is worth drawing`() {
+        assertEquals(PrecipColors.DRAWN_FROM_MM, NowcastMapper.MIN_MM_PER_HOUR, 0.0)
     }
 
     @Test

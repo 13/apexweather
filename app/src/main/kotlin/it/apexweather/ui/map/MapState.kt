@@ -102,14 +102,16 @@ data class MapUiState(
      * the same number is then a different minute. So the position is carried across by **time**:
      * whatever the reader was looking at, they end up on the frame nearest to it.
      *
-     * Only a first load starts somewhere of its own: the newest frame a radar actually saw — the
-     * present, with the past behind it and the forecast ahead. Opening on the last forecast step
-     * would lead with the least certain thing on the timeline.
+     * Only a first load starts somewhere of its own: the present of the zoom the reader is in. In
+     * Jetzt that is the newest frame a radar actually saw, with the past behind it and the forecast
+     * ahead — opening on the last forecast step would lead with the least certain thing on the
+     * timeline. In Heute it is the first hour: the list has no radar frame in it, and falling back
+     * to its end opened the map a day ahead whenever Heute was chosen before the outlook arrived.
      */
     fun selectionAfter(next: List<MapFrame>): Int {
         if (next.isEmpty()) return 0
-        val was = frame?.time ?: return next.indexOfLast { it is MapFrame.Observed }
-            .takeIf { it >= 0 } ?: next.lastIndex
+        val was = frame?.time ?: return if (zoom == MapZoom.TODAY) 0
+            else next.indexOfLast { it is MapFrame.Observed }.takeIf { it >= 0 } ?: next.lastIndex
         return next.indices.minBy { i -> abs(next[i].time.epochSecond - was.epochSecond) }
     }
 
@@ -127,6 +129,24 @@ data class MapUiState(
     }
 
     companion object {
+        /**
+         * The radar's word over the forecast near the place: where [check] has a rainless reading
+         * for [lastSeen], cells of [steps] within [CHECK_RADIUS_KM] and no later than [CHECK_WINDOW]
+         * after it are marked `unconfirmed`. Sixty minutes exactly is still inside.
+         *
+         * Both zooms go through this. Heute's outlook used to skip it, so Jetzt said "unsicher" for
+         * a quarter hour while Heute's bar for the same hour at the same place read as rain.
+         */
+        fun markUnconfirmed(steps: List<NowcastStep>, lastSeen: Instant?, check: PlaceCheck?): List<NowcastStep> {
+            if (lastSeen == null || check == null || check.readings[lastSeen]?.isRain != false) return steps
+            return steps.map { step ->
+                if (Duration.between(lastSeen, step.time) > CHECK_WINDOW) step
+                else step.copy(cells = step.cells.map { cell ->
+                    if (distanceKm(cell.lat, cell.lon, check.lat, check.lon) <= CHECK_RADIUS_KM) cell.copy(unconfirmed = true) else cell
+                })
+            }
+        }
+
         /** How long after the newest radar frame its word about the place still counts. */
         val CHECK_WINDOW: Duration = Duration.ofMinutes(60)
 
@@ -159,7 +179,6 @@ data class MapUiState(
         fun timeline(radar: List<RadarFrame>, forecast: List<NowcastStep>, check: PlaceCheck? = null): List<MapFrame> {
             val observed = radar.sortedBy { it.time }.map(MapFrame::Observed)
             val lastSeen = observed.lastOrNull()?.time
-            val dryAtPlace = lastSeen != null && check?.readings?.get(lastSeen)?.isRain == false
             val ahead = forecast
                 .filter { step -> lastSeen == null || step.time.isAfter(lastSeen) }
                 .sortedBy { it.time }
@@ -168,14 +187,7 @@ data class MapUiState(
                     val from = lastSeen ?: forecast.minOf { it.time }
                     Duration.between(from, step.time) <= NOW_AHEAD
                 }
-                .map { step ->
-                    if (!dryAtPlace || Duration.between(lastSeen, step.time) > CHECK_WINDOW) step
-                    else step.copy(cells = step.cells.map { cell ->
-                        if (distanceKm(cell.lat, cell.lon, check!!.lat, check.lon) <= CHECK_RADIUS_KM) cell.copy(unconfirmed = true) else cell
-                    })
-                }
-                .map(MapFrame::Forecast)
-            return observed + ahead
+            return observed + markUnconfirmed(ahead, lastSeen, check).map(MapFrame::Forecast)
         }
     }
 }
