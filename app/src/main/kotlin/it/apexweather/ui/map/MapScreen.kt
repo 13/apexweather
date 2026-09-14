@@ -345,6 +345,12 @@ private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Uni
             osmdroidTileCache = File(context.cacheDir, "osmdroid-tiles")
         }
         MapView(context).apply {
+            // osmdroid builds a MapView that tears itself down in onDetachedFromWindow. Compose
+            // removes the view from the window before it runs DisposableEffect's onDispose, so the
+            // repository Marker(map) reads was already null while FrameLayers.released was still
+            // false — the NPE seen once at MapScreen.kt:421. Off, onDispose below is the only
+            // teardown, and `released` is true from the moment the map is gone.
+            setDestroyMode(false)
             setTileSource(SouthTyrolTileSource())
             setMultiTouchControls(true)
             // osmdroid shows a pair of stock +/- buttons by default. They sat over the province in
@@ -410,6 +416,8 @@ private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Uni
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             layers.release()
+            // A recenter still animating would otherwise go on moving a map with nothing under it.
+            mapView.controller.stopAnimation(false)
             mapView.onDetach()
         }
     }
@@ -451,7 +459,7 @@ private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Uni
             // composable's own lifecycle, so it can still fire once more on the way out. Building
             // a Marker(map) against a detached MapView is exactly the null MapViewRepository crash
             // this guards against.
-            if (layers.released) return@AndroidView
+            if (layers.released || !map.isAttachedToWindow) return@AndroidView
             state.place?.let { place ->
                 val point = GeoPoint(place.lat, place.lon)
                 if (map.overlays.none { it is Marker }) {
