@@ -62,7 +62,11 @@ object RainViewerMapper {
 
     const val TILE_SIZE = 256
 
-    /** RainViewer's colour scheme 4: blue for light rain through yellow and red for heavy. */
+    /**
+     * Asked for as scheme 4, and answered in **Universal Blue** whatever is asked: every pixel of the
+     * tiles recorded on 2026-09-14 is a Universal Blue entry in RainViewer's published table.
+     * `RadarAtPlace` reads them by that table, and `RadarAtPlaceTest` fails if that stops being true.
+     */
     const val COLOR_SCHEME = 4
 
     /** `{smooth}_{snow}`: blurred rather than blocky, and snow coloured apart from rain. */

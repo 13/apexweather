@@ -56,7 +56,9 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
             val possible = if (solid != null) null else cell.upperMmPerHour?.let(PrecipColors::forRate)
             val colour = solid ?: possible ?: return@forEach
             projection.toPixels(GeoPoint(cell.lat, cell.lon), point)
-            paint.color = colour.toArgb(if (solid != null) alpha else alpha * POSSIBLE_ALPHA_NUMERATOR / 10)
+            // The wash carries its own alpha, as the radar's does; rain and "possible" take the overlay's.
+            val strength = if (solid != null) alpha else alpha * POSSIBLE_ALPHA_NUMERATOR / 10
+            paint.color = colour.toArgb((strength * colour.alpha).toInt())
             canvas.drawRect(point.x - half, point.y - half, point.x + half, point.y + half, paint)
         }
     }

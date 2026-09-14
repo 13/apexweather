@@ -1,41 +1,57 @@
 package it.apexweather.ui.map
 
 import androidx.compose.ui.graphics.Color
+import it.apexweather.domain.RadarAtPlace
 
 /**
  * The one intensity ramp the map speaks in, for the radar behind and the forecast in front.
  *
- * The radar tiles are painted by RainViewer in its colour scheme 4, which the app does not choose
- * the stops of. These are that scheme's own colours, read off live tiles over the eastern Alps on
- * 2026-09-11 — light blue through deep blue for rain, then orange and red where it is heavy. The
- * forecast overlay is drawn by this app, so it is given the same colours deliberately: two rain
- * layers on one map that disagreed about what blue means would be unreadable.
+ * The radar tiles arrive in RainViewer's **Universal Blue** scheme, and RainViewer publishes what
+ * every colour of it means in dBZ (see `RadarColorTable`). These stops are that scheme's colours at
+ * 15, 18, 20, 23, 29, 45, 50 and 54 dBZ, and each is placed at the rate Marshall–Palmer gives for
+ * its dBZ. They used to carry guessed rates — 0,1 mm/h for the first blue, 8 for orange — which put
+ * the forecast about three times wetter than the radar at the same colour: on 2026-09-14 INCA's
+ * drizzle over Dorf Tirol arrived painted like the radar's rain.
  *
- * The stops carry **millimetres per hour**, because that is what the forecast publishes and what a
- * reader can act on. They are not claimed as a translation of the radar's own scale: RainViewer does
- * not publish the reflectivity its scheme 4 maps each colour to, so the legend says light, moderate
- * and heavy rather than putting a number against a colour the app did not choose.
+ * Marshall–Palmer is the stratiform relation and an approximation, so the legend stays in words.
  */
 object PrecipColors {
 
-    /** Rate in mm/h, and the colour at or above it. Ordered. */
-    private val STOPS = listOf(
-        0.1 to Color(0xFF88DDEE),
-        0.5 to Color(0xFF36BAE5),
-        1.0 to Color(0xFF00A3E0),
-        2.0 to Color(0xFF0088BF),
-        4.0 to Color(0xFF005B8E),
-        8.0 to Color(0xFFFF4400),
-        16.0 to Color(0xFFC10000),
-        32.0 to Color(0xFF5D0000),
-    )
+    /** Below this a forecast cell is not drawn at all. */
+    const val DRAWN_FROM_MM = 0.1
 
-    /** What the legend draws, light to heavy. */
+    /** 15 dBZ: the first colour the radar draws as rain. */
+    const val RAIN_FROM_MM = 0.3
+
+    /** 29 dBZ. */
+    const val MODERATE_FROM_MM = 2.4
+
+    /** 45 dBZ, where the radar turns orange. */
+    const val HEAVY_FROM_MM = 24.0
+
+    /** The radar's 0-14 dBZ wash, at 10 dBZ: an echo, not rain. */
+    val SUB_RAIN = Color(0x96CEC087)
+
+    private val STOPS: List<Pair<Double, Color>> = listOf(
+        15 to Color(0xFF88DDEE),
+        18 to Color(0xFF36BAE5),
+        20 to Color(0xFF00A3E0),
+        23 to Color(0xFF0088BF),
+        29 to Color(0xFF005B8E),
+        45 to Color(0xFFFF4400),
+        50 to Color(0xFFC10000),
+        54 to Color(0xFF5D0000),
+    ).map { (dbz, colour) -> RadarAtPlace.rateOf(dbz) to colour }
+
+    /** What the legend draws, light to heavy. Rain only; the wash is not on it. */
     val RAMP: List<Color> = STOPS.map { it.second }
 
-    /** The colour for a rate in millimetres per hour. Below the first stop nothing is drawn. */
-    fun forRate(mmPerHour: Double): Color? {
-        if (mmPerHour < STOPS.first().first) return null
-        return STOPS.last { mmPerHour >= it.first }.second
+    fun isRain(mmPerHour: Double): Boolean = mmPerHour >= STOPS.first().first
+
+    /** The colour for a rate in millimetres per hour: nothing below [DRAWN_FROM_MM], the wash below rain. */
+    fun forRate(mmPerHour: Double): Color? = when {
+        mmPerHour < DRAWN_FROM_MM -> null
+        !isRain(mmPerHour) -> SUB_RAIN
+        else -> STOPS.last { mmPerHour >= it.first }.second
     }
 }

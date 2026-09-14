@@ -1,8 +1,11 @@
 package it.apexweather.ui.map
 
+import androidx.compose.ui.graphics.toArgb
 import it.apexweather.data.remote.NowcastCell
 import it.apexweather.data.remote.NowcastStep
 import it.apexweather.data.remote.RadarFrame
+import it.apexweather.domain.RadarAtPlace
+import it.apexweather.domain.RadarColorTable
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -123,18 +126,38 @@ class MapTimelineTest {
     }
 }
 
-/** The colours both layers are drawn in, and the legend is labelled with. */
+/** The colours both layers are drawn in: the radar's own, at the rates the radar means by them. */
 class PrecipColorsTest {
 
     @Test
-    fun `below the first stop nothing is drawn`() {
+    fun `below a tenth of a millimetre nothing is drawn`() {
         assertNull(PrecipColors.forRate(0.0))
         assertNull(PrecipColors.forRate(0.09))
     }
 
+    /** The radar draws 0-14 dBZ as a beige wash; forecast drizzle gets the same wash, not rain's blue. */
+    @Test
+    fun `under 0,3 mm per hour is the beige wash, not rain`() {
+        assertEquals(PrecipColors.SUB_RAIN, PrecipColors.forRate(0.1))
+        assertEquals(PrecipColors.SUB_RAIN, PrecipColors.forRate(0.29))
+        assertFalse(PrecipColors.isRain(0.29))
+        assertEquals(PrecipColors.RAMP.first(), PrecipColors.forRate(0.32))
+    }
+
+    /** Before this, orange meant 8 mm/h on the forecast and about 24 on the radar. */
+    @Test
+    fun `each colour is the radar's colour at the rate the radar means by it`() {
+        listOf(15, 18, 20, 23, 29, 45, 50, 54).forEachIndexed { i, dbz ->
+            val argb = RadarColorTable.RAIN[dbz - RadarColorTable.MIN_DBZ]
+            val colour = PrecipColors.forRate(RadarAtPlace.rateOf(dbz) + 1e-9)
+            assertEquals("dBZ $dbz", argb, colour!!.toArgb())
+            assertEquals("stop $i", PrecipColors.RAMP[i], colour)
+        }
+    }
+
     @Test
     fun `heavier rain never picks a lighter colour`() {
-        val seen = generateSequence(0.1) { it * 1.3 }.takeWhile { it < 60.0 }
+        val seen = generateSequence(RadarAtPlace.rateOf(RadarAtPlace.RAIN_DBZ)) { it * 1.3 }.takeWhile { it < 200.0 }
             .mapNotNull { PrecipColors.forRate(it) }.toList()
         val indices = seen.map { PrecipColors.RAMP.indexOf(it) }
         assertEquals("the ramp must never step backwards", indices.sorted(), indices)
