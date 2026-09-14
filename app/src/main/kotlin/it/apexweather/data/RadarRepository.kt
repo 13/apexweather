@@ -42,7 +42,7 @@ class RadarRepository @Inject constructor(
     suspend fun frames(): List<RadarFrame> = mutex.withLock {
         val at = fetchedAt
         if (at != null && Duration.between(at, clock.instant()) < FRESH_FOR) return@withLock frames
-        runCatching { RainViewerMapper.map(api.weatherMaps()) }
+        runCatchingCancellable { RainViewerMapper.map(api.weatherMaps()) }
             .onSuccess { frames = it; fetchedAt = clock.instant() }
         frames
     }
@@ -60,7 +60,7 @@ class RadarRepository @Inject constructor(
             val out = LinkedHashMap<Instant, RadarReading>()
             for (frame in current) {
                 val key = frame.time to pixel
-                val reading = readings[key] ?: runCatching {
+                val reading = readings[key] ?: runCatchingCancellable {
                     val bytes = api.tile(frame.tileUrl(pixel.zoom, pixel.x, pixel.y)).use { it.bytes() }
                     decoder.decode(bytes)?.let { RadarAtPlace.read(it.argb, it.width, pixel.px, pixel.py) }
                 }.getOrNull()?.also { readings[key] = it }

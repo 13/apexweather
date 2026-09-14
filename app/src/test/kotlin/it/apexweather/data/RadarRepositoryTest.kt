@@ -6,6 +6,11 @@ import it.apexweather.data.remote.RainViewerFrame
 import it.apexweather.data.remote.RainViewerMaps
 import it.apexweather.data.remote.RainViewerRadar
 import it.apexweather.domain.RadarReading
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody
@@ -23,6 +28,7 @@ import java.time.ZoneOffset
  * Radar frames are two hours of imagery that are worthless by tomorrow, so they are held in memory
  * and never written to Room — Room in this app holds things worth showing while offline.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class RadarRepositoryTest {
 
     private class MovableClock(var now: Instant) : Clock() {
@@ -161,5 +167,35 @@ class RadarRepositoryTest {
         val readings = RadarRepository(api, decoder, MovableClock(Instant.parse("2026-09-14T05:45:00Z"))).readingsAt(lat, lon)
         assertFalse(readings.containsKey(Instant.parse("2026-09-14T05:40:00Z")))
         assertEquals(7, readings.size)
+    }
+
+    /** The third tile and every one after it hang until cancelled; the first two return at once. */
+    private class SlowApi : RainViewerApi {
+        val times = listOf("0430", "0440", "0450", "0500", "0510", "0520", "0530", "0540")
+        var tileCalls = 0
+        override suspend fun weatherMaps() = RainViewerMaps(
+            host = "https://tilecache.rainviewer.com",
+            radar = RainViewerRadar(past = times.map {
+                RainViewerFrame(Instant.parse("2026-09-14T${it.take(2)}:${it.drop(2)}:00Z").epochSecond, "/v2/radar/$it")
+            }),
+        )
+        override suspend fun tile(url: String): ResponseBody {
+            tileCalls++
+            if (tileCalls > 2) delay(60_000)
+            val time = url.substringAfter("/v2/radar/").take(4)
+            return RadarFixtures.bytes("radar-z7-67-45-${time}Z.png").toResponseBody("image/png".toMediaType())
+        }
+    }
+
+    /** A cancelled fetch must stop the loop, not be swallowed and retried on every frame left. */
+    @Test
+    fun `cancelling readingsAt stops fetching further tiles`() = runTest {
+        val api = SlowApi()
+        val repo = RadarRepository(api, decoder, MovableClock(Instant.parse("2026-09-14T05:45:00Z")))
+        val job = launch { repo.readingsAt(lat, lon) }
+        runCurrent()
+        job.cancel()
+        advanceUntilIdle()
+        assertEquals(3, api.tileCalls)
     }
 }
