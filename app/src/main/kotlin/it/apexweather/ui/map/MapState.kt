@@ -7,8 +7,6 @@ import it.apexweather.domain.RadarReading
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.sqrt
 
 /**
  * One position on the map's timeline: either something a radar saw, or something a model expects.
@@ -177,13 +175,5 @@ data class MapUiState(
                 .map(MapFrame::Forecast)
             return observed + ahead
         }
-
-        private fun distanceKm(lat: Double, lon: Double, lat0: Double, lon0: Double): Double {
-            val dy = (lat - lat0) * KM_PER_DEGREE
-            val dx = (lon - lon0) * KM_PER_DEGREE * cos(Math.toRadians(lat0))
-            return sqrt(dx * dx + dy * dy)
-        }
-
-        private const val KM_PER_DEGREE = 111.2
     }
 }

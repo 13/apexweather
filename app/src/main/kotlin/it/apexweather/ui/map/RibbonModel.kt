@@ -4,8 +4,6 @@ import it.apexweather.data.remote.NowcastKind
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.ui.home.PrecipScale
 import java.time.Instant
-import kotlin.math.cos
-import kotlin.math.sqrt
 
 enum class BarKind { OBSERVED, NOWCAST, OUTLOOK }
 
@@ -77,11 +75,5 @@ object RibbonModel {
             val local = bars[i].time.atZone(SouthTyrol.ZONE)
             local.minute == 0 && local.second == 0 && local.hour % every == 0
         }
-    }
-
-    private fun distanceKm(lat: Double, lon: Double, lat0: Double, lon0: Double): Double {
-        val dy = (lat - lat0) * 111.2
-        val dx = (lon - lon0) * 111.2 * cos(Math.toRadians(lat0))
-        return sqrt(dx * dx + dy * dy)
     }
 }
