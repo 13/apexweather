@@ -3,6 +3,7 @@ package it.apexweather.ui.common
 import it.apexweather.data.WindUnit
 import it.apexweather.domain.model.Condition
 import java.text.NumberFormat
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -153,6 +154,12 @@ object Format {
         val day = t.atZone(zone).toLocalDate()
         return if (day == now.atZone(zone).toLocalDate()) time(t, zone, f)
         else "${weekday(day, f)} ${time(t, zone, f)}"
+    }
+
+    /** "35 min" or "9 h", unsigned: the words around it say whether it is ahead or behind. */
+    fun shortDuration(d: Duration, f: Formats): String {
+        val minutes = d.abs().toMinutes()
+        return if (minutes < 60) "${f.whole(minutes.toInt())} min" else "${f.whole(((minutes + 30) / 60).toInt())} h"
     }
 
     fun weekday(d: LocalDate, f: Formats): String = d.dayOfWeek.getDisplayName(TextStyle.SHORT, f.locale)
