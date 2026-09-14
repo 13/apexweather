@@ -12,11 +12,15 @@ import java.time.Instant
  * The old code removed the overlay and added the next on every frame, so each frame arrived as a
  * blank map until its tiles did and there was no transition at all. Every radar frame's tiles are
  * kept in one [RadarTileStore] for the life of the frame list, which is what lets them already be
- * there — see that class for why this is not an osmdroid tile provider per frame any more.
+ * there — see that class for why this is not an osmdroid tile provider per frame any more. The
+ * store is not this class's to release: it outlives the map view, so a return to the tab finds
+ * the loop already downloaded.
  */
-internal class FrameLayers(private val map: MapView) {
+internal class FrameLayers(private val map: MapView, private val tiles: RadarTileStore) {
 
-    private val tiles = RadarTileStore { map.postInvalidate() }
+    init {
+        tiles.onTile = { map.postInvalidate() }
+    }
     private var shown: Overlay? = null
     private var shownTime: Instant? = null
 
@@ -46,6 +50,10 @@ internal class FrameLayers(private val map: MapView) {
         shown = incoming
         shownTime = frame?.time
         if (incoming != null) map.overlays.add(0, incoming)
+        // Preload asked for this frame's tiles once. If one of them failed then — a dropped
+        // connection for a second — the frame would show with a blank quadrant for the rest of the
+        // loop, so it is asked for again here, under the store's own retry cooldown.
+        if (frame is MapFrame.Observed) tiles.request(frame.radar, viewportTiles())
         if (!motion || outgoing == null || incoming == null) {
             outgoing?.let { map.overlays.remove(it) }
             incoming?.let { setFade(it, 1f) }
@@ -112,7 +120,7 @@ internal class FrameLayers(private val map: MapView) {
         released = true
         fading?.cancel()
         fading = null
-        tiles.release()
+        tiles.onTile = null
     }
 
     private fun evict() {

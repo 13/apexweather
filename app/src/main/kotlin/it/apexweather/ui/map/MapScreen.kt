@@ -92,6 +92,7 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
         onPlayPause = { if (state.playing) viewModel.pause() else viewModel.play() },
         onSelect = viewModel::select,
         onZoom = viewModel::setZoom,
+        radarTiles = viewModel.radarTiles,
     )
 }
 
@@ -102,6 +103,8 @@ fun MapContent(
     onSelect: (Int) -> Unit,
     onZoom: (MapZoom) -> Unit = {},
     ready: Boolean = true,
+    /** The ViewModel's tile store; a test rendering this alone gets one of its own. */
+    radarTiles: RadarTileStore? = null,
 ) {
     val recenter = remember { mutableStateOf(0) }
     // RadarMap reports its own readiness — the next few frames' tiles are cached — and the ring
@@ -110,7 +113,7 @@ fun MapContent(
     // preloading (a test rendering MapContent alone) shows no ring by default.
     var preloaded by remember { mutableStateOf(true) }
     Box(Modifier.fillMaxSize().testTag("map_screen")) {
-        RadarMap(state, recenter.value, onReady = { preloaded = it }, Modifier.fillMaxSize())
+        RadarMap(state, recenter.value, onReady = { preloaded = it }, radarTiles, Modifier.fillMaxSize())
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 // Heavy rain is drawn in yellow and red, and white text on it is unreadable. The
@@ -331,7 +334,7 @@ private fun PrecipLegend() {
  * `onPause`/`onDetach` the map keeps its tile threads running after the tab is left.
  */
 @Composable
-private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Unit, radarTiles: RadarTileStore?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -385,7 +388,9 @@ private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Uni
 
     // One layer holder for the life of the composable: it holds every radar frame's tiles, which is
     // what lets a frame's tiles already be there when the loop reaches it.
-    val layers = remember { FrameLayers(mapView) }
+    // A store of its own only when nobody handed one in; that one goes with this composable.
+    val ownTiles = remember { if (radarTiles == null) RadarTileStore() else null }
+    val layers = remember { FrameLayers(mapView, radarTiles ?: ownTiles!!) }
     val latestState = rememberUpdatedState(state)
 
     // A pan or a zoom brings different ground into view, and every frame's tiles have to be
@@ -416,6 +421,7 @@ private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Uni
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             layers.release()
+            ownTiles?.release()
             // A recenter still animating would otherwise go on moving a map with nothing under it.
             mapView.controller.stopAnimation(false)
             mapView.onDetach()

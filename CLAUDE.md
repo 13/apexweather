@@ -362,7 +362,14 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   tile modules with their own fixed thread pools that live until `detach()`, and `TilesOverlay`
   makes whichever provider is on screen cache a screenful of display-zoom copies. Measured on the
   phone after a minute of playback at zoom 12 with thirteen of them: 338 threads, 253 MB native
-  heap, 548 MB PSS. The whole loop's tiles are 52 bitmaps of 256 px now, about 13 MB.
+  heap, 548 MB PSS. The whole loop's tiles are 52 bitmaps of 256 px now, about 13 MB. The store
+  lives in `MapViewModel`, so returning to the tab does not download the loop again; it is released
+  with the ViewModel. **The edge of the four tiles is feathered over 20 dp** (`RadarOverlay`): at
+  zoom 7 to 9 their rectangle is on screen and rain from Lombardy or Switzerland stopped at a hard
+  straight line. Faded, it reads as where the picture ends; more tiles would cost about 30 MB and
+  2,25x the data for somebody else's weather. The fade is in dp, so it looks the same at every zoom,
+  and it is skipped once the rectangle covers the viewport. `RadarOverlayTest` pins the placement
+  against osmdroid's own `getPixelFromTile` and the exact sub-pixel position.
   **The basemap is the province's own, shaded from the province's own DEM.**
   `SouthTyrolTileSource` draws `p_bz-BaseMap:Basemap-Meteo-Dark` from the Autonome Provinz Bozen –
   Südtirol's WMTS, which is a grey relief map with roads and bilingual labels, published under CC0
@@ -372,7 +379,7 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   the Schlern are different facts. It draws streets at zoom 17 where the OSM raster stopped being
   useful around 11, which is why the map's own ceiling could rise from 11 to 16. And CC0 means the
   OSM tile policy's **no pre-emptive fetching** no longer binds the basemap, so `FLAG_NO_PREVENTIVE`
-  is off there too — but there is still no download-for-offline here and there must not be one.
+  is off there — but there is still no download-for-offline here and there must not be one.
   The service is WMTS; its `EPSG_3857` matrix set is ordinary Web Mercator with 256 px tiles, so row
   and column are y and x. Use the short per-layer path
   (`/mapproxy/p_bz-BaseMap/wmts/<Layer>/EPSG_3857/{z}/{x}/{y}.jpeg`), which is what the province's
@@ -517,7 +524,8 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   sequential tile fetches. `RadarRepository.readingsAt` fetches uncached tiles concurrently, at most
   `MAX_PARALLEL_TILES` (4), with the network calls outside the repository's `mutex`; a separate
   `readingsLock` serialises whole calls, so overlapping refreshes (init, place change, tab resume)
-  neither download a tile twice nor exceed the limit. Suspend fetches use
+  neither download a tile twice nor exceed the limit. Each reading is written down as it arrives, so
+  a refresh cancelled by a newer one keeps what it had already fetched. Suspend fetches use
   `data/runCatchingCancellable`, not `runCatching`, which also catches cancellation and kept
   downloading after the reader left the tab.
   The RainViewer credit in `map_attribution` is required, GeoSphere's is required by CC BY 4.0, and

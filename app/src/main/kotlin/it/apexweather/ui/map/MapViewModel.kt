@@ -51,6 +51,9 @@ class MapViewModel internal constructor(
      */
     private var refreshJob: Job? = null
 
+    /** Every radar frame's tiles, kept here so a return to the tab does not download the loop again. */
+    val radarTiles = RadarTileStore()
+
     init {
         viewModelScope.launch {
             holder.home.collect { home ->
@@ -169,6 +172,7 @@ class MapViewModel internal constructor(
 
     override fun onCleared() {
         animation?.cancel()
+        radarTiles.release()
     }
 
     private companion object {
