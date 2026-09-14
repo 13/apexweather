@@ -39,6 +39,14 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
     private val cellKm = if (step.kind == NowcastKind.OUTLOOK) OUTLOOK_CELL_KM else NOWCAST_CELL_KM
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
 
+    /**
+     * Reused across draws rather than allocated fresh each time: a frame redraws many times a
+     * second while it is the one on screen, and a bitmap the size of a few dozen pixels is cheap to
+     * keep and expensive to keep re-creating. Reallocated only when the grid on screen changes
+     * shape (a pan, a zoom, a new step); otherwise just erased and repainted.
+     */
+    private var buffer: android.graphics.Bitmap? = null
+
     /** [FrameLayers]' crossfade: 1 at full strength, fading to 0 as this frame gives way to the next. */
     var fade: Float = 1f
 
@@ -62,17 +70,46 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
         }
         if (placed.isEmpty()) return
         // One bitmap pixel per grid cell, drawn scaled with filtering: the edges soften and the grid
-        // still reads as coarser than radar, where squares read as pixel blocks.
-        val left = placed.minOf { it.first } - side / 2f
-        val top = placed.minOf { it.second } - side / 2f
-        val cols = ((placed.maxOf { it.first } - left) / side).toInt() + 2
-        val rows = ((placed.maxOf { it.second } - top) / side).toInt() + 2
-        val bitmap = createBitmap(cols, rows)
-        placed.forEach { (x, y, argb) ->
-            bitmap[((x - left) / side).toInt().coerceIn(0, cols - 1), ((y - top) / side).toInt().coerceIn(0, rows - 1)] = argb
+        // still reads as coarser than radar, where squares read as pixel blocks. A transparent
+        // border cell on every side (not only the far and bottom ones) is what lets the filter
+        // fade the edge out rather than clip it.
+        //
+        // A small number of cells can round into the same bitmap pixel as a neighbour: INCA's grid
+        // is its own projection resampled to lat/lon, not an axis-aligned rectangle, so `side` (one
+        // scalar pixel width) cannot place every cell exactly. This was measured against a recorded
+        // field with rain in it (`map-2026-09-14/inca-0500Z.json`, `NowcastOverlayScreenshotTest`)
+        // at 61 of 801 placed cells at zoom 9, and shrinking `side` to spread them out was tried and
+        // rejected: it fixes the count but opens a regular lattice of empty bitmap pixels through
+        // the *interior* of an otherwise continuous field — visible dark seams running through the
+        // rain, worse than the coincidence it was meant to prevent. A shared pixel between two
+        // adjacent, similarly-coloured cells is not visible in the rendered field; a grid of holes
+        // punched through it is.
+        val layout = bitmapLayout(placed.map { it.first }, placed.map { it.second }, side)
+        val bitmap = buffer.let { existing ->
+            if (existing != null && existing.width == layout.cols && existing.height == layout.rows) {
+                existing.eraseColor(android.graphics.Color.TRANSPARENT)
+                existing
+            } else {
+                existing?.recycle()
+                createBitmap(layout.cols, layout.rows).also { buffer = it }
+            }
         }
-        canvas.drawBitmap(bitmap, null, android.graphics.RectF(left, top, left + cols * side, top + rows * side), bitmapPaint)
-        bitmap.recycle()
+        placed.forEach { (x, y, argb) ->
+            bitmap[layout.column(x).coerceIn(0, layout.cols - 1), layout.row(y).coerceIn(0, layout.rows - 1)] = argb
+        }
+        canvas.drawBitmap(
+            bitmap,
+            null,
+            android.graphics.RectF(layout.left, layout.top, layout.left + layout.cols * side, layout.top + layout.rows * side),
+            bitmapPaint,
+        )
+    }
+
+    /** The reused bitmap belongs to this overlay alone; nothing else may hold on to it once gone. */
+    override fun onDetach(mapView: MapView?) {
+        buffer?.recycle()
+        buffer = null
+        super.onDetach(mapView)
     }
 
     /** [km] of ground, in pixels, measured off the projection at this latitude. */
@@ -106,4 +143,35 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
         /** AROME's, for the hours past INCA's reach. */
         const val OUTLOOK_CELL_KM = 2.5
     }
+}
+
+/**
+ * Where the bitmap's corner sits on screen, and how many cells wide and tall it is.
+ *
+ * [column] and [row] are the inverse of that placement: which pixel of the bitmap a screen point
+ * falls into. Both sides of the same arithmetic live here so they cannot drift apart — the grid
+ * placement was once computed in [NowcastOverlay.draw] and the pixel index recomputed beside it,
+ * and a change to one without the other is exactly how a `-2f` becomes a `-1f` unnoticed.
+ */
+internal data class BitmapLayout(val left: Float, val top: Float, val cols: Int, val rows: Int, val side: Float) {
+    fun column(x: Float) = ((x - left) / side).toInt()
+    fun row(y: Float) = ((y - top) / side).toInt()
+}
+
+/**
+ * Lays a grid of cell centres out on a bitmap with a transparent cell of margin on every side, not
+ * only the far and bottom ones.
+ *
+ * The first version placed the nearest cell's centre in column/row 0 — half a cell of margin
+ * before it and a full cell after — which gave the filtered edge somewhere to fade into on the far
+ * and bottom sides and nowhere on the near and top ones, so the softening the whole feature was
+ * for was only ever visible on two of the four edges. Shifting `left`/`top` out by one more full
+ * `side` moves the nearest cell into column/row 1 and opens an equal margin on every side.
+ */
+internal fun bitmapLayout(xs: List<Float>, ys: List<Float>, side: Float): BitmapLayout {
+    val left = xs.min() - side / 2f - side
+    val top = ys.min() - side / 2f - side
+    val cols = ((xs.max() - left) / side).toInt() + 2
+    val rows = ((ys.max() - top) / side).toInt() + 2
+    return BitmapLayout(left, top, cols, rows, side)
 }
