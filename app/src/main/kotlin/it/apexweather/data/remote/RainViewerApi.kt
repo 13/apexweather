@@ -21,6 +21,10 @@ interface RainViewerApi {
     @GET("public/weather-maps.json")
     suspend fun weatherMaps(): RainViewerMaps
 
+    /** One tile as PNG bytes, by its full URL from [RadarFrame.tileUrl]. */
+    @GET
+    suspend fun tile(@retrofit2.http.Url url: String): okhttp3.ResponseBody
+
     companion object { const val BASE_URL = "https://api.rainviewer.com/" }
 }
 

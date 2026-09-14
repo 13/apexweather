@@ -86,6 +86,7 @@ class MapViewModelTest {
                 },
             ),
         )
+        override suspend fun tile(url: String): okhttp3.ResponseBody = throw java.io.IOException("no tiles in this test")
     }
 
     /** No forecast: this is a test about the loop, and one source of frames is enough to drive it. */
@@ -159,7 +160,7 @@ class MapViewModelTest {
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T = MapViewModel(
-                    RadarRepository(rainViewer, clock), NowcastRepository(NoNowcast(), clock), holder,
+                    RadarRepository(rainViewer, { null }, clock), NowcastRepository(NoNowcast(), clock), holder,
                 ) as T
             },
         )[MapViewModel::class.java]
