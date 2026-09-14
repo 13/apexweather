@@ -51,6 +51,9 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
      */
     private var buffer: android.graphics.Bitmap? = null
 
+    /** [buffer]'s pixels, read out for [fillHoles] and written back; resized whenever it is. */
+    private var pixels: IntArray? = null
+
     /** [FrameLayers]' crossfade: 1 at full strength, fading to 0 as this frame gives way to the next. */
     var fade: Float = 1f
 
@@ -90,6 +93,20 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
         placed.forEach { (x, y, argb) ->
             bitmap[layout.column(x).coerceIn(0, layout.cols - 1), layout.row(y).coerceIn(0, layout.rows - 1)] = argb
         }
+        // INCA's grid is its own (evidently rotated) projection resampled to lat/lon — measured
+        // against a recorded field with rain in it, no two of its 1 638 points share a latitude or
+        // a longitude — so even placed at full sub-pixel precision it cannot tile this raster
+        // exactly: a handful of interior pixels end up with no cell close enough to claim them, and
+        // print as small dark dimples once bilinear filtering blends them against the transparent
+        // background. `fillHoles` closes only the ones surrounded enough to be obvious, leaving the
+        // padding ring (which never has three filled orthogonal neighbours) untouched.
+        val pixelCount = layout.cols * layout.rows
+        val pixelBuffer = pixels.let { existing ->
+            if (existing != null && existing.size == pixelCount) existing else IntArray(pixelCount).also { pixels = it }
+        }
+        bitmap.getPixels(pixelBuffer, 0, layout.cols, 0, 0, layout.cols, layout.rows)
+        fillHoles(pixelBuffer, layout.cols, layout.rows)
+        bitmap.setPixels(pixelBuffer, 0, layout.cols, 0, 0, layout.cols, layout.rows)
         canvas.drawBitmap(
             bitmap,
             null,
@@ -108,6 +125,7 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
     override fun onDetach(mapView: MapView?) {
         buffer?.recycle()
         buffer = null
+        pixels = null
         super.onDetach(mapView)
     }
 
@@ -198,4 +216,55 @@ internal fun bitmapLayout(xs: List<Float>, ys: List<Float>, side: Float): Bitmap
     val cols = ((xs.max() - left) / side).toInt() + 2
     val rows = ((ys.max() - top) / side).toInt() + 2
     return BitmapLayout(left, top, cols, rows, side)
+}
+
+/**
+ * Fills a transparent pixel with the average of its orthogonal neighbours, where at least three
+ * of the (up to four) that exist already have a colour.
+ *
+ * Three of four is "obviously surrounded": a real edge or a thin outline never has more than two
+ * filled orthogonal neighbours, so this never smears one — it only closes a pixel that reads as a
+ * hole in what is otherwise a solid field. [argb] is row-major, `cols` wide and `rows` tall,
+ * matching `Bitmap.getPixels`' own layout exactly so it can be read out of and written back into a
+ * bitmap with no reshaping. Neighbours are read from a copy of [argb] taken once at the start, so
+ * one fill is never built from another fill made earlier in the same pass — every pixel in a call
+ * sees the same picture the call began with. A border pixel simply has fewer neighbours to ask;
+ * nothing outside the array is invented to make up the other one or two.
+ *
+ * Each channel — alpha, red, green, blue — is averaged on its own, never as one packed `Int`,
+ * because an `Int` average would blend the channels' bits into each other.
+ *
+ * Returns how many pixels were filled.
+ */
+internal fun fillHoles(argb: IntArray, cols: Int, rows: Int): Int {
+    val source = argb.copyOf()
+    var filled = 0
+    for (row in 0 until rows) {
+        for (col in 0 until cols) {
+            val i = row * cols + col
+            if (source[i] ushr 24 != 0) continue
+            var count = 0
+            var a = 0
+            var r = 0
+            var g = 0
+            var b = 0
+            fun consider(neighbour: Int) {
+                if (neighbour ushr 24 == 0) return
+                count++
+                a += neighbour ushr 24
+                r += (neighbour ushr 16) and 0xFF
+                g += (neighbour ushr 8) and 0xFF
+                b += neighbour and 0xFF
+            }
+            if (row > 0) consider(source[i - cols])
+            if (row < rows - 1) consider(source[i + cols])
+            if (col > 0) consider(source[i - 1])
+            if (col < cols - 1) consider(source[i + 1])
+            if (count >= 3) {
+                argb[i] = ((a / count) shl 24) or (((r / count) and 0xFF) shl 16) or (((g / count) and 0xFF) shl 8) or ((b / count) and 0xFF)
+                filled++
+            }
+        }
+    }
+    return filled
 }

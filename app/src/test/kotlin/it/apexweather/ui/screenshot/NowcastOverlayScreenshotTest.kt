@@ -53,6 +53,17 @@ import kotlin.math.max
  * float with the projection's own scale and offset rather than its own truncating `toPixels` — and
  * [collisions] now measures **zero** at both zoom 9 (801 placed) and zoom 13 (104 placed).
  *
+ * **Zero collisions was not the whole story.** Looking at the recorded PNG after that fix (not
+ * only trusting the count) found a different, smaller defect it had uncovered rather than caused:
+ * about seven single-pixel dark dimples inside the zoom-9 field, where the raster simply had no
+ * cell close enough to claim a given interior pixel — an inherent consequence of tiling a rotated
+ * native grid onto an axis-aligned one, not a truncation bug. `NowcastOverlay.fillHoles` closes a
+ * transparent pixel with the average of its orthogonal neighbours wherever at least three of them
+ * already have a colour, which [dimples] checks for directly rather than trusting the collision
+ * count alone: a non-background pixel whose luminance is more than 18 below the mean of its eight
+ * neighbours, with at least three non-background orthogonal ones — the same criterion used to spot
+ * them by eye in the first place.
+ *
  * Record after a deliberate change with `./gradlew :app:recordRoborazziDebug`, and look at the
  * result before committing it — a golden nobody looked at proves nothing.
  */
@@ -82,7 +93,7 @@ class NowcastOverlayScreenshotTest {
         val canvas = Canvas(bitmap)
         // A dark background, as the map's own basemap is: a transparent bitmap drawn over white
         // would not show whether the corners of its border cells are really transparent.
-        canvas.drawColor(Color.rgb(20, 24, 36))
+        canvas.drawColor(BACKGROUND)
         NowcastOverlay(step, ALPHA).draw(canvas, map, false)
         return bitmap
     }
@@ -130,22 +141,71 @@ class NowcastOverlayScreenshotTest {
         return placed.size to (slots.size - slots.toSet().size)
     }
 
-    @Test
-    fun `zoom 9, the whole recorded field, soft on every edge and no cell overwriting another`() {
-        val map = mapAt(9.0)
-        render(map).captureRoboImage("src/test/screenshots/map_nowcast_z9.png")
-        val (placed, collided) = collisions(map)
-        println("zoom 9: $placed cells placed, $collided collisions")
-        assertNoCollisions(placed, collided)
+    /** ITU-R BT.601 luminance; unweighted would call a saturated blue as bright as a saturated green. */
+    private fun luminance(color: Int): Double {
+        val r = (color shr 16) and 0xFF
+        val g = (color shr 8) and 0xFF
+        val b = color and 0xFF
+        return 0.299 * r + 0.587 * g + 0.114 * b
+    }
+
+    /**
+     * How many pixels in [bitmap] read as a dark dimple: not the background, at least three of its
+     * four orthogonal neighbours are not the background either (so it sits inside filled territory
+     * rather than at an edge), and its own luminance is more than 18 below the mean of all eight
+     * neighbours around it — noticeably darker than the field it is surrounded by. The interior
+     * only, since a pixel on the canvas edge has fewer than eight neighbours and the field is never
+     * drawn out to the canvas edge in these fixtures.
+     */
+    private fun dimples(bitmap: Bitmap): Int {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        fun at(x: Int, y: Int) = pixels[y * width + x]
+        var count = 0
+        for (y in 1 until height - 1) {
+            for (x in 1 until width - 1) {
+                val centre = at(x, y)
+                if (centre == BACKGROUND) continue
+                val orthogonal = listOf(at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1))
+                if (orthogonal.count { it != BACKGROUND } < 3) continue
+                val neighbours = listOf(
+                    at(x - 1, y - 1), at(x, y - 1), at(x + 1, y - 1),
+                    at(x - 1, y), at(x + 1, y),
+                    at(x - 1, y + 1), at(x, y + 1), at(x + 1, y + 1),
+                )
+                val meanLuminance = neighbours.sumOf(::luminance) / neighbours.size
+                if (meanLuminance - luminance(centre) > DIMPLE_LUMINANCE_DROP) count++
+            }
+        }
+        return count
     }
 
     @Test
-    fun `zoom 13, magnified, still no cell overwriting another`() {
+    fun `zoom 9, the whole recorded field, soft on every edge, no cell overwriting another, no dimples`() {
+        val map = mapAt(9.0)
+        val bitmap = render(map)
+        bitmap.captureRoboImage("src/test/screenshots/map_nowcast_z9.png")
+        val (placed, collided) = collisions(map)
+        println("zoom 9: $placed cells placed, $collided collisions")
+        assertNoCollisions(placed, collided)
+        val dimpleCount = dimples(bitmap)
+        println("zoom 9: $dimpleCount dimples")
+        assertNoDimples(dimpleCount)
+    }
+
+    @Test
+    fun `zoom 13, magnified, still no cell overwriting another, no dimples`() {
         val map = mapAt(13.0)
-        render(map).captureRoboImage("src/test/screenshots/map_nowcast_z13.png")
+        val bitmap = render(map)
+        bitmap.captureRoboImage("src/test/screenshots/map_nowcast_z13.png")
         val (placed, collided) = collisions(map)
         println("zoom 13: $placed cells placed, $collided collisions")
         assertNoCollisions(placed, collided)
+        val dimpleCount = dimples(bitmap)
+        println("zoom 13: $dimpleCount dimples")
+        assertNoDimples(dimpleCount)
     }
 
     private fun assertNoCollisions(placed: Int, collided: Int) {
@@ -153,9 +213,19 @@ class NowcastOverlayScreenshotTest {
         org.junit.Assert.assertEquals("$collided of $placed placed cells shared a bitmap slot with another", 0, collided)
     }
 
+    private fun assertNoDimples(dimpleCount: Int) {
+        org.junit.Assert.assertEquals("$dimpleCount pixels read as a dark dimple in the interior", 0, dimpleCount)
+    }
+
     private companion object {
         const val SIZE = 800
         const val ALPHA = 130
         const val ONE_KM_OF_LON = 0.01306
+
+        /** How far below its neighbourhood's mean luminance a pixel has to sit to read as a dimple. */
+        const val DIMPLE_LUMINANCE_DROP = 18.0
+
+        /** Matches `render`'s canvas fill; a pixel exactly this colour was never touched by the overlay. */
+        val BACKGROUND = Color.rgb(20, 24, 36)
     }
 }
