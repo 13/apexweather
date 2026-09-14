@@ -52,10 +52,10 @@ fails a test instead of silently mis-reading rain.
   `RadarRepository` and refreshed with them.
 - It reads a 3x3 patch of pixels centred on the place's pixel, because RainViewer's `smooth` option
   blurs edges and one pixel lands on a rim too easily. The patch's value is its highest dBZ.
-- A pixel's dBZ is an exact lookup of its RGBA in the Universal Blue rain and snow blocks. The
-  smoothed tiles blend neighbouring colours, so a pixel with no exact entry takes the nearest entry
-  by RGBA distance, and one further than a small tolerance counts as unreadable and is skipped.
-  Snow is flagged as well as measured.
+- A pixel's dBZ is an exact lookup of its RGBA in the Universal Blue rain and snow blocks. Despite
+  the `smooth` option, every one of the 81 067 non-transparent pixels in the thirteen recorded tiles
+  is an exact entry, so there is no nearest-colour fallback: a colour outside the table is
+  unreadable and skipped. Snow is flagged as well as measured.
 - dBZ becomes a rate with Marshall–Palmer, `Z = 200·R^1.6`: 15 dBZ ≈ 0,3 mm/h, 20 ≈ 0,65,
   30 ≈ 2,7, 45 ≈ 24. It is the stratiform relation and an approximation, not a measurement, and it
   is said so wherever a number is derived from it.
@@ -66,7 +66,7 @@ fails a test instead of silently mis-reading rain.
   `IntArray` so both feed it the same way.
 
 Tested against tiles recorded on 2026-09-14: the 04:30Z tile reads 6 dBZ (dry) at Dorf Tirol, the
-05:30Z one transparent, and every pixel of every recorded tile resolves within tolerance.
+05:30Z one transparent, and every pixel of every recorded tile is an exact table entry.
 
 ## 1b. One scale for both layers: `PrecipColors` re-anchored
 
@@ -173,7 +173,7 @@ frame rather than queueing fades.
 
 **Preload.** Entering a zoom requests, for every radar frame in it, the tiles covering the visible
 box plus their zoom-7 parents (`fetchRadarParents`), through one provider per frame kept for the
-life of the zoom. Play stays disabled, with a small progress ring on the button, until the next
+life of the zoom. A small progress ring sits on the play button until the next
 three frames' visible tiles are in cache. That is what removes the blank flashes between frames.
 Thirteen frames of about six 256 px tiles is around 20 MB of bitmaps at worst, so osmdroid's tile
 cache capacity is raised to cover one zoom's worth and no more.
@@ -214,7 +214,8 @@ tiles leave RainViewer's two-hour window by mid-morning and cannot be re-recorde
 - `MapTimelineTest`: this morning's unconfirmed steps; nothing marked past 60 minutes or beyond
   5 km; nothing marked when the radar is wet.
 - `RibbonModelTest` (new, pure): bars per zoom, rain words, zoom switch keeps the instant.
-- `MapViewModelTest`: play loops inside the zoom; play waits for preload. Keeps
+- `MapViewModelTest`: play loops inside the zoom; switching zoom stops it. (Waiting for tiles lives
+  in the view, since only the MapView knows what is cached; `MapContentTest` checks the ring.) Keeps
   `Dispatchers.setMain` and stops the loop in a `finally`.
 - Roborazzi: `RainRibbon` in the three states of the brainstorm mockup (forecast step, unconfirmed,
   *Heute*). Look at each PNG before committing.
