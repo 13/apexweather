@@ -36,6 +36,9 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
     private val cellKm = if (step.kind == NowcastKind.OUTLOOK) OUTLOOK_CELL_KM else NOWCAST_CELL_KM
     private val paint = Paint().apply { isAntiAlias = false; style = Paint.Style.FILL }
 
+    /** [FrameLayers]' crossfade: 1 at full strength, fading to 0 as this frame gives way to the next. */
+    var fade: Float = 1f
+
     override fun draw(canvas: Canvas, map: MapView, shadow: Boolean) {
         if (shadow || cells.isEmpty()) return
         val projection = map.projection
@@ -60,7 +63,7 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
             projection.toPixels(GeoPoint(cell.lat, cell.lon), point)
             // The wash carries its own alpha, as the radar's does; rain and "possible" take the overlay's.
             val strength = if (solid != null) alpha else alpha * POSSIBLE_ALPHA_NUMERATOR / 10
-            paint.color = colour.toArgb((strength * colour.alpha).toInt())
+            paint.color = colour.toArgb((strength * colour.alpha * fade).toInt())
             canvas.drawRect(point.x - half, point.y - half, point.x + half, point.y + half, paint)
         }
     }

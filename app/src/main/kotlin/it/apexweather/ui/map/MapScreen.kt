@@ -32,6 +32,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,12 +66,10 @@ import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
-import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.TilesOverlay
 
 @Composable
 fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
@@ -104,8 +104,13 @@ fun MapContent(
     ready: Boolean = true,
 ) {
     val recenter = remember { mutableStateOf(0) }
+    // RadarMap reports its own readiness — the next few frames' tiles are cached — and the ring
+    // shows for either reason: a caller (a test) asking for it explicitly, or the map itself
+    // still fetching. `ready` starts true so a caller that never passes it and never reports
+    // preloading (a test rendering MapContent alone) shows no ring by default.
+    var preloaded by remember { mutableStateOf(true) }
     Box(Modifier.fillMaxSize().testTag("map_screen")) {
-        RadarMap(state, recenter.value, Modifier.fillMaxSize())
+        RadarMap(state, recenter.value, onReady = { preloaded = it }, Modifier.fillMaxSize())
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 // Heavy rain is drawn in yellow and red, and white text on it is unreadable. The
@@ -137,7 +142,7 @@ fun MapContent(
                     modifier = Modifier.testTag("map_radar_unavailable"),
                 )
             } else {
-                Timeline(state, ready, onPlayPause, onSelect, onZoom)
+                Timeline(state, ready && preloaded, onPlayPause, onSelect, onZoom)
             }
             Text(
                 stringResource(R.string.map_attribution),
@@ -326,12 +331,9 @@ private fun PrecipLegend() {
  * `onPause`/`onDetach` the map keeps its tile threads running after the tab is left.
  */
 @Composable
-private fun RadarMap(state: MapUiState, recenter: Int, modifier: Modifier = Modifier) {
+private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-
-    // The frame's provider, so a pan or a zoom can fetch that frame's own zoom-7 tiles again.
-    val radarProvider = remember { mutableStateOf<MapTileProviderBasic?>(null) }
 
     val mapView = remember {
         // A unique user agent is what the OpenStreetMap tile policy asks for first; the okhttp
@@ -369,23 +371,31 @@ private fun RadarMap(state: MapUiState, recenter: Int, modifier: Modifier = Modi
             setScrollableAreaLimitDouble(
                 BoundingBox(SouthTyrol.NORTH, SouthTyrol.EAST, SouthTyrol.SOUTH, SouthTyrol.WEST),
             )
-            addMapListener(object : MapListener {
-                // A pan or a zoom brings different ground into view, and its zoom-7 tiles have to be
-                // fetched before the rain over it can be drawn.
-                override fun onScroll(event: ScrollEvent?): Boolean {
-                    radarProvider.value?.fetchRadarParents(this@apply)
-                    return false
-                }
-
-                override fun onZoom(event: ZoomEvent?): Boolean {
-                    radarProvider.value?.fetchRadarParents(this@apply)
-                    return false
-                }
-            })
             minZoomLevel = MIN_ZOOM
             maxZoomLevel = MAX_ZOOM
             controller.setZoom(START_ZOOM)
         }
+    }
+
+    // One layer holder for the life of the composable: it owns a tile provider per radar frame,
+    // which is what lets a frame's tiles already be there when the loop reaches it.
+    val layers = remember { FrameLayers(mapView) }
+    val latestState = rememberUpdatedState(state)
+
+    // A pan or a zoom brings different ground into view, and every frame's tiles have to be
+    // fetched again for it — set up once `layers` exists, since the listener reads it.
+    LaunchedEffect(mapView, layers) {
+        mapView.addMapListener(object : MapListener {
+            override fun onScroll(event: ScrollEvent?): Boolean {
+                layers.preload(latestState.value.visible, latestState.value.selected)
+                return false
+            }
+
+            override fun onZoom(event: ZoomEvent?): Boolean {
+                layers.preload(latestState.value.visible, latestState.value.selected)
+                return false
+            }
+        })
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -399,6 +409,7 @@ private fun RadarMap(state: MapUiState, recenter: Int, modifier: Modifier = Modi
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            layers.release()
             mapView.onDetach()
         }
     }
@@ -407,6 +418,22 @@ private fun RadarMap(state: MapUiState, recenter: Int, modifier: Modifier = Modi
     // Keyed on the counter rather than on the place, so pressing it twice works the second time.
     LaunchedEffect(recenter, state.place) {
         if (recenter > 0) state.place?.let { mapView.controller.animateTo(GeoPoint(it.lat, it.lon)) }
+    }
+
+    val reduceMotion = remember(context) {
+        runCatching {
+            android.provider.Settings.Global.getFloat(
+                context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
+            )
+        }.getOrDefault(1f) == 0f
+    }
+
+    // Every frame of the current zoom's tiles is asked for before the loop can need them, and the
+    // play button's ring stays up until the next few are cached — see FrameLayers.preload.
+    LaunchedEffect(state.visible, state.zoom) {
+        onReady(false)
+        while (!layers.preload(state.visible, state.selected)) kotlinx.coroutines.delay(250)
+        onReady(true)
     }
 
     AndroidView(
@@ -433,52 +460,10 @@ private fun RadarMap(state: MapUiState, recenter: Int, modifier: Modifier = Modi
                     )
                 }
             }
-            // One rain overlay at a time, of either kind: the frame changes several times a second
-            // while playing, and overlays left behind would stack every frame on top of the last.
-            map.overlays.filterIsInstance<TilesOverlay>().forEach { map.overlays.remove(it) }
-            map.overlays.filterIsInstance<NowcastOverlay>().forEach { map.overlays.remove(it) }
-            radarProvider.value = null
-            when (val frame = state.frame) {
-                is MapFrame.Observed -> {
-                    val provider = MapTileProviderBasic(map.context, RadarTileSource(frame.radar)).apply {
-                        // A standalone provider has a handler of its own, and nothing tells the map
-                        // when one of its tiles arrives. Without this the radar appears only after
-                        // the reader happens to pan, because a pan is what forces the redraw.
-                        setTileRequestCompleteHandler(map.tileRequestCompleteHandler)
-                    }
-                    map.overlays.add(
-                        0,
-                        TilesOverlay(provider, map.context).apply {
-                            loadingBackgroundColor = android.graphics.Color.TRANSPARENT
-                            // Rain you can see the ground through. RainViewer's tiles are painted
-                            // opaque, which hides the valley the rain is sitting in — and the valley
-                            // is half the information on a map of this province. The alpha is on the
-                            // colour matrix rather than on the overlay because osmdroid's
-                            // TilesOverlay has no alpha of its own.
-                            setColorFilter(
-                                ColorMatrixColorFilter(
-                                    ColorMatrix(
-                                        floatArrayOf(
-                                            1f, 0f, 0f, 0f, 0f,
-                                            0f, 1f, 0f, 0f, 0f,
-                                            0f, 0f, 1f, 0f, 0f,
-                                            0f, 0f, 0f, RADAR_ALPHA, 0f,
-                                        ),
-                                    ),
-                                ),
-                            )
-                        },
-                    )
-                    // Without this the map draws no rain at all above zoom 7; see fetchRadarParents.
-                    provider.fetchRadarParents(map)
-                    radarProvider.value = provider
-                }
-                // The forecast is this app's own drawing rather than somebody's tiles, so it is an
-                // overlay of squares and needs no provider and no parent fetching.
-                is MapFrame.Forecast -> map.overlays.add(0, NowcastOverlay(frame.step, NOWCAST_ALPHA))
-                null -> Unit
-            }
-            map.invalidate()
+            // The layer itself decides whether to fade the frame in or cut straight to it — see
+            // FrameLayers.show. Motion is off with the reader's switch or the system's own.
+            val motion = state.animations && !reduceMotion
+            layers.show(state.frame, motion)
         },
     )
 }
@@ -491,21 +476,9 @@ private const val MIN_ZOOM = 7.0
  *
  * It used to be 11, because the basemap was OSM's raster style and the radar is RainViewer's zoom
  * 7 upscaled — and the second of those has not changed. Rain drawn at 16 is a 20 km pixel smeared
- * across a village, and that is exactly why it is now drawn at [RADAR_ALPHA]: a wash of colour over
- * ground the reader can still read is honest about being a wash, where an opaque block of it is
- * not.
+ * across a village, and that is exactly why it is now drawn at [FrameLayers.RADAR_ALPHA]: a wash of
+ * colour over ground the reader can still read is honest about being a wash, where an opaque block
+ * of it is not.
  */
 private const val MAX_ZOOM = 16.0
 private const val START_ZOOM = 10.0
-
-/** How much of the radar is let through, so the valley under the rain stays visible. */
-private const val RADAR_ALPHA = 0.62f
-
-/**
- * And how much of the forecast, out of 255.
- *
- * A shade lighter than the radar on purpose. The two never appear together — the timeline shows one
- * frame at a time — but the reader moves between them with one drag, and a forecast that arrived
- * looking more solid than the observation it follows would be claiming more than it knows.
- */
-private const val NOWCAST_ALPHA = 130

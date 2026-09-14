@@ -40,7 +40,7 @@ class MapViewModel @Inject constructor(
         viewModelScope.launch {
             holder.home.collect { home ->
                 val changed = _state.value.place?.istat != home.place?.istat
-                _state.update { it.copy(place = home.place) }
+                _state.update { it.copy(place = home.place, animations = home.settings.animations) }
                 // The forecast covers a box around the place, so a new place needs a new one.
                 if (changed && home.place != null) refresh()
             }

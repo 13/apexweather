@@ -58,6 +58,8 @@ data class MapUiState(
     val loading: Boolean = true,
     /** Null until the place and its readings are known; nothing is marked without it. */
     val check: PlaceCheck? = null,
+    /** Whether the reader has switched the sky's motion off; [FrameLayers] reads this too. */
+    val animations: Boolean = true,
 ) {
     /** The frames the current zoom scrubs and plays through. */
     val visible: List<MapFrame> get() = if (zoom == MapZoom.NOW) frames else outlook
