@@ -440,9 +440,33 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   this app), against about 300 kB for `Place.NOWCAST_BOX_DEG_*`. Its grid is a projected 1 km one,
   so no two points share a latitude and `NowcastOverlay` draws cells one at a time — as squares, not
   a smoothed field, because a smoothed field would look like radar and this is a model.
-  **Both layers share one colour ramp** (`PrecipColors`), read off live RainViewer tiles, and the
-  legend is labelled light-to-heavy rather than in millimetres: RainViewer does not publish what its
-  scheme 4 colours mean in rate, and the app will not invent numbers for somebody else's scale.
+  **Both layers share one colour ramp** (`PrecipColors`), and **RainViewer does publish what its
+  colours mean**: `rainviewer_api_colors_table.csv` gives every scheme's RGBA at every dBZ, rain
+  and snow. The tiles arrive in **Universal Blue** whatever scheme the URL asks for, every pixel of
+  thirteen recorded tiles is an exact entry, and `tools/radar-colors.py` generates
+  `RadarColorTable.kt` from it. `PrecipColors`' stops sit at the Marshall–Palmer rate of their dBZ;
+  they used to carry guessed rates that painted the forecast three times wetter than the radar.
+  Below 15 dBZ the radar's beige wash is not rain. The legend stays in words, because
+  Marshall–Palmer is an approximation.
+  **The radar overrules the forecast's first hour near the place** (`MapUiState.timeline`,
+  `PlaceCheck`). On 2026-09-14 INCA's 05:00Z run carried a shower the radar had lost an hour before
+  over Dorf Tirol, the map drew rain at 08:00, the home screen said 0,0 mm and the ground stayed dry.
+  Where the newest frame reads no rain at the place (`RadarRepository.readingsAt`), cells within
+  5 km and 60 min are `unconfirmed` and drawn as "possible". A tile that failed is an unknown and
+  overrules nothing. The home screen deliberately does not read INCA: that morning it was the one
+  that was wrong. `NowcastRepository` asks for a run when it is due (reference + 15 min + a lag
+  seeded at 35 min and only ever lowered), never more often than every 3 min — on INCA's own
+  reference time, never AROME's, and the learned lag is floored at zero because a run can be
+  stamped slightly ahead of the phone's clock.
+  **`MapViewModel.refresh` updates twice.** Radar and forecast go on screen first; the radar check
+  at the place is applied after, only if the place has not changed meanwhile, because the check
+  annotates the map and must not hold it back — before this, the first map open waited for thirteen
+  sequential tile fetches. `RadarRepository.readingsAt` fetches uncached tiles concurrently, at most
+  `MAX_PARALLEL_TILES` (4), with the network calls outside the repository's `mutex`; a separate
+  `readingsLock` serialises whole calls, so overlapping refreshes (init, place change, tab resume)
+  neither download a tile twice nor exceed the limit. Suspend fetches use
+  `data/runCatchingCancellable`, not `runCatching`, which also catches cancellation and kept
+  downloading after the reader left the tab.
   The RainViewer credit in `map_attribution` is required, GeoSphere's is required by CC BY 4.0, and
   the province is credited beside them; the bottom of the map carries a scrim so all of it stays
   readable over heavy rain. The spec that first rejected
