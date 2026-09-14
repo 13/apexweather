@@ -38,6 +38,13 @@ class NowcastRepository @Inject constructor(
     /** How long after its reference time a run appears. Only ever lowered; see [forPlace]. */
     private var lag: Duration = SEED_LAG
 
+    /**
+     * The reference time of the newest INCA run held, independent of AROME. [due] reads this, not
+     * [nowcast]'s own `issuedAt` — that field can be AROME's reference time when INCA has failed and
+     * AROME has not, and AROME's hourly schedule says nothing about when INCA's next run appears.
+     */
+    private var incaIssuedAt: Instant? = null
+
     suspend fun forPlace(place: Place): PrecipNowcast = mutex.withLock {
         val now = clock.instant()
         if (istat == place.istat && !due(now)) return@withLock nowcast
@@ -65,10 +72,17 @@ class NowcastRepository @Inject constructor(
         }
         if (fetched != null) {
             // A fetch can land long after a run appeared but never before it, so only a shorter
-            // delay than the one held is evidence.
-            if (near != null && near.issuedAt.isAfter(nowcast.issuedAt)) {
-                val seen = Duration.between(near.issuedAt, now)
+            // delay than the one held is evidence — floored at zero, because a run can be stamped
+            // ahead of the clock (GeoSphere's clock and the reader's are not perfectly synced) and a
+            // negative lag would ask for the next run before it exists.
+            if (near != null && (incaIssuedAt == null || near.issuedAt.isAfter(incaIssuedAt))) {
+                val seen = maxOf(Duration.between(near.issuedAt, now), Duration.ZERO)
                 if (seen < lag) lag = seen
+                incaIssuedAt = near.issuedAt
+            }
+            if (near == null && istat != place.istat) {
+                // AROME alone answered for a place INCA has not; there is no known INCA schedule here.
+                incaIssuedAt = null
             }
             nowcast = fetched
             istat = place.istat
@@ -76,6 +90,7 @@ class NowcastRepository @Inject constructor(
             // The held forecast is about somewhere else, and somewhere else's rain is worse than none.
             nowcast = PrecipNowcast.EMPTY
             istat = null
+            incaIssuedAt = null
         }
         nowcast
     }
@@ -87,8 +102,10 @@ class NowcastRepository @Inject constructor(
     private fun due(now: Instant): Boolean {
         val asked = askedAt ?: return true
         if (Duration.between(asked, now) < MIN_GAP) return false
-        if (nowcast.steps.isEmpty()) return true
-        return !now.isBefore(nowcast.issuedAt.plus(RUN_STEP).plus(lag))
+        // The schedule is INCA's alone: AROME's hourly reference time says nothing about when
+        // INCA's next quarter-hourly run appears.
+        val inca = incaIssuedAt ?: return true
+        return !now.isBefore(inca.plus(RUN_STEP).plus(lag))
     }
 
     companion object {

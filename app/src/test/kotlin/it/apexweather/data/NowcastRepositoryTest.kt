@@ -23,6 +23,9 @@ class NowcastRepositoryTest {
         var reference: String = "2026-09-14T05:00+00:00"
         var calls = 0
         var fail = false
+
+        /** When true, AROME answers with real data instead of the default empty response. */
+        var withOutlook = false
         override suspend fun precipitation(bbox: String, parameters: String, outputFormat: String): NowcastResponse {
             calls++
             if (fail) throw IOException("no network")
@@ -32,7 +35,14 @@ class NowcastRepositoryTest {
                 features = listOf(NowcastFeature(NowcastGeometry(listOf(11.16, 46.69)), NowcastProperties(mapOf("rr" to NowcastParameter("kg m-2", listOf(0.1)))))),
             )
         }
-        override suspend fun outlook(bbox: String, end: String, parameters: String, outputFormat: String) = NowcastResponse()
+        override suspend fun outlook(bbox: String, end: String, parameters: String, outputFormat: String): NowcastResponse {
+            if (!withOutlook) return NowcastResponse()
+            return NowcastResponse(
+                referenceTime = "2026-09-14T00:00+00:00",
+                timestamps = listOf("2026-09-14T01:00+00:00"),
+                features = listOf(NowcastFeature(NowcastGeometry(listOf(11.16, 46.69)), NowcastProperties(mapOf("rain_p50" to NowcastParameter("kg m-2", listOf(1.0)))))),
+            )
+        }
     }
 
     private val t = { hhmm: String -> Instant.parse("2026-09-14T$hhmm:00Z") }
@@ -102,5 +112,59 @@ class NowcastRepositoryTest {
         api.fail = true
         clock.now = t("05:51")
         assertEquals(held, repo.forPlace(DORF_TIROL))
+    }
+
+    /**
+     * GeoSphere's clock and the reader's are not perfectly synced, so a run can be stamped after the
+     * moment the app asks for it. Without a floor of zero that reads as a negative lag, which pulls
+     * the next ask earlier than the run that has not appeared yet.
+     */
+    @Test
+    fun `a run stamped ahead of the clock never makes the lag negative`() = runTest {
+        val api = FakeApi()
+        api.reference = "2026-09-14T05:15+00:00"
+        val clock = MutableClock(t("05:10"))
+        val repo = NowcastRepository(api, clock)
+        repo.forPlace(DORF_TIROL)
+        assertEquals(1, api.calls)
+        // With a floor of 0 the next run is due at 05:15 + 15 + 0 = 05:30. The old code learns
+        // -5 min, is due at 05:25, and asks.
+        clock.now = t("05:27")
+        repo.forPlace(DORF_TIROL)
+        assertEquals(1, api.calls)
+    }
+
+    /** AROME succeeding on its own must never move when the next INCA run is expected. */
+    @Test
+    fun `a run from AROME alone does not move INCA's schedule`() = runTest {
+        val api = FakeApi()
+        api.withOutlook = true
+        val clock = MutableClock(t("05:36"))
+        val repo = NowcastRepository(api, clock)
+        repo.forPlace(DORF_TIROL)
+        assertEquals(1, api.calls)
+
+        clock.now = t("05:51")
+        api.fail = true
+        repo.forPlace(DORF_TIROL) // INCA fails, AROME alone still answers: due.
+        assertEquals(2, api.calls)
+
+        clock.now = t("05:53")
+        repo.forPlace(DORF_TIROL) // three-minute floor
+        assertEquals(2, api.calls)
+
+        clock.now = t("05:54")
+        api.fail = false
+        api.reference = "2026-09-14T05:15+00:00"
+        repo.forPlace(DORF_TIROL) // due: the held INCA run is still 05:00
+        assertEquals(3, api.calls)
+
+        clock.now = t("06:04")
+        repo.forPlace(DORF_TIROL) // 05:15 + 15 + 35 = 06:05, not due yet
+        assertEquals(3, api.calls)
+
+        clock.now = t("06:06")
+        repo.forPlace(DORF_TIROL)
+        assertEquals(4, api.calls)
     }
 }
