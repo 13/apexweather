@@ -458,6 +458,43 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   seeded at 35 min and only ever lowered), never more often than every 3 min — on INCA's own
   reference time, never AROME's, and the learned lag is floored at zero because a run can be
   stamped slightly ahead of the phone's clock.
+  **The timeline is a rain ribbon** (`RainRibbon`, `RibbonModel`): a bar per step for the place
+  alone — solid blue seen, amber hatched expected, dashed outline expected and not confirmed — so
+  whether the rain reaches the reader is on screen before anything plays. Two zooms: *Jetzt* (2 h
+  back, 3 h ahead, quarter hours) and *Heute* (24 h of AROME ensemble hours, with the p90 as a cap).
+  Amber is forecast chrome only and never a rain colour. **Frames crossfade over 250 ms and play
+  waits for the next three frames' tiles** (`FrameLayers`); a provider per frame lives as long as
+  the frame list. The animations switch and the system's reduced motion turn the fade off, as they
+  do the sky's.
+  **Ribbon labels never overlap** (`visibleLabelSlots` in `RainRibbon.kt`). Labels are measured,
+  "jetzt" is placed first, and any label that would collide is dropped. At font scale 2 on the phone
+  the old code drew "13 jetzt14".
+  **The zoom chips are `selectable` with `Role.Tab` in a `selectableGroup`**, because which one is
+  on was carried by colour alone.
+  **The jetzt step carries no "in/vor" offset**. In Heute the first hour is labelled "jetzt" on the
+  ribbon and read "vor 20 min" in the header.
+  **`FrameLayers` never detaches the provider behind the frame on screen or the one fading out**
+  (`providersToEvict`). Before this, a zoom switch or a frame-list rollover could blank the frame
+  being looked at.
+  **Preloading requests tiles once and gives up waiting after `PRELOAD_TIMEOUT_MS` (8 s)**. Offline,
+  it used to re-request every frame's tiles every 250 ms forever.
+  **`FrameLayers.released` stops all layer work after teardown, and `AndroidView.update` returns
+  early when it is set.** An osmdroid `Marker(map)` NPE (`MapView.getRepository()` null) was seen
+  once at 14:09 on 2026-09-14: an update running against a detached MapView. It was never
+  reproduced, so this closes the path; it is not a proven fix.
+  **The forecast overlay places cells at sub-pixel precision** (`Projection.toProjectedPixels` /
+  `getProjectedPowerDifference` / offsets), not `toPixels`, which truncates to int. Truncation put
+  61 of 801 cells of this morning's INCA run into already-used pixels at zoom 9. The exact placement
+  leaves single-pixel gaps, because INCA's grid is rotated against the raster. **`fillHoles` fills a
+  transparent pixel with at least 3 of 4 filled neighbours from their average.** It cannot tell a gap
+  from an enclosed dry kilometre, which is below what the grid resolves. A one-cell transparent ring
+  on every side keeps the edges soft.
+  **The overlay is pinned against this morning's run** (`NowcastOverlayScreenshotTest`). There are
+  goldens at zoom 9 and 13, a zero-collision assertion, and a dimple assertion. The dimple check's
+  threshold is 12, proven against a recorded dimpled render (`nowcast_z9_dimpled.png`); at 18 it
+  passed that render.
+  **Crossfade and the ribbon look were not seen over real rain**: the day of implementation was dry
+  across the province. The fixture goldens are the evidence.
   **`MapViewModel.refresh` updates twice.** Radar and forecast go on screen first; the radar check
   at the place is applied after, only if the place has not changed meanwhile, because the check
   annotates the map and must not hold it back — before this, the first map open waited for thirteen
