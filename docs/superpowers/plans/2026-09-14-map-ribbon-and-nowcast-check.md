@@ -451,7 +451,7 @@ class PrecipColorsTest {
 
     @Test
     fun `heavier rain never picks a lighter colour`() {
-        val seen = generateSequence(0.3) { it * 1.3 }.takeWhile { it < 200.0 }
+        val seen = generateSequence(RadarAtPlace.rateOf(RadarAtPlace.RAIN_DBZ)) { it * 1.3 }.takeWhile { it < 200.0 }
             .mapNotNull { PrecipColors.forRate(it) }.toList()
         val indices = seen.map { PrecipColors.RAMP.indexOf(it) }
         assertEquals("the ramp must never step backwards", indices.sorted(), indices)
@@ -532,7 +532,7 @@ object PrecipColors {
 }
 ```
 
-Note `RAIN_FROM_MM` (0.3) is the rounded boundary for words; `isRain` uses the exact 15 dBZ rate (0.3237). The test at 0.29/0.32 holds for both.
+Note `RAIN_FROM_MM` (0.3) is the rounded boundary for words; `isRain` uses the exact 15 dBZ rate (0.3158). The test at 0.29/0.32 holds for both.
 
 - [ ] **Step 4: Keep the wash translucent in `NowcastOverlay`**
 
