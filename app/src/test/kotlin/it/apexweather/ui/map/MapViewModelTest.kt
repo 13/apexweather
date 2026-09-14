@@ -109,10 +109,18 @@ class MapViewModelTest {
 
     /** No forecast: this is a test about the loop, and one source of frames is enough to drive it. */
     private class NoNowcast : NowcastApi {
-        override suspend fun precipitation(bbox: String, parameters: String, outputFormat: String) =
-            NowcastResponse()
-        override suspend fun outlook(bbox: String, end: String, parameters: String, outputFormat: String) =
-            NowcastResponse()
+        /** Set to model GeoSphere's slow INCA answer: 383 kB uncompressed, 4,4 s on the phone. */
+        var delayMs: Long = 0
+        var calls = 0
+        override suspend fun precipitation(bbox: String, parameters: String, outputFormat: String): NowcastResponse {
+            calls++
+            if (delayMs > 0) delay(delayMs)
+            return NowcastResponse()
+        }
+        override suspend fun outlook(bbox: String, end: String, parameters: String, outputFormat: String): NowcastResponse {
+            if (delayMs > 0) delay(delayMs)
+            return NowcastResponse()
+        }
     }
 
     /**
@@ -125,6 +133,7 @@ class MapViewModelTest {
 
     private val clock = MutableClock(t0)
     private val rainViewer = FakeRainViewer(t0)
+    private val nowcastApi = NoNowcast()
 
     private lateinit var settings: SettingsRepository
 
@@ -178,7 +187,7 @@ class MapViewModelTest {
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T = MapViewModel(
-                    RadarRepository(rainViewer, { null }, clock), NowcastRepository(NoNowcast(), clock), holder, mainDispatcher,
+                    RadarRepository(rainViewer, { null }, clock), NowcastRepository(nowcastApi, clock), holder, mainDispatcher,
                 ) as T
             },
         )[MapViewModel::class.java]
@@ -316,6 +325,46 @@ class MapViewModelTest {
         runCurrent()
         assertEquals("the frames must be drawn while the radar check is still pending", 6, vm.state.value.frames.size)
         assertFalse(vm.state.value.loading)
+    }
+
+    /**
+     * The radar list answers in about 350 ms on the phone and INCA in about 4,4 s. The map used to put
+     * nothing on screen until both forecasts were in, so a first open showed a bare basemap for six
+     * seconds (measured 2026-09-14).
+     */
+    @Test
+    fun `the radar is on screen while the forecast is still being fetched`() = mapTest { vm ->
+        vm.state.first { it.place != null }
+        runCurrent()
+        nowcastApi.delayMs = 60_000
+        rainViewer.frames = 6
+        clock.now = clock.now.plus(java.time.Duration.ofMinutes(20))
+        vm.refresh()
+        runCurrent()
+        assertEquals("the radar waited for the forecast", 6, vm.state.value.frames.size)
+        assertFalse(vm.state.value.loading)
+    }
+
+    /**
+     * A first open asks three times in a few hundred milliseconds — init, the place collector and the
+     * tab's resume — and each used to cancel the one before, throwing away an INCA request already in
+     * flight and starting it again.
+     */
+    @Test
+    fun `refreshes asked for while one is still fetching share its requests`() = mapTest { vm ->
+        vm.state.first { it.place != null }
+        runCurrent()
+        nowcastApi.delayMs = 5_000
+        clock.now = clock.now.plus(java.time.Duration.ofMinutes(20))
+        val before = nowcastApi.calls
+        vm.refresh()
+        runCurrent()
+        advanceTimeBy(1_000)
+        vm.refresh()
+        vm.refresh()
+        advanceTimeBy(20_000)
+        runCurrent()
+        assertEquals("a later refresh restarted the forecast request", before + 1, nowcastApi.calls)
     }
 
     /**

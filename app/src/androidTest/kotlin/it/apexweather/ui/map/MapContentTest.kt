@@ -6,10 +6,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.height
 import androidx.test.platform.app.InstrumentationRegistry
 import it.apexweather.R
 import it.apexweather.data.remote.NowcastCell
@@ -20,6 +22,7 @@ import it.apexweather.domain.NearbyStation
 import it.apexweather.domain.Place
 import it.apexweather.domain.RadarReading
 import it.apexweather.ui.theme.ApexTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -188,6 +191,29 @@ class MapContentTest {
         rule.runOnIdle { mapState.value = mapState.value.withZoom(MapZoom.TODAY) }
         rule.onNodeWithTag("map_zoom_today").assertIsSelected()
         rule.onNodeWithTag("map_zoom_now").assertIsNotSelected()
+    }
+
+    /**
+     * "vor 10 min" used to be a line of its own under the time, so the card grew by a line whenever
+     * the selection left the present and shrank when it came back — the whole bottom of the map
+     * jumped while the loop played. It sits to the right of the time now.
+     */
+    @Test
+    fun theRelativeTimeSitsBesideTheTimeAndTheCardKeepsItsHeight() {
+        lateinit var mapState: MutableState<MapUiState>
+        rule.setContent {
+            // 12 is the newest radar frame, the present: no offset. 11 is ten minutes before it.
+            mapState = remember { mutableStateOf(withForecast(selected = 12)) }
+            ApexTheme { MapContent(mapState.value, onPlayPause = {}, onSelect = {}) }
+        }
+        rule.onNodeWithTag("map_frame_offset").assertDoesNotExist()
+        val without = rule.onNodeWithTag("map_timeline").getUnclippedBoundsInRoot().height
+        rule.runOnIdle { mapState.value = mapState.value.copy(selected = 11) }
+        val time = rule.onNodeWithTag("map_frame_time").getUnclippedBoundsInRoot()
+        val offset = rule.onNodeWithTag("map_frame_offset").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val with = rule.onNodeWithTag("map_timeline").getUnclippedBoundsInRoot().height
+        assertEquals("the card changed height when the offset appeared", without.value, with.value, 0.5f)
+        assertTrue("the offset is not to the right of the time", offset.left >= time.right)
     }
 
     /**

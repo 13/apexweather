@@ -7,6 +7,7 @@ import it.apexweather.data.remote.NowcastParameter
 import it.apexweather.data.remote.NowcastProperties
 import it.apexweather.data.remote.NowcastResponse
 import it.apexweather.domain.DORF_TIROL
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -26,8 +27,12 @@ class NowcastRepositoryTest {
 
         /** When true, AROME answers with real data instead of the default empty response. */
         var withOutlook = false
+
+        /** How long each of the two requests takes to answer. */
+        var delayMs: Long = 0
         override suspend fun precipitation(bbox: String, parameters: String, outputFormat: String): NowcastResponse {
             calls++
+            if (delayMs > 0) delay(delayMs)
             if (fail) throw IOException("no network")
             return NowcastResponse(
                 referenceTime = reference,
@@ -36,6 +41,7 @@ class NowcastRepositoryTest {
             )
         }
         override suspend fun outlook(bbox: String, end: String, parameters: String, outputFormat: String): NowcastResponse {
+            if (delayMs > 0) delay(delayMs)
             if (!withOutlook) return NowcastResponse()
             return NowcastResponse(
                 referenceTime = "2026-09-14T00:00+00:00",
@@ -46,6 +52,16 @@ class NowcastRepositoryTest {
     }
 
     private val t = { hhmm: String -> Instant.parse("2026-09-14T$hhmm:00Z") }
+
+    /** The two requests are independent; asked one after the other, AROME waited out INCA's 4,4 s. */
+    @Test
+    fun `the nowcast and the outlook are fetched side by side`() = runTest {
+        val api = FakeApi().apply { withOutlook = true; delayMs = 1_000 }
+        val repo = NowcastRepository(api, MutableClock(t("05:36")))
+        val held = repo.forPlace(DORF_TIROL)
+        assertEquals("one request waited for the other", 1_000L, testScheduler.currentTime)
+        assertEquals(1, held.outlook.size)
+    }
 
     @Test
     fun `a held run is kept until the next one is due`() = runTest {

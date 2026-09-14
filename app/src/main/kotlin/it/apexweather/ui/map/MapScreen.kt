@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -191,25 +192,31 @@ private fun Timeline(state: MapUiState, ready: Boolean, onPlayPause: () -> Unit,
             Column(Modifier.weight(1f)) {
                 val present = state.presentTime
                 val time = state.frame?.time
-                // On its own line, not beside the time in a Row: at a 2x font scale the kind chip
-                // and the play button already take most of the card's width, and a Row squeezed that
-                // narrow wrapped "vor 20 min" onto two lines and drew it over the time it belongs to.
-                Text(
-                    time?.let { Format.dayTime(it, SouthTyrol.ZONE, present ?: it, formats) }.orEmpty(),
-                    style = MaterialTheme.typography.titleLarge, color = Color.White,
-                    modifier = Modifier.testTag("map_frame_time"),
-                )
-                // Not on the jetzt step itself: the outlook is hourly and the present rarely lands
-                // on the hour, so the jetzt step's own timestamp is almost never exactly
-                // presentTime — comparing the two times alone read "in 20 min" on the very step
-                // the ribbon beneath it calls "jetzt".
-                if (time != null && present != null && time != present && state.selected != state.nowIndex) {
-                    val d = java.time.Duration.between(present, time)
+                // Beside the time, on its baseline. On a line of its own the card grew by a line
+                // whenever the selection left the present and shrank when it came back, so the whole
+                // bottom of the map jumped while the loop played. It is one line and gives way with
+                // an ellipsis: at a 2x font scale the play button and the kind chip leave little
+                // width, and wrapped it once drew "vor 20 min" over the time it belongs to.
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        stringResource(if (d.isNegative) R.string.map_ago else R.string.map_in, Format.shortDuration(d, formats)),
-                        style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.65f),
-                        modifier = Modifier.testTag("map_frame_offset"),
+                        time?.let { Format.dayTime(it, SouthTyrol.ZONE, present ?: it, formats) }.orEmpty(),
+                        style = MaterialTheme.typography.titleLarge, color = Color.White,
+                        maxLines = 1, softWrap = false,
+                        modifier = Modifier.alignByBaseline().testTag("map_frame_time"),
                     )
+                    // Not on the jetzt step itself: the outlook is hourly and the present rarely lands
+                    // on the hour, so the jetzt step's own timestamp is almost never exactly
+                    // presentTime — comparing the two times alone read "in 20 min" on the very step
+                    // the ribbon beneath it calls "jetzt".
+                    if (time != null && present != null && time != present && state.selected != state.nowIndex) {
+                        val d = java.time.Duration.between(present, time)
+                        Text(
+                            stringResource(if (d.isNegative) R.string.map_ago else R.string.map_in, Format.shortDuration(d, formats)),
+                            style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.65f),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false).alignByBaseline().testTag("map_frame_offset"),
+                        )
+                    }
                 }
                 if (state.place != null && word != null) {
                     val upTo = bar.takeIf { state.zoom == MapZoom.TODAY }?.upperMmPerHour?.takeIf { it >= PrecipColors.RAIN_FROM_MM }

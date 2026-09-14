@@ -4,6 +4,8 @@ import it.apexweather.data.remote.NowcastApi
 import it.apexweather.data.remote.NowcastMapper
 import it.apexweather.data.remote.PrecipNowcast
 import it.apexweather.domain.Place
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
@@ -56,11 +58,20 @@ class NowcastRepository @Inject constructor(
         // standing.
         // An answer with no steps is no answer: the mappers return EMPTY for a response without a
         // reference time, and treating that as a fetch would overwrite a good held run with nothing.
-        val near = runCatchingCancellable { NowcastMapper.map(api.precipitation(box)) }.getOrNull()?.takeIf { it.steps.isNotEmpty() }
-        // The outlook is fetched whole, with nothing trimmed at INCA's end: Heute needs every AROME
-        // hour, including the ones Jetzt's [steps] drops as already covered by INCA's finer run.
-        val far = runCatchingCancellable { NowcastMapper.mapOutlook(api.outlook(box, NowcastApi.endOf(now)), after = null) }.getOrNull()
-            ?.takeIf { it.steps.isNotEmpty() }
+        // Side by side, not one after the other: INCA's box is 383 kB the service will not gzip and
+        // took 4,4 s on the phone (2026-09-14), and AROME waited all of that out before it started.
+        val (near, far) = coroutineScope {
+            val nearAsync = async {
+                runCatchingCancellable { NowcastMapper.map(api.precipitation(box)) }.getOrNull()?.takeIf { it.steps.isNotEmpty() }
+            }
+            // The outlook is fetched whole, with nothing trimmed at INCA's end: Heute needs every AROME
+            // hour, including the ones Jetzt's [steps] drops as already covered by INCA's finer run.
+            val farAsync = async {
+                runCatchingCancellable { NowcastMapper.mapOutlook(api.outlook(box, NowcastApi.endOf(now)), after = null) }.getOrNull()
+                    ?.takeIf { it.steps.isNotEmpty() }
+            }
+            nearAsync.await() to farAsync.await()
+        }
         val nearEnd = near?.steps?.lastOrNull()?.time
         val fetched = when {
             near == null && far == null -> null

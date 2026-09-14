@@ -518,10 +518,16 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   Default, and the ribbon's bars are computed in `refresh` off Main for both zooms and carried in
   `MapUiState` (`nowBars`/`todayBars`); the screen only reads `bars`. A hand-built state for a test
   calls `withBars()`.
-  **`MapViewModel.refresh` updates twice.** Radar and forecast go on screen first; the radar check
-  at the place is applied after, only if the place has not changed meanwhile, because the check
-  annotates the map and must not hold it back — before this, the first map open waited for thirteen
-  sequential tile fetches. `RadarRepository.readingsAt` fetches uncached tiles concurrently, at most
+  **`MapViewModel.refresh` updates three times.** The radar goes on screen the moment its list is
+  in, beside whatever forecast that place already had; then the forecast; then the radar check at
+  the place, only if the place has not changed meanwhile, because the check annotates the map and
+  must not hold it back. Measured on 2026-09-14: the radar list answered in 350 ms and INCA in 4,4 s
+  (383 kB, not gzipped), and waiting for both was six seconds of bare basemap on a first open.
+  `NowcastRepository` fetches INCA and AROME side by side for the same reason. A first open asks
+  for three refreshes within half a second (init, place collector, resume), so **a refresh for the
+  same place joins one still fetching** instead of cancelling it; once the forecast is on screen a
+  newer refresh cancels the older as before. The card's "vor/in … min" sits on the time's baseline,
+  not on its own line, which grew the card by 16 dp whenever it appeared (`MapContentTest`). `RadarRepository.readingsAt` fetches uncached tiles concurrently, at most
   `MAX_PARALLEL_TILES` (4), with the network calls outside the repository's `mutex`; a separate
   `readingsLock` serialises whole calls, so overlapping refreshes (init, place change, tab resume)
   neither download a tile twice nor exceed the limit. Each reading is written down as it arrives, so
