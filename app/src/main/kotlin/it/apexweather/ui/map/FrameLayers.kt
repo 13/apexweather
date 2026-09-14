@@ -28,23 +28,42 @@ internal class FrameLayers(private val map: MapView) {
     private val providers = HashMap<Instant, MapTileProviderBasic>()
     private var shown: Overlay? = null
     private var shownTime: Instant? = null
+
+    /** The frame fading out from under [shown], while its own provider is still protected. */
+    private var outgoingTime: Instant? = null
     private var fading: ValueAnimator? = null
 
+    /** The observed frame times [requestTiles] was last asked to keep; [onAnimationEnd] reads it. */
+    private var lastWanted: Set<Instant> = emptySet()
+
+    /**
+     * Set once [release] has run. Every other method becomes a no-op after — `show` does nothing,
+     * `requestTiles` fetches nothing, and `nextFramesCached` reports true rather than polling a
+     * MapView that no longer has anything under it, so a caller stuck in the preload loop past
+     * teardown stops waiting rather than spinning.
+     */
+    var released: Boolean = false
+        private set
+
     fun show(frame: MapFrame?, motion: Boolean) {
-        if (frame?.time == shownTime && frame != null) return
+        if (released) return
+        if (frame?.time == shownTime) return
         fading?.end()
         val incoming = frame?.let(::overlayFor)
         val outgoing = shown
+        val outgoingWasTime = shownTime
         shown = incoming
         shownTime = frame?.time
         if (incoming != null) map.overlays.add(0, incoming)
         if (!motion || outgoing == null || incoming == null) {
             outgoing?.let { map.overlays.remove(it) }
             incoming?.let { setFade(it, 1f) }
+            outgoingTime = null
             map.invalidate()
             return
         }
         setFade(incoming, 0f)
+        outgoingTime = outgoingWasTime
         fading = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = FADE_MS
             addUpdateListener { a ->
@@ -55,6 +74,13 @@ internal class FrameLayers(private val map: MapView) {
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: android.animation.Animator) {
                     map.overlays.remove(outgoing)
+                    val endedTime = outgoingTime
+                    outgoingTime = null
+                    fading = null
+                    // The frame that just finished fading out may have fallen out of the frame
+                    // list while it was fading — a pan or a zoom that landed mid-fade, say — so it
+                    // is checked against the wanted set again here, not only in requestTiles.
+                    if (endedTime != null && endedTime !in lastWanted) providers.remove(endedTime)?.detach()
                     map.invalidate()
                 }
             })
@@ -63,34 +89,65 @@ internal class FrameLayers(private val map: MapView) {
     }
 
     /**
-     * Asks every radar frame from [from] onwards for the tiles the map is showing, parents included.
-     * True once the next [READY_AHEAD] frames have them in memory.
+     * Asks every radar frame from [from] onwards for the tiles the map is showing, parents
+     * included, and prunes providers nothing on screen still needs.
+     *
+     * A provider behind the frame on screen or behind one still fading out is never detached here
+     * whatever [frames] says — see [providersToEvict]. The old code evicted purely off the frame
+     * list, which could drop the very provider a `TilesOverlay` on screen was reading from.
      */
-    fun preload(frames: List<MapFrame>, from: Int): Boolean {
+    fun requestTiles(frames: List<MapFrame>, from: Int) {
+        if (released) return
+        val indices = tileIndices()
+        val wanted = frames.filterIsInstance<MapFrame.Observed>().map { it.time }.toSet()
+        lastWanted = wanted
+        frames.drop(from.coerceAtLeast(0)).filterIsInstance<MapFrame.Observed>().forEach { frame ->
+            val provider = providerFor(frame)
+            indices.forEach { provider.getMapTile(it) }
+            if (map.zoomLevelDouble > RainViewerMapper.MAX_ZOOM) provider.fetchRadarParents(map)
+        }
+        val protected = setOfNotNull(shownTime, outgoingTime)
+        providersToEvict(providers.keys, wanted, protected).forEach { providers.remove(it)?.detach() }
+    }
+
+    /**
+     * True once the next [READY_AHEAD] observed frames from [from] have the current viewport's
+     * tiles in memory. Never fetches anything itself — [requestTiles] does that — this only reads
+     * the cache. False, not true, when the viewport has no tile indices yet: an empty box has
+     * nothing cached by definition, and reporting ready on it would clear the play button's ring
+     * before there was ever anything to check.
+     */
+    fun nextFramesCached(frames: List<MapFrame>, from: Int): Boolean {
+        if (released) return true
+        val indices = tileIndices()
+        if (indices.isEmpty()) return false
+        var checked = 0
+        for (frame in frames.drop(from.coerceAtLeast(0)).filterIsInstance<MapFrame.Observed>()) {
+            if (checked >= READY_AHEAD) break
+            val provider = providers[frame.time] ?: return false
+            if (indices.any { provider.tileCache.getMapTile(it) == null }) return false
+            checked++
+        }
+        return true
+    }
+
+    fun release() {
+        released = true
+        fading?.cancel()
+        fading = null
+        providers.values.forEach { it.detach() }
+        providers.clear()
+    }
+
+    /** The current viewport's tile indices at the radar's own zoom ceiling. */
+    private fun tileIndices(): List<Long> {
         val zoom = minOf(map.zoomLevelDouble.toInt(), RainViewerMapper.MAX_ZOOM)
         val box = map.boundingBox
-        val indices = buildList {
+        return buildList {
             for (x in tileX(box.lonWest, zoom)..tileX(box.lonEast, zoom)) {
                 for (y in tileY(box.latNorth, zoom)..tileY(box.latSouth, zoom)) add(MapTileIndex.getTileIndex(zoom, x, y))
             }
         }
-        var ready = true
-        frames.drop(from.coerceAtLeast(0)).filterIsInstance<MapFrame.Observed>().forEachIndexed { n, frame ->
-            val provider = providerFor(frame)
-            indices.forEach { provider.getMapTile(it) }
-            if (map.zoomLevelDouble > RainViewerMapper.MAX_ZOOM) provider.fetchRadarParents(map)
-            if (n < READY_AHEAD && indices.any { provider.tileCache.getMapTile(it) == null }) ready = false
-        }
-        providers.entries.removeAll { (t, provider) ->
-            frames.none { it.time == t }.also { gone -> if (gone) provider.detach() }
-        }
-        return ready
-    }
-
-    fun release() {
-        fading?.cancel()
-        providers.values.forEach { it.detach() }
-        providers.clear()
     }
 
     private fun providerFor(frame: MapFrame.Observed): MapTileProviderBasic =
@@ -134,6 +191,12 @@ internal class FrameLayers(private val map: MapView) {
         const val FADE_MS = 250L
         const val READY_AHEAD = 3
 
+        /**
+         * How long the preload loop polls [nextFramesCached] before giving up and clearing the
+         * ring anyway. Play is not held hostage by a slow network.
+         */
+        const val PRELOAD_TIMEOUT_MS = 8_000L
+
         /** One zoom's worth: thirteen frames of a handful of tiles each, and no more. */
         const val TILE_CAPACITY = 40
 
@@ -144,3 +207,15 @@ internal class FrameLayers(private val map: MapView) {
         const val NOWCAST_ALPHA = 130
     }
 }
+
+/**
+ * Which of the [held] providers no longer earns its place: not [wanted] by the current frame
+ * list, and not [protected] — behind the frame on screen right now, or the one still fading out
+ * from under it.
+ *
+ * Pure, so the rule can be proven without a MapView: `requestTiles` used to evict purely off
+ * [wanted], which could detach the very provider the overlay currently on screen was reading
+ * from — a `TilesOverlay` left pointing at a provider whose tiles are gone.
+ */
+internal fun providersToEvict(held: Set<Instant>, wanted: Set<Instant>, protected: Set<Instant>): Set<Instant> =
+    held - wanted - protected

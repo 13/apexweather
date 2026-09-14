@@ -387,12 +387,12 @@ private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Uni
     LaunchedEffect(mapView, layers) {
         mapView.addMapListener(object : MapListener {
             override fun onScroll(event: ScrollEvent?): Boolean {
-                layers.preload(latestState.value.visible, latestState.value.selected)
+                layers.requestTiles(latestState.value.visible, latestState.value.selected)
                 return false
             }
 
             override fun onZoom(event: ZoomEvent?): Boolean {
-                layers.preload(latestState.value.visible, latestState.value.selected)
+                layers.requestTiles(latestState.value.visible, latestState.value.selected)
                 return false
             }
         })
@@ -429,10 +429,16 @@ private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Uni
     }
 
     // Every frame of the current zoom's tiles is asked for before the loop can need them, and the
-    // play button's ring stays up until the next few are cached — see FrameLayers.preload.
+    // play button's ring stays up until the next few are cached — see FrameLayers.requestTiles and
+    // .nextFramesCached. The poll gives up after FrameLayers.PRELOAD_TIMEOUT_MS: play is not held
+    // hostage by a slow network, and the frame itself shows whatever it has the moment it's asked for.
     LaunchedEffect(state.visible, state.zoom) {
         onReady(false)
-        while (!layers.preload(state.visible, state.selected)) kotlinx.coroutines.delay(250)
+        layers.requestTiles(state.visible, state.selected)
+        val deadline = System.currentTimeMillis() + FrameLayers.PRELOAD_TIMEOUT_MS
+        while (!layers.nextFramesCached(state.visible, state.selected) && System.currentTimeMillis() < deadline) {
+            kotlinx.coroutines.delay(250)
+        }
         onReady(true)
     }
 
@@ -440,6 +446,12 @@ private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Uni
         factory = { mapView },
         modifier = modifier.testTag("map_view"),
         update = { map ->
+            // A recomposition can land after onDispose has already released this layer and
+            // detached the map — the update lambda is driven by snapshot reads, not by the
+            // composable's own lifecycle, so it can still fire once more on the way out. Building
+            // a Marker(map) against a detached MapView is exactly the null MapViewRepository crash
+            // this guards against.
+            if (layers.released) return@AndroidView
             state.place?.let { place ->
                 val point = GeoPoint(place.lat, place.lon)
                 if (map.overlays.none { it is Marker }) {
