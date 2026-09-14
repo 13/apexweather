@@ -183,7 +183,15 @@ private fun Timeline(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int)
                 style = MaterialTheme.typography.titleMedium, color = Color.White,
                 modifier = Modifier.testTag("map_frame_time"),
             )
-            FrameKindChip(state.frame)
+            FrameKindChip(state.frame, state.unconfirmedHere)
+        }
+        val drySince = state.radarDrySince
+        if (state.unconfirmedHere && drySince != null) {
+            Text(
+                stringResource(R.string.map_radar_sees_nothing, Format.time(drySince, SouthTyrol.ZONE, formats)),
+                style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.8f),
+                modifier = Modifier.testTag("map_radar_overrule"),
+            )
         }
         if (state.frames.size > 1) {
             Slider(
@@ -209,14 +217,19 @@ private fun Timeline(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int)
  * reader who is not told why will read it as the weather getting vaguer rather than the forecast.
  */
 @Composable
-private fun FrameKindChip(frame: MapFrame?) {
+private fun FrameKindChip(frame: MapFrame?, unconfirmed: Boolean) {
     val label = when {
+        unconfirmed -> R.string.map_kind_unconfirmed
         frame is MapFrame.Forecast && frame.step.kind == NowcastKind.OUTLOOK -> R.string.map_kind_outlook
         frame is MapFrame.Forecast -> R.string.map_kind_forecast
         else -> R.string.map_kind_radar
     }
     val forecast = frame is MapFrame.Forecast
-    val colour = if (forecast) MaterialTheme.colorScheme.primary else Color(0xFF9CC9FF)
+    val colour = when {
+        unconfirmed -> Color.White.copy(alpha = 0.7f)
+        forecast -> MaterialTheme.colorScheme.primary
+        else -> Color(0xFF9CC9FF)
+    }
     Row(
         Modifier.clip(CircleShape).background(colour.copy(alpha = 0.18f))
             .padding(horizontal = 10.dp, vertical = 3.dp).testTag("map_frame_kind"),

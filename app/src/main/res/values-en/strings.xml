@@ -84,6 +84,8 @@
     <string name="map_kind_radar">Radar</string>
     <string name="map_kind_forecast">Forecast</string>
     <string name="map_kind_outlook">Outlook</string>
+    <string name="map_kind_unconfirmed">uncertain</string>
+    <string name="map_radar_sees_nothing">Radar has seen no rain here since %1$s</string>
     <string name="map_legend_light">light</string>
     <string name="map_legend_heavy">heavy</string>
     <string name="map_radar_unavailable">Radar images unavailable</string>

@@ -3,8 +3,12 @@ package it.apexweather.ui.map
 import it.apexweather.data.remote.NowcastStep
 import it.apexweather.data.remote.RadarFrame
 import it.apexweather.domain.Place
+import it.apexweather.domain.RadarReading
+import java.time.Duration
 import java.time.Instant
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sqrt
 
 /**
  * One position on the map's timeline: either something a radar saw, or something a model expects.
@@ -28,6 +32,9 @@ sealed interface MapFrame {
     }
 }
 
+/** What the radar saw at the place, frame by frame. A frame whose tile failed is absent. */
+data class PlaceCheck(val lat: Double, val lon: Double, val readings: Map<Instant, RadarReading>)
+
 /**
  * What the map tab draws. Pure, so the screen can be driven from a hand-built state in a test
  * without a network, a tile server or a real MapView.
@@ -39,6 +46,8 @@ data class MapUiState(
     val playing: Boolean = false,
     val place: Place? = null,
     val loading: Boolean = true,
+    /** Null until the place and its readings are known; nothing is marked without it. */
+    val check: PlaceCheck? = null,
 ) {
     val frame: MapFrame? get() = frames.getOrNull(selected)
 
@@ -53,6 +62,19 @@ data class MapUiState(
 
     /** True when the frame on screen is a forecast rather than an observation. */
     val showingForecast: Boolean get() = frame is MapFrame.Forecast
+
+    /** The frame on screen is a forecast whose rain near the place the radar does not see. */
+    val unconfirmedHere: Boolean
+        get() = (frame as? MapFrame.Forecast)?.step?.cells?.any { it.unconfirmed } == true
+
+    /** The oldest frame of the unbroken run of rainless readings up to the newest one. */
+    val radarDrySince: Instant?
+        get() {
+            val c = check ?: return null
+            return frames.filterIsInstance<MapFrame.Observed>()
+                .takeLastWhile { c.readings[it.time]?.isRain == false }
+                .firstOrNull()?.time
+        }
 
     /**
      * Where the reader should be standing once [next] replaces the timeline.
@@ -74,6 +96,12 @@ data class MapUiState(
     }
 
     companion object {
+        /** How long after the newest radar frame its word about the place still counts. */
+        val CHECK_WINDOW: Duration = Duration.ofMinutes(60)
+
+        /** How far around the place the radar's word reaches: where the pixels were read. */
+        const val CHECK_RADIUS_KM = 5.0
+
         /**
          * Merges the radar's past with the nowcast's future into one timeline.
          *
@@ -82,15 +110,38 @@ data class MapUiState(
          * its first step or two often describe minutes a radar has already watched. Where both
          * exist the radar is the better witness, and a timeline that ran backwards through them
          * would be nonsense.
+         *
+         * **And the radar may overrule the forecast's first hour near the place.** On 2026-09-14 the
+         * newest frame was dry over Dorf Tirol while INCA's run, built while an echo still counted,
+         * put 0,96 mm/h there fifteen minutes later — and no gauge in the valley caught a drop. Where
+         * [check] has a rainless reading for the newest frame, forecast cells within
+         * [CHECK_RADIUS_KM] and [CHECK_WINDOW] are marked `unconfirmed`. Past the window INCA may be
+         * right about rain arriving from outside the patch, so nothing is marked there; and with no
+         * reading for the newest frame nothing is marked at all.
          */
-        fun timeline(radar: List<RadarFrame>, forecast: List<NowcastStep>): List<MapFrame> {
+        fun timeline(radar: List<RadarFrame>, forecast: List<NowcastStep>, check: PlaceCheck? = null): List<MapFrame> {
             val observed = radar.sortedBy { it.time }.map(MapFrame::Observed)
             val lastSeen = observed.lastOrNull()?.time
+            val dryAtPlace = lastSeen != null && check?.readings?.get(lastSeen)?.isRain == false
             val ahead = forecast
                 .filter { step -> lastSeen == null || step.time.isAfter(lastSeen) }
                 .sortedBy { it.time }
+                .map { step ->
+                    if (!dryAtPlace || Duration.between(lastSeen, step.time) > CHECK_WINDOW) step
+                    else step.copy(cells = step.cells.map { cell ->
+                        if (distanceKm(cell.lat, cell.lon, check!!.lat, check.lon) <= CHECK_RADIUS_KM) cell.copy(unconfirmed = true) else cell
+                    })
+                }
                 .map(MapFrame::Forecast)
             return observed + ahead
         }
+
+        private fun distanceKm(lat: Double, lon: Double, lat0: Double, lon0: Double): Double {
+            val dy = (lat - lat0) * KM_PER_DEGREE
+            val dx = (lon - lon0) * KM_PER_DEGREE * cos(Math.toRadians(lat0))
+            return sqrt(dx * dx + dy * dy)
+        }
+
+        private const val KM_PER_DEGREE = 111.2
     }
 }

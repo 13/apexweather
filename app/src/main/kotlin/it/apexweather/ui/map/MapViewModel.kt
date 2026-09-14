@@ -50,13 +50,15 @@ class MapViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             val past = radar.frames()
+            val place = _state.value.place
             // The forecast is only asked for once a place is known, because the box it covers is
             // drawn around the place. A failure here leaves the radar loop intact: the map was worth
             // looking at without a forecast until now, and still is.
-            val ahead = _state.value.place?.let { nowcast.forPlace(it).steps }.orEmpty()
-            val frames = MapUiState.timeline(past, ahead)
+            val ahead = place?.let { nowcast.forPlace(it).steps }.orEmpty()
+            val check = place?.let { PlaceCheck(it.lat, it.lon, radar.readingsAt(it.lat, it.lon)) }
+            val frames = MapUiState.timeline(past, ahead, check)
             _state.update { state ->
-                state.copy(frames = frames, selected = state.selectionAfter(frames), loading = false)
+                state.copy(frames = frames, check = check, selected = state.selectionAfter(frames), loading = false)
             }
         }
     }

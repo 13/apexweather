@@ -85,6 +85,8 @@
     <string name="map_kind_radar">Radar</string>
     <string name="map_kind_forecast">Previsione</string>
     <string name="map_kind_outlook">Tendenza</string>
+    <string name="map_kind_unconfirmed">incerto</string>
+    <string name="map_radar_sees_nothing">Il radar qui non vede pioggia dalle %1$s</string>
     <string name="map_legend_light">debole</string>
     <string name="map_legend_heavy">forte</string>
     <string name="map_radar_unavailable">Immagini radar non raggiungibili</string>

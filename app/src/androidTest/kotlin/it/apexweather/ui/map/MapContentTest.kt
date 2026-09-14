@@ -12,6 +12,7 @@ import it.apexweather.data.remote.NowcastStep
 import it.apexweather.data.remote.RadarFrame
 import it.apexweather.domain.NearbyStation
 import it.apexweather.domain.Place
+import it.apexweather.domain.RadarReading
 import it.apexweather.ui.theme.ApexTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -130,5 +131,20 @@ class MapContentTest {
         rule.setContent { ApexTheme { MapContent(state(frames.first()), onPlayPause = {}, onSelect = {}) } }
         rule.onNodeWithTag("map_frame_time").assertIsDisplayed()
         rule.onNodeWithTag("map_scrubber").assertDoesNotExist()
+    }
+
+    /** The radar's word overrules the forecast's first hour near the place, and the card says so in a word. */
+    @Test
+    fun anUnconfirmedStepIsLabelledUncertainAndSaysWhy() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val times = frames.map { it.time }
+        val check = PlaceCheck(place.lat, place.lon, times.associateWith { RadarReading.NO_ECHO })
+        val state = MapUiState(
+            frames = MapUiState.timeline(frames, steps, check), check = check,
+            selected = 13, playing = false, place = place, loading = false,
+        )
+        rule.setContent { ApexTheme { MapContent(state, onPlayPause = {}, onSelect = {}) } }
+        rule.onNodeWithText(context.getString(R.string.map_kind_unconfirmed)).assertIsDisplayed()
+        rule.onNodeWithTag("map_radar_overrule").assertIsDisplayed()
     }
 }

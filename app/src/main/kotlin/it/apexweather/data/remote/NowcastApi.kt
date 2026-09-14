@@ -127,6 +127,11 @@ data class NowcastCell(
     val lon: Double,
     val mmPerHour: Double,
     val upperMmPerHour: Double? = null,
+    /**
+     * The newest radar frame is dry at the place and this cell is within the first hour and a few
+     * kilometres of it: drawn as "possible", never as rain. See `MapUiState.timeline`.
+     */
+    val unconfirmed: Boolean = false,
 )
 
 /**

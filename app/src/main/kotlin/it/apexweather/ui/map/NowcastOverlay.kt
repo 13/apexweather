@@ -52,8 +52,10 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
             // fraction of the strength: cells the median calls dry and the ninetieth percentile
             // calls wet are where the rain *might* reach, and they are not the same claim. Drawn
             // pale rather than not at all, because "the median says no" is not "no".
-            val solid = PrecipColors.forRate(cell.mmPerHour)
-            val possible = if (solid != null) null else cell.upperMmPerHour?.let(PrecipColors::forRate)
+            // A cell the radar does not confirm is only ever "possible", however wet INCA calls it.
+            val solid = if (cell.unconfirmed) null else PrecipColors.forRate(cell.mmPerHour)
+            val possible = if (solid != null) null
+                else (if (cell.unconfirmed) cell.mmPerHour else cell.upperMmPerHour)?.let(PrecipColors::forRate)
             val colour = solid ?: possible ?: return@forEach
             projection.toPixels(GeoPoint(cell.lat, cell.lon), point)
             // The wash carries its own alpha, as the radar's does; rain and "possible" take the overlay's.

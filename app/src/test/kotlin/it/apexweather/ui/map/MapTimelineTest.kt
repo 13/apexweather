@@ -1,11 +1,16 @@
 package it.apexweather.ui.map
 
 import androidx.compose.ui.graphics.toArgb
+import it.apexweather.Fixtures
+import it.apexweather.RadarFixtures
 import it.apexweather.data.remote.NowcastCell
+import it.apexweather.data.remote.NowcastMapper
+import it.apexweather.data.remote.NowcastResponse
 import it.apexweather.data.remote.NowcastStep
 import it.apexweather.data.remote.RadarFrame
 import it.apexweather.domain.RadarAtPlace
 import it.apexweather.domain.RadarColorTable
+import it.apexweather.domain.RadarReading
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -123,6 +128,87 @@ class MapTimelineTest {
     @Test
     fun `a selection off the end resolves to no frame rather than throwing`() {
         assertNull(MapUiState(frames = MapUiState.timeline(radar(0), emptyList()), selected = 7).frame)
+    }
+
+    // --- Fix B: the radar overrules the first hour of forecast near the place -----------------
+
+    private val lat = 46.688958
+    private val lon = 11.156624
+
+    private fun instantOf(hhmm: String): Instant = Instant.parse("2026-09-14T${hhmm.take(2)}:${hhmm.drop(2)}:00Z")
+
+    private fun morningRadar(vararg hhmm: String) = hhmm.map { RadarFrame(instantOf(it), "https://example.invalid/$it") }
+
+    private fun morningReadings(vararg hhmm: String): Map<Instant, RadarReading> {
+        val p = RadarAtPlace.pixelOf(lat, lon)
+        return hhmm.associate { t -> instantOf(t) to RadarAtPlace.read(RadarFixtures.tile("radar-z7-67-45-${t}Z.png"), 256, p.px, p.py) }
+    }
+
+    private val inca05 by lazy {
+        NowcastMapper.map(Fixtures.json.decodeFromString(NowcastResponse.serializer(), Fixtures.read("map-2026-09-14/inca-0500Z.json")))
+    }
+
+    private val times = arrayOf("0430", "0440", "0450", "0500", "0510", "0520", "0530", "0540")
+
+    private fun List<MapFrame>.step(hhmm: String) =
+        filterIsInstance<MapFrame.Forecast>().first { it.time == Instant.parse("2026-09-14T$hhmm:00Z") }.step
+
+    private fun NowcastStep.atPlace() = cells.first { it.lat == 46.68674850463867 && it.lon == 11.16190242767334 }
+
+    /**
+     * 2026-09-14, as the reader saw it at 07:45 local: the newest radar frame (05:40Z) dry over Dorf
+     * Tirol, and INCA's 05:00Z run still carrying a shower that had died an hour before. Nobody's
+     * gauge caught a drop.
+     */
+    @Test
+    fun `this morning's dead shower is marked unconfirmed at Dorf Tirol`() {
+        val frames = MapUiState.timeline(morningRadar(*times), inca05.steps, PlaceCheck(lat, lon, morningReadings(*times)))
+        assertTrue(frames.step("05:45").atPlace().unconfirmed)
+        assertEquals(0.96, frames.step("05:45").atPlace().mmPerHour, 0.001)
+        assertTrue(frames.step("06:00").atPlace().unconfirmed)
+        assertTrue(frames.step("06:15").atPlace().unconfirmed)
+    }
+
+    @Test
+    fun `past an hour after the newest radar frame nothing is marked`() {
+        val frames = MapUiState.timeline(morningRadar(*times), inca05.steps, PlaceCheck(lat, lon, morningReadings(*times)))
+        assertTrue(frames.step("06:45").cells.isNotEmpty())
+        assertFalse(frames.step("06:45").cells.any { it.unconfirmed })
+    }
+
+    @Test
+    fun `cells further than five kilometres are never marked`() {
+        val frames = MapUiState.timeline(morningRadar(*times), inca05.steps, PlaceCheck(lat, lon, morningReadings(*times)))
+        val far = frames.step("05:45").cells.filter { kotlin.math.abs(it.lat - lat) > 0.06 }
+        assertTrue("the fixture must have rain far away for this to prove anything", far.isNotEmpty())
+        assertFalse(far.any { it.unconfirmed })
+    }
+
+    @Test
+    fun `where the newest frame is raining at the place nothing is marked`() {
+        val wet = morningReadings(*times).mapValues { RadarReading(30) }
+        val frames = MapUiState.timeline(morningRadar(*times), inca05.steps, PlaceCheck(lat, lon, wet))
+        assertFalse(frames.filterIsInstance<MapFrame.Forecast>().any { f -> f.step.cells.any { it.unconfirmed } })
+    }
+
+    /** A tile that failed is an unknown, and an unknown overrules nothing. */
+    @Test
+    fun `with no reading for the newest frame nothing is marked`() {
+        val readings = morningReadings(*times) - Instant.parse("2026-09-14T05:40:00Z")
+        val frames = MapUiState.timeline(morningRadar(*times), inca05.steps, PlaceCheck(lat, lon, readings))
+        assertFalse(frames.filterIsInstance<MapFrame.Forecast>().any { f -> f.step.cells.any { it.unconfirmed } })
+        assertFalse(MapUiState.timeline(morningRadar(*times), inca05.steps, null)
+            .filterIsInstance<MapFrame.Forecast>().any { f -> f.step.cells.any { it.unconfirmed } })
+    }
+
+    @Test
+    fun `the card knows since when the radar has seen no rain here`() {
+        val check = PlaceCheck(lat, lon, morningReadings(*times))
+        val frames = MapUiState.timeline(morningRadar(*times), inca05.steps, check)
+        val state = MapUiState(frames = frames, selected = frames.indexOfFirst { it.time == Instant.parse("2026-09-14T05:45:00Z") }, check = check, loading = false)
+        assertTrue(state.unconfirmedHere)
+        // 04:30Z's 8 dBZ is an echo but not rain, so the dry run reaches back to the first frame.
+        assertEquals(Instant.parse("2026-09-14T04:30:00Z"), state.radarDrySince)
     }
 }
 
