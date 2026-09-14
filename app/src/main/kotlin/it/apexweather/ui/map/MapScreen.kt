@@ -4,11 +4,11 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,12 +19,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -36,11 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -60,6 +56,7 @@ import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.GlassCard
 import it.apexweather.ui.common.LocalFormats
 import java.io.File
+import kotlin.math.abs
 import org.osmdroid.config.Configuration
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.events.MapListener
@@ -92,11 +89,18 @@ fun MapScreen(viewModel: MapViewModel = hiltViewModel()) {
         state,
         onPlayPause = { if (state.playing) viewModel.pause() else viewModel.play() },
         onSelect = viewModel::select,
+        onZoom = viewModel::setZoom,
     )
 }
 
 @Composable
-fun MapContent(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int) -> Unit) {
+fun MapContent(
+    state: MapUiState,
+    onPlayPause: () -> Unit,
+    onSelect: (Int) -> Unit,
+    onZoom: (MapZoom) -> Unit = {},
+    ready: Boolean = true,
+) {
     val recenter = remember { mutableStateOf(0) }
     Box(Modifier.fillMaxSize().testTag("map_screen")) {
         RadarMap(state, recenter.value, Modifier.fillMaxSize())
@@ -131,11 +135,11 @@ fun MapContent(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int) -> Un
                     modifier = Modifier.testTag("map_radar_unavailable"),
                 )
             } else {
-                Timeline(state, onPlayPause, onSelect)
+                Timeline(state, ready, onPlayPause, onSelect, onZoom)
             }
             Text(
                 stringResource(R.string.map_attribution),
-                style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f),
+                style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f),
                 modifier = Modifier.testTag("map_attribution"),
             )
         }
@@ -143,46 +147,69 @@ fun MapContent(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int) -> Un
 }
 
 /**
- * The scrubber, the clock and the legend, in one card.
+ * The card: play, when and what, the place's own rain, the zoom, the ribbon and the legend.
  *
- * The card has to answer three questions at a glance and in this order: what am I looking at, when
- * is it, and is it something that happened or something expected. The last of those is why the
- * label beside the time is not decoration — a forecast frame drawn exactly like a radar frame is
- * the one mistake a map like this can make that matters.
+ * It answers in this order: when is this, is it seen or expected, and what does it mean for the
+ * reader's place. The last used to take pressing play and watching the map.
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun Timeline(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int) -> Unit) {
+private fun Timeline(state: MapUiState, ready: Boolean, onPlayPause: () -> Unit, onSelect: (Int) -> Unit, onZoom: (MapZoom) -> Unit) {
     val formats = LocalFormats.current
+    val bars = remember(state.visible, state.check, state.place) { RibbonModel.bars(state) }
+    val bar = bars.getOrNull(state.selected)
+    val word = bar?.let(RibbonModel::word)
     GlassCard(Modifier.fillMaxWidth().testTag("map_timeline")) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            FilledIconButton(
-                onClick = onPlayPause,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = Color.White.copy(alpha = 0.14f), contentColor = Color.White,
-                ),
-                modifier = Modifier.size(40.dp).testTag("map_play_pause"),
-            ) {
-                Icon(
-                    if (state.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = stringResource(if (state.playing) R.string.map_pause else R.string.map_play),
-                )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            Box(contentAlignment = Alignment.Center) {
+                FilledIconButton(
+                    onClick = onPlayPause,
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White.copy(alpha = 0.14f), contentColor = Color.White),
+                    modifier = Modifier.size(40.dp).testTag("map_play_pause"),
+                ) {
+                    Icon(
+                        if (state.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = stringResource(if (state.playing) R.string.map_pause else R.string.map_play),
+                    )
+                }
+                if (!ready) {
+                    CircularProgressIndicator(
+                        color = Color.White, strokeWidth = 2.dp,
+                        modifier = Modifier.size(40.dp).testTag("map_play_loading"),
+                    )
+                }
             }
-            // The clock alone is not enough now that the timeline runs a day out: at eleven in the
-            // morning a forecast frame reading "10:00" would be read as an hour ago. `dayTime` puts
-            // the weekday in front on any day but the present one, and the present here is the
-            // newest frame a radar actually saw rather than a clock this composable would have to
-            // be handed.
-            val present = state.frames.getOrNull(state.nowIndex)?.time ?: state.frame?.time
-            Text(
-                state.frame?.time?.let { Format.dayTime(it, SouthTyrol.ZONE, present ?: it, formats) }.orEmpty(),
-                style = MaterialTheme.typography.titleMedium, color = Color.White,
-                modifier = Modifier.testTag("map_frame_time"),
-            )
+            Column(Modifier.weight(1f)) {
+                val present = state.presentTime
+                val time = state.frame?.time
+                // On its own line, not beside the time in a Row: at a 2x font scale the kind chip
+                // and the play button already take most of the card's width, and a Row squeezed that
+                // narrow wrapped "vor 20 min" onto two lines and drew it over the time it belongs to.
+                Text(
+                    time?.let { Format.dayTime(it, SouthTyrol.ZONE, present ?: it, formats) }.orEmpty(),
+                    style = MaterialTheme.typography.titleLarge, color = Color.White,
+                    modifier = Modifier.testTag("map_frame_time"),
+                )
+                if (time != null && present != null && time != present) {
+                    val d = java.time.Duration.between(present, time)
+                    Text(
+                        stringResource(if (d.isNegative) R.string.map_ago else R.string.map_in, Format.shortDuration(d, formats)),
+                        style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.65f),
+                    )
+                }
+                if (state.place != null && word != null) {
+                    val upTo = bar.takeIf { state.zoom == MapZoom.TODAY }?.upperMmPerHour?.takeIf { it >= PrecipColors.RAIN_FROM_MM }
+                    Text(
+                        buildString {
+                            append(state.place.name(formats.locale))
+                            append(" · ")
+                            append(stringResource(word.labelRes()))
+                            if (upTo != null) append(", ").append(stringResource(R.string.map_up_to, Format.mmValue(upTo, formats)))
+                        },
+                        style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.testTag("map_place_word"),
+                    )
+                }
+            }
             FrameKindChip(state.frame, state.unconfirmedHere)
         }
         val drySince = state.radarDrySince
@@ -193,41 +220,57 @@ private fun Timeline(state: MapUiState, onPlayPause: () -> Unit, onSelect: (Int)
                 modifier = Modifier.testTag("map_radar_overrule"),
             )
         }
-        if (state.frames.size > 1) {
-            Slider(
-                value = state.selected.toFloat(),
-                onValueChange = { onSelect(it.toInt()) },
-                valueRange = 0f..(state.frames.size - 1).toFloat(),
-                steps = state.frames.size - 2,
-                track = { TimelineTrack(state) },
-                colors = SliderDefaults.colors(thumbColor = Color.White),
-                modifier = Modifier.testTag("map_scrubber"),
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ZoomChip(R.string.map_zoom_now, state.zoom == MapZoom.NOW, "map_zoom_now") { onZoom(MapZoom.NOW) }
+            ZoomChip(R.string.map_zoom_today, state.zoom == MapZoom.TODAY, "map_zoom_today") { onZoom(MapZoom.TODAY) }
+        }
+        if (bars.size > 1) {
+            val nowLabel = stringResource(R.string.map_now)
+            val labels = RibbonModel.labelIndices(bars, state.zoom)
+                .filter { abs(it - state.nowIndex) > 1 }
+                .map { it to Format.hour(bars[it].time, SouthTyrol.ZONE, formats) } + (state.nowIndex to nowLabel)
+            RainRibbon(
+                bars = bars, selected = state.selected, nowIndex = state.nowIndex,
+                labels = labels.filter { it.first in bars.indices }.sortedBy { it.first },
+                stateDescription = listOfNotNull(
+                    state.frame?.time?.let { Format.dayTime(it, SouthTyrol.ZONE, state.presentTime ?: it, formats) },
+                    word?.let { stringResource(it.labelRes()) },
+                ).joinToString(", "),
+                onSelect = onSelect,
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
         PrecipLegend()
     }
 }
 
-/**
- * Whether this frame was seen or is expected, said in a word rather than left to the colours.
- *
- * Three words, not two. The forecast half of the timeline is not one thing: the first two and a
- * half hours are INCA at a kilometre and a quarter hour with radar folded in, and everything after
- * that is AROME's ensemble at 2,5 km and a whole hour. The squares visibly grow at the join, and a
- * reader who is not told why will read it as the weather getting vaguer rather than the forecast.
- */
+@Composable
+private fun ZoomChip(label: Int, selected: Boolean, tag: String, onClick: () -> Unit) {
+    Text(
+        stringResource(label),
+        style = MaterialTheme.typography.labelMedium,
+        color = if (selected) Color(0xFF111111) else Color.White,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(if (selected) Color.White else Color.White.copy(alpha = 0.10f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .testTag(tag),
+    )
+}
+
+/** Seen, expected, or expected and not confirmed — said in a word rather than left to colour. */
 @Composable
 private fun FrameKindChip(frame: MapFrame?, unconfirmed: Boolean) {
     val label = when {
         unconfirmed -> R.string.map_kind_unconfirmed
-        frame is MapFrame.Forecast && frame.step.kind == NowcastKind.OUTLOOK -> R.string.map_kind_outlook
-        frame is MapFrame.Forecast -> R.string.map_kind_forecast
+        frame is MapFrame.Forecast && frame.step.kind == NowcastKind.OUTLOOK -> R.string.map_kind_ensemble
+        frame is MapFrame.Forecast -> R.string.map_kind_nowcast
         else -> R.string.map_kind_radar
     }
-    val forecast = frame is MapFrame.Forecast
     val colour = when {
         unconfirmed -> Color.White.copy(alpha = 0.7f)
-        forecast -> MaterialTheme.colorScheme.primary
+        frame is MapFrame.Forecast -> RibbonColors.FORECAST
         else -> Color(0xFF9CC9FF)
     }
     Row(
@@ -241,70 +284,25 @@ private fun FrameKindChip(frame: MapFrame?, unconfirmed: Boolean) {
     }
 }
 
-/**
- * The slider's own track, drawn so the future looks like the future.
- *
- * Material's default track is one bar with a filled part and an empty part, which says how far along
- * the reader is and nothing about what they are scrubbing through. This one splits at the present:
- * the observed stretch is solid, the forecast stretch is dashed, and the join carries a tick. The
- * Slider around it keeps its own dragging and its own accessibility; only the painting changes.
- */
-@Composable
-private fun TimelineTrack(state: MapUiState) {
-    val nowFraction = if (state.frames.size < 2) 1f
-    else (state.nowIndex.coerceAtLeast(0)).toFloat() / (state.frames.size - 1).toFloat()
-    val forecastColour = MaterialTheme.colorScheme.primary
-    Canvas(Modifier.fillMaxWidth().height(14.dp).testTag("map_timeline_track")) {
-        val y = size.height / 2f
-        val thickness = 4.dp.toPx()
-        val split = size.width * nowFraction
-        drawLine(
-            Color.White.copy(alpha = 0.85f), Offset(0f, y), Offset(split, y),
-            strokeWidth = thickness, cap = StrokeCap.Round,
-        )
-        if (nowFraction < 1f) {
-            drawLine(
-                forecastColour.copy(alpha = 0.75f), Offset(split, y), Offset(size.width, y),
-                strokeWidth = thickness, cap = StrokeCap.Round,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())),
-            )
-            // The present, which is the one instant on this track a reader looks for.
-            drawLine(
-                Color.White, Offset(split, y - 6.dp.toPx()), Offset(split, y + 6.dp.toPx()),
-                strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round,
-            )
-        }
-    }
+private fun RainWord.labelRes(): Int = when (this) {
+    RainWord.DRY -> R.string.map_rain_dry
+    RainWord.POSSIBLE -> R.string.map_rain_possible
+    RainWord.LIGHT -> R.string.map_rain_light
+    RainWord.MODERATE -> R.string.map_rain_moderate
+    RainWord.HEAVY -> R.string.map_rain_heavy
 }
 
-/**
- * What the colours mean.
- *
- * Without it the map is a picture: a reader can see that something is orange over the Pustertal and
- * has no way to learn whether that is a shower or a flood. The scale is the one both layers are
- * drawn in — see [PrecipColors] — and it is labelled light to heavy rather than in millimetres,
- * because RainViewer does not publish what its own colours mean in rate and the app will not invent
- * numbers for somebody else's scale.
- */
+/** What the colours mean, in words: the numbers are Marshall–Palmer's, and "leicht" claims less. */
 @Composable
 private fun PrecipLegend() {
-    Column(Modifier.fillMaxWidth().padding(top = 2.dp).testTag("map_legend")) {
-        Canvas(Modifier.fillMaxWidth().height(6.dp)) {
-            drawRoundRect(
-                brush = Brush.horizontalGradient(PrecipColors.RAMP),
-                cornerRadius = CornerRadius(size.height / 2f),
-            )
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp).testTag("map_legend")) {
+        Canvas(Modifier.fillMaxWidth().height(3.dp)) {
+            drawRoundRect(brush = Brush.horizontalGradient(PrecipColors.RAMP), cornerRadius = CornerRadius(size.height / 2f))
         }
-        Spacer(Modifier.height(3.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                stringResource(R.string.map_legend_light),
-                style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f),
-            )
-            Text(
-                stringResource(R.string.map_legend_heavy),
-                style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f),
-            )
+        Row(Modifier.fillMaxWidth().padding(top = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            listOf(R.string.map_legend_light, R.string.map_legend_moderate, R.string.map_legend_heavy).forEach {
+                Text(stringResource(it), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+            }
         }
     }
 }

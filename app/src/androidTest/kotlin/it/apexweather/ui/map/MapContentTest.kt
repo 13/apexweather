@@ -60,7 +60,7 @@ class MapContentTest {
     fun theTimelineAndTheAttributionAreBothOnScreen() {
         rule.setContent { ApexTheme { MapContent(state(*frames.toTypedArray()), onPlayPause = {}, onSelect = {}) } }
         rule.onNodeWithTag("map_timeline").assertIsDisplayed()
-        rule.onNodeWithTag("map_scrubber").assertIsDisplayed()
+        rule.onNodeWithTag("map_ribbon").assertIsDisplayed()
         rule.onNodeWithTag("map_frame_time").assertIsDisplayed()
         rule.onNodeWithTag("map_attribution").assertIsDisplayed()
     }
@@ -112,7 +112,7 @@ class MapContentTest {
     @Test
     fun aFrameBeyondTheRadarIsLabelledAsForecast() {
         val expected = InstrumentationRegistry.getInstrumentation().targetContext
-            .getString(R.string.map_kind_forecast)
+            .getString(R.string.map_kind_nowcast)
         rule.setContent { ApexTheme { MapContent(withForecast(selected = 16), onPlayPause = {}, onSelect = {}) } }
         rule.onNodeWithTag("map_frame_kind").assertIsDisplayed()
         rule.onNodeWithText(expected).assertIsDisplayed()
@@ -125,12 +125,12 @@ class MapContentTest {
         rule.onNodeWithTag("map_recenter").assertIsDisplayed()
     }
 
-    /** A single frame has nothing to scrub through, and a slider with one stop cannot be dragged. */
+    /** A single frame has nothing to scrub through, and a ribbon with one bar cannot be dragged. */
     @Test
-    fun oneFrameShowsNoScrubber() {
+    fun oneFrameShowsNoRibbon() {
         rule.setContent { ApexTheme { MapContent(state(frames.first()), onPlayPause = {}, onSelect = {}) } }
         rule.onNodeWithTag("map_frame_time").assertIsDisplayed()
-        rule.onNodeWithTag("map_scrubber").assertDoesNotExist()
+        rule.onNodeWithTag("map_ribbon").assertDoesNotExist()
     }
 
     /** The radar's word overrules the forecast's first hour near the place, and the card says so in a word. */
@@ -146,5 +146,26 @@ class MapContentTest {
         rule.setContent { ApexTheme { MapContent(state, onPlayPause = {}, onSelect = {}) } }
         rule.onNodeWithText(context.getString(R.string.map_kind_unconfirmed)).assertIsDisplayed()
         rule.onNodeWithTag("map_radar_overrule").assertIsDisplayed()
+    }
+
+    @Test
+    fun theZoomChipsReportTheirChoice() {
+        var chosen: MapZoom? = null
+        rule.setContent { ApexTheme { MapContent(withForecast(selected = 0), onPlayPause = {}, onSelect = {}, onZoom = { chosen = it }) } }
+        rule.onNodeWithTag("map_zoom_today").performClick()
+        assertTrue(chosen == MapZoom.TODAY)
+    }
+
+    /** The place's own word is on the card, so "does it reach me" needs no playing. */
+    @Test
+    fun theCardNamesThePlaceAndItsRain() {
+        rule.setContent { ApexTheme { MapContent(withForecast(selected = 16), onPlayPause = {}, onSelect = {}) } }
+        rule.onNodeWithTag("map_place_word").assertIsDisplayed()
+    }
+
+    @Test
+    fun whileTilesLoadThePlayButtonSaysSo() {
+        rule.setContent { ApexTheme { MapContent(state(*frames.toTypedArray()), onPlayPause = {}, onSelect = {}, ready = false) } }
+        rule.onNodeWithTag("map_play_loading").assertIsDisplayed()
     }
 }
