@@ -783,7 +783,7 @@ class RadarRepository @Inject constructor(
     suspend fun frames(): List<RadarFrame> = mutex.withLock {
         val at = fetchedAt
         if (at != null && Duration.between(at, clock.instant()) < FRESH_FOR) return@withLock frames
-        runCatching { RainViewerMapper.map(api.weatherMaps()) }
+        runCatchingCancellable { RainViewerMapper.map(api.weatherMaps()) }
             .onSuccess { frames = it; fetchedAt = clock.instant() }
         frames
     }
@@ -801,7 +801,7 @@ class RadarRepository @Inject constructor(
             val out = LinkedHashMap<Instant, RadarReading>()
             for (frame in current) {
                 val key = frame.time to pixel
-                val reading = readings[key] ?: runCatching {
+                val reading = readings[key] ?: runCatchingCancellable {
                     val bytes = api.tile(frame.tileUrl(pixel.zoom, pixel.x, pixel.y)).use { it.bytes() }
                     decoder.decode(bytes)?.let { RadarAtPlace.read(it.argb, it.width, pixel.px, pixel.py) }
                 }.getOrNull()?.also { readings[key] = it }
@@ -996,8 +996,8 @@ In `NowcastRepository.kt` replace the fields and `forPlace` and the companion:
         // standing.
         // An answer with no steps is no answer: the mappers return EMPTY for a response without a
         // reference time, and treating that as a fetch would overwrite a good held run with nothing.
-        val near = runCatching { NowcastMapper.map(api.precipitation(box)) }.getOrNull()?.takeIf { it.steps.isNotEmpty() }
-        val far = runCatching {
+        val near = runCatchingCancellable { NowcastMapper.map(api.precipitation(box)) }.getOrNull()?.takeIf { it.steps.isNotEmpty() }
+        val far = runCatchingCancellable {
             NowcastMapper.mapOutlook(
                 api.outlook(box, NowcastApi.endOf(now)),
                 after = near?.steps?.lastOrNull()?.time,
@@ -1610,7 +1610,7 @@ data class PrecipNowcast(
 In `NowcastRepository.forPlace`, replace the `far` and `fetched` blocks with:
 
 ```kotlin
-        val far = runCatching { NowcastMapper.mapOutlook(api.outlook(box, NowcastApi.endOf(now)), after = null) }.getOrNull()
+        val far = runCatchingCancellable { NowcastMapper.mapOutlook(api.outlook(box, NowcastApi.endOf(now)), after = null) }.getOrNull()
             ?.takeIf { it.steps.isNotEmpty() }
         val nearEnd = near?.steps?.lastOrNull()?.time
         val fetched = when {
