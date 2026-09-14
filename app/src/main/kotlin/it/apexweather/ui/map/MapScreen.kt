@@ -383,8 +383,8 @@ private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Uni
         }
     }
 
-    // One layer holder for the life of the composable: it owns a tile provider per radar frame,
-    // which is what lets a frame's tiles already be there when the loop reaches it.
+    // One layer holder for the life of the composable: it holds every radar frame's tiles, which is
+    // what lets a frame's tiles already be there when the loop reaches it.
     val layers = remember { FrameLayers(mapView) }
     val latestState = rememberUpdatedState(state)
 
@@ -393,12 +393,12 @@ private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Uni
     LaunchedEffect(mapView, layers) {
         mapView.addMapListener(object : MapListener {
             override fun onScroll(event: ScrollEvent?): Boolean {
-                layers.requestTiles(latestState.value.visible, latestState.value.selected)
+                latestState.value.let { layers.requestTiles(it.frames, it.visible, it.selected) }
                 return false
             }
 
             override fun onZoom(event: ZoomEvent?): Boolean {
-                layers.requestTiles(latestState.value.visible, latestState.value.selected)
+                latestState.value.let { layers.requestTiles(it.frames, it.visible, it.selected) }
                 return false
             }
         })
@@ -442,7 +442,7 @@ private fun RadarMap(state: MapUiState, recenter: Int, onReady: (Boolean) -> Uni
     // hostage by a slow network, and the frame itself shows whatever it has the moment it's asked for.
     LaunchedEffect(state.visible, state.zoom) {
         onReady(false)
-        layers.requestTiles(state.visible, state.selected)
+        layers.requestTiles(state.frames, state.visible, state.selected)
         val deadline = System.currentTimeMillis() + FrameLayers.PRELOAD_TIMEOUT_MS
         while (!layers.nextFramesCached(state.visible, state.selected) && System.currentTimeMillis() < deadline) {
             kotlinx.coroutines.delay(250)

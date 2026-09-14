@@ -353,17 +353,16 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   `RadarRepository`, which holds them in memory for ten minutes and writes nothing to Room: the tiles
   are not cached across runs either, so a stored frame list would name pictures that can no longer be
   fetched. `nowcast` has been empty every time it was checked and is ignored.
-  **RainViewer's radar stops at zoom 7.** Zoom 8 returns a PNG reading "Zoom Level Not Supported"
-  rather than a 404, so `RadarTileSource` declares the ceiling. Drawing a z7 tile at z9 is osmdroid's
-  *approximater*, and it only works if the z7 tile is already cached — so `fetchRadarParents` asks
-  for those tiles explicitly on every pan and zoom.
-  **Do not replace it with a protected-tile computer:** `MapTileCache.garbageCollection()` returns
-  before running the computers unless the memory cache is over capacity, which a dozen radar tiles
-  never manage, so osmdroid's own `MapTileAreaZoomComputer(-1)` never fires either. Two more
-  non-obvious requirements: the provider must be given `map.tileRequestCompleteHandler`, or tiles
-  arrive and nothing redraws until the reader pans; and the tile source must **not** carry
-  `FLAG_NO_PREVENTIVE`, which osmdroid's own OSM source sets to honour the OSM policy and which
-  `MapTilePreCache` checks before fetching anything.
+  **RainViewer's radar stops at zoom 7, and the map's own minimum zoom is 7** — so every radar pixel
+  on screen is a z7 tile scaled up, and the radar is **not an osmdroid tile source**. Zoom 8 returns
+  a PNG reading "Zoom Level Not Supported" rather than a 404. `RadarTileStore` (`RadarTiles.kt`)
+  fetches the z7 tiles inside the province — four of them — for every frame, keyed by frame time,
+  in memory only, and `RadarOverlay` draws them through the projection, unfiltered as osmdroid's
+  approximater drew them. **Do not go back to a `MapTileProviderBasic` per frame:** each builds five
+  tile modules with their own fixed thread pools that live until `detach()`, and `TilesOverlay`
+  makes whichever provider is on screen cache a screenful of display-zoom copies. Measured on the
+  phone after a minute of playback at zoom 12 with thirteen of them: 338 threads, 253 MB native
+  heap, 548 MB PSS. The whole loop's tiles are 52 bitmaps of 256 px now, about 13 MB.
   **The basemap is the province's own, shaded from the province's own DEM.**
   `SouthTyrolTileSource` draws `p_bz-BaseMap:Basemap-Meteo-Dark` from the Autonome Provinz Bozen –
   Südtirol's WMTS, which is a grey relief map with roads and bilingual labels, published under CC0
@@ -398,8 +397,8 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   radar is somebody else's weather.
   **The radar is drawn at 62 % alpha**, because an opaque block of blue hides the valley the rain is
   sitting in, and because at zoom 16 a z7 radar pixel is 20 km smeared over a village — a wash of
-  colour is honest about being a wash where a solid block is not. The alpha goes on a `ColorMatrix`,
-  since osmdroid's `TilesOverlay` has none of its own.
+  colour is honest about being a wash where a solid block is not. `RadarOverlay` puts it on its paint,
+  multiplied by the crossfade.
   **The timeline carries both halves: where the rain has been and where it is going.** The radar's
   last two hours are followed by **a day of forecast in two resolutions** — GeoSphere's INCA nowcast
   for the two and a half hours it runs (1 km, quarter-hourly, radar-blended) and then the **median of AROME's
@@ -438,8 +437,9 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   affordable: a South Tyrol box is 4,7 MB of uncompressed GeoJSON (the service does not gzip, and
   its 46 kB NetCDF alternative is HDF5, which nothing on Android reads without a library bigger than
   this app), against about 300 kB for `Place.NOWCAST_BOX_DEG_*`. Its grid is a projected 1 km one,
-  so no two points share a latitude and `NowcastOverlay` draws cells one at a time — as squares, not
-  a smoothed field, because a smoothed field would look like radar and this is a model.
+  so no two points share a latitude and `NowcastOverlay` draws them as a bitmap of one pixel per grid
+  cell, scaled up with filtering: the edges soften, but the grid still reads as coarser than the
+  radar, which is honest about it being a model and not a measurement (see the overlay notes below).
   **Both layers share one colour ramp** (`PrecipColors`), and **RainViewer does publish what its
   colours mean**: `rainviewer_api_colors_table.csv` gives every scheme's RGBA at every dBZ, rain
   and snow. The tiles arrive in **Universal Blue** whatever scheme the URL asks for, every pixel of
@@ -462,9 +462,16 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   alone — solid blue seen, amber hatched expected, dashed outline expected and not confirmed — so
   whether the rain reaches the reader is on screen before anything plays. Two zooms: *Jetzt* (2 h
   back, 3 h ahead, quarter hours) and *Heute* (24 h of AROME ensemble hours, with the p90 as a cap).
-  Amber is forecast chrome only and never a rain colour. **Frames crossfade over 250 ms and play
-  waits for the next three frames' tiles** (`FrameLayers`); a provider per frame lives as long as
-  the frame list. The animations switch and the system's reduced motion turn the fade off, as they
+  Amber is forecast chrome only and never a rain colour. **The map's rain words use the radar's Marshall–Palmer
+  boundaries** — light from 15 dBZ (`PrecipColors.RAIN_FROM_MM`, 0,3158 mm/h, derived, never
+  written as 0,3), moderate from 2,4, heavy from 24 — and are **deliberately not** the home strip's
+  `PrecipScale` shades (0,5 / 2,5): the map speaks the radar's scale because its colours are the
+  radar's, and the forecast is drawn in them so the two layers mean the same rain. **Frames crossfade over 250 ms and play
+  waits for the next three frames' tiles** (`FrameLayers`). Every radar frame's tiles are requested
+  in the order the loop reaches them from the selection, **wrapping round** (`preloadOrder`) — a
+  first load selects the newest frame, and "from the selection onwards" once fetched that frame
+  alone. Tiles live as long as the frame list, **whatever the zoom shows**: eviction follows
+  `MapUiState.frames`, not `visible`, which in Heute holds no radar at all. The animations switch and the system's reduced motion turn the fade off, as they
   do the sky's.
   **Ribbon labels never overlap** (`visibleLabelSlots` in `RainRibbon.kt`). Labels are measured,
   "jetzt" is placed first, and any label that would collide is dropped. At font scale 2 on the phone
@@ -473,15 +480,17 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   on was carried by colour alone.
   **The jetzt step carries no "in/vor" offset**. In Heute the first hour is labelled "jetzt" on the
   ribbon and read "vor 20 min" in the header.
-  **`FrameLayers` never detaches the provider behind the frame on screen or the one fading out**
-  (`providersToEvict`). Before this, a zoom switch or a frame-list rollover could blank the frame
+  **`FrameLayers` never evicts the tiles of the frame on screen or the one fading out**
+  (`framesToEvict`). Before this, a zoom switch or a frame-list rollover could blank the frame
   being looked at.
   **Preloading requests tiles once and gives up waiting after `PRELOAD_TIMEOUT_MS` (8 s)**. Offline,
   it used to re-request every frame's tiles every 250 ms forever.
-  **`FrameLayers.released` stops all layer work after teardown, and `AndroidView.update` returns
-  early when it is set.** An osmdroid `Marker(map)` NPE (`MapView.getRepository()` null) was seen
-  once at 14:09 on 2026-09-14: an update running against a detached MapView. It was never
-  reproduced, so this closes the path; it is not a proven fix.
+  **The MapView is built with `setDestroyMode(false)`, so `onDispose` is its only teardown.**
+  osmdroid 6.1.20 destroys a MapView in `onDetachedFromWindow`, and Compose detaches the view
+  before it runs `onDispose` — so for a moment the map was destroyed while `FrameLayers.released`
+  was still false, and an `update` then built `Marker(map)` against a null repository (the NPE seen
+  once at 14:09 on 2026-09-14). `update` also returns while the view is not attached; Compose
+  re-runs it on attach, so nothing is skipped.
   **The forecast overlay places cells at sub-pixel precision** (`Projection.toProjectedPixels` /
   `getProjectedPowerDifference` / offsets), not `toPixels`, which truncates to int. Truncation put
   61 of 801 cells of this morning's INCA run into already-used pixels at zoom 9. The exact placement

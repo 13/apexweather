@@ -137,30 +137,6 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
         return max(1f, abs(bx - ax))
     }
 
-    /**
-     * [lat]/[lon] as a screen pixel at full precision, in place of [Projection.toPixels]' own
-     * int-truncated one.
-     *
-     * `toPixels` throws away the sub-pixel fraction before this overlay ever sees it — harmless
-     * for a single marker, but this overlay can place hundreds of grid cells a few pixels apart,
-     * and two cells whose true positions differ by less than a pixel then round to the exact same
-     * integer pixel and collide in [bitmapLayout]'s bitmap: measured at 61 of 801 placed cells at
-     * zoom 9 against a recorded field with rain in it (`map-2026-09-14/inca-0500Z.json`,
-     * `NowcastOverlayScreenshotTest`). `toProjectedPixels` gives a zoom-independent, high-precision
-     * Mercator position; dividing it by the projection's own zoom scale
-     * ([Projection.getProjectedPowerDifference]) and adding its own screen offset
-     * ([Projection.getOffsetX]/`getOffsetY`) is exactly the arithmetic
-     * `Projection.getLongPixelsFromProjected` does internally before its own final `(long)` cast —
-     * recovering the fraction osmdroid already computed and then discarded, using only its own
-     * public API. Skips the wraparound correction that method also applies, because a single
-     * place's forecast box never nears the antimeridian.
-     */
-    private fun projectPrecise(projection: Projection, lat: Double, lon: Double, reuse: PointL): Pair<Float, Float> {
-        projection.toProjectedPixels(lat, lon, reuse)
-        val power = projection.projectedPowerDifference
-        return (reuse.x / power + projection.offsetX).toFloat() to (reuse.y / power + projection.offsetY).toFloat()
-    }
-
     private fun androidx.compose.ui.graphics.Color.toArgb(alpha: Int): Int =
         (alpha shl 24) or
             ((red * 255).toInt() shl 16) or
@@ -277,4 +253,28 @@ internal fun fillHoles(argb: IntArray, cols: Int, rows: Int): Int {
         }
     }
     return filled
+}
+
+/**
+ * [lat]/[lon] as a screen pixel at full precision, in place of [Projection.toPixels]' own
+ * int-truncated one.
+ *
+ * `toPixels` throws away the sub-pixel fraction before an overlay ever sees it — harmless
+ * for a single marker, but the forecast overlay can place hundreds of grid cells a few pixels apart,
+ * and two cells whose true positions differ by less than a pixel then round to the exact same
+ * integer pixel and collide in [bitmapLayout]'s bitmap: measured at 61 of 801 placed cells at
+ * zoom 9 against a recorded field with rain in it (`map-2026-09-14/inca-0500Z.json`,
+ * `NowcastOverlayScreenshotTest`). `toProjectedPixels` gives a zoom-independent, high-precision
+ * Mercator position; dividing it by the projection's own zoom scale
+ * ([Projection.getProjectedPowerDifference]) and adding its own screen offset
+ * ([Projection.getOffsetX]/`getOffsetY`) is exactly the arithmetic
+ * `Projection.getLongPixelsFromProjected` does internally before its own final `(long)` cast —
+ * recovering the fraction osmdroid already computed and then discarded, using only its own
+ * public API. Skips the wraparound correction that method also applies, because the province
+ * never nears the antimeridian. [RadarOverlay] places its tile corners with it too.
+ */
+internal fun projectPrecise(projection: Projection, lat: Double, lon: Double, reuse: PointL): Pair<Float, Float> {
+    projection.toProjectedPixels(lat, lon, reuse)
+    val power = projection.projectedPowerDifference
+    return (reuse.x / power + projection.offsetX).toFloat() to (reuse.y / power + projection.offsetY).toFloat()
 }

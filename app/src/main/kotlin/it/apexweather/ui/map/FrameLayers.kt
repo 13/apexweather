@@ -1,40 +1,31 @@
 package it.apexweather.ui.map
 
 import android.animation.ValueAnimator
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
-import it.apexweather.data.remote.RainViewerMapper
-import org.osmdroid.tileprovider.MapTileProviderBasic
-import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
-import org.osmdroid.views.overlay.TilesOverlay
 import java.time.Instant
-import kotlin.math.PI
-import kotlin.math.asinh
-import kotlin.math.floor
-import kotlin.math.tan
 
 /**
  * The rain layer of the MapView: one frame on screen, the next one faded in over it, and every
- * frame of the zoom's tiles fetched before the loop needs them.
+ * radar frame's tiles fetched before the loop needs them.
  *
  * The old code removed the overlay and added the next on every frame, so each frame arrived as a
- * blank map until its tiles did and there was no transition at all. A provider per frame is kept
- * for the life of the frame list, which is what lets the tiles already be there.
+ * blank map until its tiles did and there was no transition at all. Every radar frame's tiles are
+ * kept in one [RadarTileStore] for the life of the frame list, which is what lets them already be
+ * there — see that class for why this is not an osmdroid tile provider per frame any more.
  */
 internal class FrameLayers(private val map: MapView) {
 
-    private val providers = HashMap<Instant, MapTileProviderBasic>()
+    private val tiles = RadarTileStore { map.postInvalidate() }
     private var shown: Overlay? = null
     private var shownTime: Instant? = null
 
-    /** The frame fading out from under [shown], while its own provider is still protected. */
+    /** The frame fading out from under [shown], whose tiles are still protected. */
     private var outgoingTime: Instant? = null
     private var fading: ValueAnimator? = null
 
-    /** The observed frame times [requestTiles] was last asked to keep; [onAnimationEnd] reads it. */
-    private var lastWanted: Set<Instant> = emptySet()
+    /** The radar frame list [requestTiles] was last given; [show]'s fade end reads it. */
+    private var lastFrames: List<MapFrame> = emptyList()
 
     /**
      * Set once [release] has run. Every other method becomes a no-op after — `show` does nothing,
@@ -74,13 +65,11 @@ internal class FrameLayers(private val map: MapView) {
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: android.animation.Animator) {
                     map.overlays.remove(outgoing)
-                    val endedTime = outgoingTime
                     outgoingTime = null
                     fading = null
-                    // The frame that just finished fading out may have fallen out of the frame
-                    // list while it was fading — a pan or a zoom that landed mid-fade, say — so it
-                    // is checked against the wanted set again here, not only in requestTiles.
-                    if (endedTime != null && endedTime !in lastWanted) providers.remove(endedTime)?.detach()
+                    // The frame that just finished fading out may have left the frame list while it
+                    // was fading — a refresh that landed mid-fade — so the list is applied again.
+                    if (!released) evict()
                     map.invalidate()
                 }
             })
@@ -89,102 +78,65 @@ internal class FrameLayers(private val map: MapView) {
     }
 
     /**
-     * Asks every radar frame from [from] onwards for the tiles the map is showing, parents
-     * included, and prunes providers nothing on screen still needs.
+     * Asks for every radar frame's tiles in [visible] for the ground on screen, starting at [from]
+     * and wrapping round (see [preloadOrder]), and drops the tiles of frames [radarFrames] no longer
+     * has.
      *
-     * A provider behind the frame on screen or behind one still fading out is never detached here
-     * whatever [frames] says — see [providersToEvict]. The old code evicted purely off the frame
-     * list, which could drop the very provider a `TilesOverlay` on screen was reading from.
+     * Eviction follows the radar frame list, not [visible]: Heute's visible frames are all forecast,
+     * and computing it from them dropped every radar frame on the way into Heute and fetched them
+     * all again on the way out. The frame on screen and the one fading out are never evicted
+     * whatever the list says — see [framesToEvict].
      */
-    fun requestTiles(frames: List<MapFrame>, from: Int) {
+    fun requestTiles(radarFrames: List<MapFrame>, visible: List<MapFrame>, from: Int) {
         if (released) return
-        val indices = tileIndices()
-        val wanted = frames.filterIsInstance<MapFrame.Observed>().map { it.time }.toSet()
-        lastWanted = wanted
-        frames.drop(from.coerceAtLeast(0)).filterIsInstance<MapFrame.Observed>().forEach { frame ->
-            val provider = providerFor(frame)
-            indices.forEach { provider.getMapTile(it) }
-            if (map.zoomLevelDouble > RainViewerMapper.MAX_ZOOM) provider.fetchRadarParents(map)
-        }
-        val protected = setOfNotNull(shownTime, outgoingTime)
-        providersToEvict(providers.keys, wanted, protected).forEach { providers.remove(it)?.detach() }
+        lastFrames = radarFrames
+        evict()
+        val range = viewportTiles()
+        preloadOrder(visible, from).forEach { tiles.request(it.radar, range) }
     }
 
     /**
-     * True once the next [READY_AHEAD] observed frames from [from] have the current viewport's
-     * tiles in memory. Never fetches anything itself — [requestTiles] does that — this only reads
-     * the cache. False, not true, when the viewport has no tile indices yet: an empty box has
-     * nothing cached by definition, and reporting ready on it would clear the play button's ring
-     * before there was ever anything to check.
+     * True once the next [READY_AHEAD] radar frames the loop will reach from [from] — wrapping round,
+     * as the loop does — have the viewport's tiles. Never fetches anything itself. False, not true,
+     * when the viewport has no tiles yet: an empty box has nothing cached by definition, and
+     * reporting ready on it would clear the play button's ring before there was anything to check.
      */
-    fun nextFramesCached(frames: List<MapFrame>, from: Int): Boolean {
+    fun nextFramesCached(visible: List<MapFrame>, from: Int): Boolean {
         if (released) return true
-        val indices = tileIndices()
-        if (indices.isEmpty()) return false
-        var checked = 0
-        for (frame in frames.drop(from.coerceAtLeast(0)).filterIsInstance<MapFrame.Observed>()) {
-            if (checked >= READY_AHEAD) break
-            val provider = providers[frame.time] ?: return false
-            if (indices.any { provider.tileCache.getMapTile(it) == null }) return false
-            checked++
-        }
-        return true
+        val range = viewportTiles()
+        if (range.isEmpty()) return false
+        return preloadOrder(visible, from).take(READY_AHEAD).all { tiles.has(it.radar, range) }
     }
 
     fun release() {
         released = true
         fading?.cancel()
         fading = null
-        providers.values.forEach { it.detach() }
-        providers.clear()
+        tiles.release()
     }
 
-    /** The current viewport's tile indices at the radar's own zoom ceiling. */
-    private fun tileIndices(): List<Long> {
-        val zoom = minOf(map.zoomLevelDouble.toInt(), RainViewerMapper.MAX_ZOOM)
+    private fun evict() {
+        val protected = setOfNotNull(shownTime, outgoingTime)
+        tiles.evict(framesToEvict(tiles.heldFrames, lastFrames, protected))
+        // A tile still in flight for a frame that has just left the list is not stored when it lands.
+        tiles.admit(lastFrames.filterIsInstance<MapFrame.Observed>().mapTo(HashSet()) { it.time } + protected)
+    }
+
+    private fun viewportTiles(): List<Pair<Int, Int>> {
         val box = map.boundingBox
-        return buildList {
-            for (x in tileX(box.lonWest, zoom)..tileX(box.lonEast, zoom)) {
-                for (y in tileY(box.latNorth, zoom)..tileY(box.latSouth, zoom)) add(MapTileIndex.getTileIndex(zoom, x, y))
-            }
-        }
+        return radarTileRange(box.lonWest, box.lonEast, box.latNorth, box.latSouth)
     }
-
-    private fun providerFor(frame: MapFrame.Observed): MapTileProviderBasic =
-        providers.getOrPut(frame.time) {
-            MapTileProviderBasic(map.context, RadarTileSource(frame.radar)).apply {
-                setTileRequestCompleteHandler(map.tileRequestCompleteHandler)
-                tileCache.ensureCapacity(TILE_CAPACITY)
-            }
-        }
 
     private fun overlayFor(frame: MapFrame): Overlay = when (frame) {
-        is MapFrame.Observed -> TilesOverlay(providerFor(frame), map.context).apply {
-            loadingBackgroundColor = android.graphics.Color.TRANSPARENT
-            providerFor(frame).fetchRadarParents(map)
-        }
+        is MapFrame.Observed -> RadarOverlay(frame.radar, tiles, RADAR_ALPHA)
         is MapFrame.Forecast -> NowcastOverlay(frame.step, NOWCAST_ALPHA)
     }
 
     private fun setFade(overlay: Overlay, f: Float) {
         when (overlay) {
-            is TilesOverlay -> overlay.setColorFilter(radarFilter(RADAR_ALPHA * f))
+            is RadarOverlay -> overlay.fade = f
             is NowcastOverlay -> overlay.fade = f
         }
-    }
-
-    private fun radarFilter(alpha: Float) = ColorMatrixColorFilter(
-        ColorMatrix(floatArrayOf(1f, 0f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 0f, alpha, 0f)),
-    )
-
-    private fun tileX(lon: Double, zoom: Int): Int {
-        val n = 1 shl zoom
-        return floor((lon + 180.0) / 360.0 * n).toInt().coerceIn(0, n - 1)
-    }
-
-    private fun tileY(lat: Double, zoom: Int): Int {
-        val n = 1 shl zoom
-        return floor((1.0 - asinh(tan(Math.toRadians(lat))) / PI) / 2.0 * n).toInt().coerceIn(0, n - 1)
     }
 
     companion object {
@@ -197,9 +149,6 @@ internal class FrameLayers(private val map: MapView) {
          */
         const val PRELOAD_TIMEOUT_MS = 8_000L
 
-        /** One zoom's worth: thirteen frames of a handful of tiles each, and no more. */
-        const val TILE_CAPACITY = 40
-
         /** How much of the radar is let through, so the valley under the rain stays visible. */
         const val RADAR_ALPHA = 0.62f
 
@@ -209,13 +158,25 @@ internal class FrameLayers(private val map: MapView) {
 }
 
 /**
- * Which of the [held] providers no longer earns its place: not [wanted] by the current frame
- * list, and not [protected] — behind the frame on screen right now, or the one still fading out
- * from under it.
+ * Which of the [held] frames' tiles no longer earn their place: not a radar frame of [radarFrames],
+ * and not [protected] — the frame on screen right now, or the one still fading out from under it.
  *
- * Pure, so the rule can be proven without a MapView: `requestTiles` used to evict purely off
- * [wanted], which could detach the very provider the overlay currently on screen was reading
- * from — a `TilesOverlay` left pointing at a provider whose tiles are gone.
+ * [radarFrames] is the whole radar-and-nowcast list, never the zoom's visible one: in Heute that is
+ * all forecast, and evicting against it dropped every radar frame.
  */
-internal fun providersToEvict(held: Set<Instant>, wanted: Set<Instant>, protected: Set<Instant>): Set<Instant> =
-    held - wanted - protected
+internal fun framesToEvict(held: Set<Instant>, radarFrames: List<MapFrame>, protected: Set<Instant>): Set<Instant> =
+    held - radarFrames.filterIsInstance<MapFrame.Observed>().mapTo(HashSet()) { it.time } - protected
+
+/**
+ * Every radar frame of [frames], in the order the loop reaches them from [from]: that frame and
+ * those after it, then round from the start.
+ *
+ * Preloading used to take the frames from [from] onwards only. A first load selects the newest
+ * radar frame, so exactly one frame was fetched; the loop then ran through the forecast, wrapped to
+ * the oldest radar frame, and faded it in over nothing.
+ */
+internal fun preloadOrder(frames: List<MapFrame>, from: Int): List<MapFrame.Observed> {
+    if (frames.isEmpty()) return emptyList()
+    val start = if (from in frames.indices) from else 0
+    return (frames.drop(start) + frames.take(start)).filterIsInstance<MapFrame.Observed>()
+}
