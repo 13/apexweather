@@ -41,6 +41,10 @@ object RibbonColors {
     val FORECAST = Color(0xFFFFC861)
 }
 
+/** The bar under an x position, or null where there is nothing to point at. */
+internal fun ribbonIndexAt(x: Float, width: Int, count: Int): Int? =
+    if (count <= 0 || width <= 0) null else (x / width * count).toInt().coerceIn(0, count - 1)
+
 /**
  * The map's timeline as rain at the reader's place: a bar per step, so the answer to "when does it
  * reach me" is on screen before anything plays.
@@ -68,19 +72,18 @@ fun RainRibbon(
     val fontScale = LocalDensity.current.fontScale
     val barAreaHeight = (34 * fontScale).dp
 
-    fun indexAt(x: Float, width: Int): Int =
-        if (currentBars.isEmpty()) 0 else (x / width * currentBars.size).toInt().coerceIn(0, currentBars.lastIndex)
-
     Column(
         modifier
             .fillMaxWidth()
             .testTag("map_ribbon")
             .semantics(mergeDescendants = true) {
                 this.stateDescription = stateDescription
-                progressBarRangeInfo = ProgressBarRangeInfo(
-                    selected.toFloat(), 0f..(bars.size - 1).coerceAtLeast(1).toFloat(), steps = (bars.size - 2).coerceAtLeast(0),
-                )
-                setProgress { value -> onSelect(value.roundToInt().coerceIn(0, (bars.size - 1).coerceAtLeast(0))); true }
+                if (bars.size >= 2) {
+                    progressBarRangeInfo = ProgressBarRangeInfo(
+                        selected.toFloat(), 0f..(bars.size - 1).toFloat(), steps = (bars.size - 2).coerceAtLeast(0),
+                    )
+                    setProgress { value -> onSelect(value.roundToInt().coerceIn(0, bars.size - 1)); true }
+                }
             },
     ) {
         Canvas(
@@ -88,15 +91,15 @@ fun RainRibbon(
                 .fillMaxWidth()
                 .height(barAreaHeight)
                 .pointerInput(Unit) {
-                    detectTapGestures { currentOnSelect(indexAt(it.x, size.width)) }
+                    detectTapGestures { ribbonIndexAt(it.x, size.width, currentBars.size)?.let(currentOnSelect) }
                 }
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
                         onDragEnd = { if (currentNow >= 0 && abs(currentSelected - currentNow) <= 1) currentOnSelect(currentNow) },
                     ) { change, _ ->
-                        val i = indexAt(change.position.x, size.width)
+                        val i = ribbonIndexAt(change.position.x, size.width, currentBars.size) ?: return@detectHorizontalDragGestures
                         if (i != currentSelected) {
-                            if (currentBars[i].time.epochSecond % 3600 == 0L) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                            if (currentBars.getOrNull(i)?.time?.epochSecond?.rem(3600) == 0L) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                             currentOnSelect(i)
                         }
                     }
