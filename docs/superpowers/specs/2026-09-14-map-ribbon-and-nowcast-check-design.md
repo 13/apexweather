@@ -34,25 +34,56 @@ the rate at that instant; in the hour strip it is Open-Meteo's sum over the hour
 
 ## 1. The radar's word at the place: `RadarAtPlace`
 
-A pure function from radar tile pixels to a coarse level at one coordinate: `DRY`, `LIGHT`,
-`MODERATE`, `HEAVY`.
+A pure function from radar tile pixels to reflectivity, and from reflectivity to a rate, at one
+coordinate.
+
+**RainViewer publishes what its colours mean**, which the app had recorded as not so.
+`https://www.rainviewer.com/files/rainviewer_api_colors_table.csv` gives every scheme's RGBA for
+every whole dBZ from -32 to 75, in two blocks: rain, then snow. The tiles the app receives match
+the **Universal Blue** column exactly, although the URL asks for scheme 4 — the pixel over Dorf
+Tirol at 04:30Z is `#9e93756e`, Universal Blue at 6 dBZ, to the byte — and `PrecipColors`' eight
+stops are that column's colours at 15, 18, 20, 23, 29, 45, 50 and 54 dBZ. The table is committed as
+a fixture, and a test pins that a live tile's pixels are all in it, so a scheme change upstream
+fails a test instead of silently mis-reading rain.
 
 - For every radar frame the app fetches the single zoom-7 tile containing the place (and, where
   it differs, the one containing its station). Over this province that is one tile, rarely two:
   thirteen PNGs of about 10 kB per frame list, held in memory beside the frames in
   `RadarRepository` and refreshed with them.
-- It reads a 3x3 patch of pixels centred on the place's pixel. RainViewer's `smooth` option blurs
-  edges, and a single pixel lands on a blurred rim too easily. The patch's level is the wettest
-  pixel's, after a transparent or near-transparent pixel (alpha < 40) counts as dry.
-- A pixel's level is the nearest `PrecipColors` stop by RGB distance, bucketed: first two stops
-  light, next three moderate, the rest heavy. The snow palette (options `_1`) is a separate set of
-  colours; any pixel matching it counts as `LIGHT` at least, because the question this answers is
-  wet or dry.
-- The PNG decoding is `BitmapFactory` on a device and a `javax.imageio` reader in JVM tests; the
-  mapping from pixels to level takes an `IntArray` so both feed it the same way.
+- It reads a 3x3 patch of pixels centred on the place's pixel, because RainViewer's `smooth` option
+  blurs edges and one pixel lands on a rim too easily. The patch's value is its highest dBZ.
+- A pixel's dBZ is an exact lookup of its RGBA in the Universal Blue rain and snow blocks. The
+  smoothed tiles blend neighbouring colours, so a pixel with no exact entry takes the nearest entry
+  by RGBA distance, and one further than a small tolerance counts as unreadable and is skipped.
+  Snow is flagged as well as measured.
+- dBZ becomes a rate with Marshall–Palmer, `Z = 200·R^1.6`: 15 dBZ ≈ 0,3 mm/h, 20 ≈ 0,65,
+  30 ≈ 2,7, 45 ≈ 24. It is the stratiform relation and an approximation, not a measurement, and it
+  is said so wherever a number is derived from it.
+- **Below 15 dBZ is not rain.** Universal Blue draws 0–14 dBZ as a translucent beige, under
+  0,3 mm/h. This morning's echo was 6 dBZ. `RadarAtPlace` reports it as `DRY` for the purposes of
+  §3, which is the reading the gauges agreed with.
+- Decoding is `BitmapFactory` on a device and `javax.imageio` in JVM tests; the lookup takes an
+  `IntArray` so both feed it the same way.
 
-Tested against tiles recorded on 2026-09-14 (`app/src/test/resources/fixtures/rainviewer/`): the
-04:30Z tile reads wet at Dorf Tirol and the 05:30Z one dry.
+Tested against tiles recorded on 2026-09-14: the 04:30Z tile reads 6 dBZ (dry) at Dorf Tirol, the
+05:30Z one transparent, and every pixel of every recorded tile resolves within tolerance.
+
+## 1b. One scale for both layers: `PrecipColors` re-anchored
+
+Today the forecast paints the lightest blue at 0,1 mm/h and orange at 8 mm/h, where the radar
+paints them at about 0,3 and 24. The same colour therefore means three times more rain on the
+radar than on the forecast, and INCA's drizzle arrives looking like the radar's rain.
+
+The stops move to the rates their colours stand for on the radar, from the table and
+Marshall–Palmer: 15 dBZ ≈ 0,3, 18 ≈ 0,5, 20 ≈ 0,65, 23 ≈ 1,0, 29 ≈ 2,4, 45 ≈ 24, 50 ≈ 49,
+54 ≈ 87 mm/h. Forecast cells under 0,3 mm/h are drawn in the radar's beige at its alpha (as
+"possible", not as rain) rather than as the first blue; under 0,1 mm/h they are not drawn, as now.
+The rain words in §4 use the same boundaries, so the ribbon, the map and the legend agree.
+
+The comments in `PrecipColors`, `RainViewerMapper.COLOR_SCHEME` and CLAUDE.md that say RainViewer
+does not publish its scale, and that the tiles are scheme 4, are corrected. The legend stays
+labelled in words: the numbers now exist, but Marshall–Palmer is an approximation and "leicht" does
+not claim a precision "0,3 mm/h" would.
 
 ## 2. Fix A: ask for INCA when a newer run is due
 
@@ -74,8 +105,9 @@ held run without a request, and a call at 05:51Z makes one.
 In `MapUiState.timeline`, after merging, each forecast step within 60 minutes of the newest radar
 frame is checked against that frame's `RadarAtPlace` level:
 
-- If the radar reads `DRY` at the place and the step has any cell at or above 0,1 mm/h within
-  5 km of the place, those cells are marked `unconfirmed = true` (a new field on `NowcastCell`).
+- If the radar reads `DRY` at the place (under 15 dBZ, see §1) and the step has any cell drawn at
+  all (0,1 mm/h or more) within 5 km of the place, those cells are marked `unconfirmed = true` (a
+  new field on `NowcastCell`).
 - Past 60 minutes nothing is marked. INCA may be right about rain arriving from outside the
   patch, and a single radar frame cannot speak for an hour it has not seen.
 - Cells further than 5 km are never marked. The patch is where the pixels were read, and where the
@@ -95,8 +127,8 @@ Tested with this morning as a fixture: radar frames 04:30Z to 05:40Z, INCA's 05:
 `RainRibbon` replaces the `Slider` in `Timeline`.
 
 **Bars.** One bar per step, height by `PrecipScale.fillFraction` on the rate so the square-root
-scale matches the hour strip's. Past steps are solid blue from their `RadarAtPlace` level (a level
-has no rate, so each draws a fixed height: light 0,3, moderate 1,5, heavy 6 mm/h equivalents).
+scale matches the hour strip's. Past steps are solid blue from their `RadarAtPlace` rate (§1), and a
+sub-rain echo under 15 dBZ draws as a dry stub.
 Forecast steps are amber hatched from the rate at the place's nearest grid cell. Unconfirmed steps
 are dashed outlines. A dry step is a 2 dp stub, so time still has a place on the ribbon. The
 selected bar is outlined in white; a white line marks "jetzt" (the newest radar frame).
@@ -113,8 +145,9 @@ The zoom is held in `MapUiState` and not persisted. Play loops inside the curren
 
 **Header.** Play/pause, the time via `Format.dayTime` in large type, how far it is from "jetzt"
 ("in 35 min", "vor 20 min", "in 9 h"), and under it "<place> · <word>". The word comes from the
-selected step: `trocken`, `leichter Regen`, `Regen`, `starker Regen`, `Regen möglich` (unconfirmed,
-or p90-only), and in *Heute* `bis N mm/h` beside it. The kind chip reads `Radar`, `Nowcast`,
+selected step, on §1b's boundaries: `trocken` under 0,3 mm/h, `leichter Regen` to 2,4, `Regen` to
+24, `starker Regen` above; `Regen möglich` for an unconfirmed step, a p90-only step, or a forecast
+between 0,1 and 0,3 mm/h; and in *Heute* `bis N mm/h` beside it. The kind chip reads `Radar`, `Nowcast`,
 `Ensemble` or `unsicher`.
 
 **Interaction.** Drag or tap on the ribbon selects a step; releasing within one step of "jetzt"
@@ -167,8 +200,16 @@ words (5), "up to %s mm/h" (1), the radar-overrule line (1). The existing `map_k
 
 ## 7. Testing
 
-- `RadarAtPlaceTest`: recorded tiles, wet and dry at the place, the snow palette, a transparent
-  rim.
+- `RadarAtPlaceTest`: recorded tiles, the 6 dBZ echo reading dry, the snow block, a transparent
+  rim, and every pixel of every recorded tile resolving within tolerance against the committed
+  colour table.
+- `PrecipColorsTest`: each stop's colour is the Universal Blue colour at its dBZ, and its rate is
+  Marshall–Palmer's for that dBZ.
+
+The fixtures recorded this morning — thirteen z7 tiles (67/45, 04:30Z to 06:30Z), INCA's 05:00Z
+run and the ensemble over the place box, RainViewer's frame list and the colour table — are
+committed with this spec under `app/src/test/resources/fixtures/map-2026-09-14/`, because the
+tiles leave RainViewer's two-hour window by mid-morning and cannot be re-recorded.
 - `NowcastRepositoryTest` (new): next-run timing with a fake clock; place switch fetches at once.
 - `MapTimelineTest`: this morning's unconfirmed steps; nothing marked past 60 minutes or beyond
   5 km; nothing marked when the radar is wet.
