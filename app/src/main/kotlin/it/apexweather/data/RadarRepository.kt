@@ -6,8 +6,13 @@ import it.apexweather.data.remote.RainViewerMapper
 import it.apexweather.domain.RadarAtPlace
 import it.apexweather.domain.RadarReading
 import it.apexweather.domain.TilePixel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -52,19 +57,39 @@ class RadarRepository @Inject constructor(
      *
      * A frame whose tile could not be fetched or decoded is absent from the result rather than
      * reported dry: an unknown must never overrule a forecast.
+     *
+     * The fetches themselves run outside the lock: a network call can take a while, and holding the
+     * mutex across thirteen of them serialised every one of them behind the last, which is what made
+     * the radar check slow enough to be worth showing the map without. They run up to
+     * [MAX_PARALLEL_TILES] at a time instead, and the lock is only ever held around the in-memory
+     * map — working out what is missing, and writing back what came in.
      */
     suspend fun readingsAt(lat: Double, lon: Double): Map<Instant, RadarReading> {
         val current = frames()
         val pixel = RadarAtPlace.pixelOf(lat, lon)
+        val missing = mutex.withLock { current.filter { (it.time to pixel) !in readings } }
+        if (missing.isNotEmpty()) {
+            val semaphore = Semaphore(MAX_PARALLEL_TILES)
+            val fetched = coroutineScope {
+                missing.map { frame ->
+                    async {
+                        frame.time to semaphore.withPermit {
+                            runCatchingCancellable {
+                                val bytes = api.tile(frame.tileUrl(pixel.zoom, pixel.x, pixel.y)).use { it.bytes() }
+                                decoder.decode(bytes)?.let { RadarAtPlace.read(it.argb, it.width, pixel.px, pixel.py) }
+                            }.getOrNull()
+                        }
+                    }
+                }.awaitAll()
+            }
+            mutex.withLock {
+                fetched.forEach { (time, reading) -> if (reading != null) readings[time to pixel] = reading }
+            }
+        }
         return mutex.withLock {
             val out = LinkedHashMap<Instant, RadarReading>()
             for (frame in current) {
-                val key = frame.time to pixel
-                val reading = readings[key] ?: runCatchingCancellable {
-                    val bytes = api.tile(frame.tileUrl(pixel.zoom, pixel.x, pixel.y)).use { it.bytes() }
-                    decoder.decode(bytes)?.let { RadarAtPlace.read(it.argb, it.width, pixel.px, pixel.py) }
-                }.getOrNull()?.also { readings[key] = it }
-                if (reading != null) out[frame.time] = reading
+                readings[frame.time to pixel]?.let { out[frame.time] = it }
             }
             readings.keys.retainAll { (time, _) -> current.any { it.time == time } }
             out
@@ -74,5 +99,8 @@ class RadarRepository @Inject constructor(
     companion object {
         /** RainViewer publishes a new frame every ten minutes; asking sooner returns the same list. */
         val FRESH_FOR: Duration = Duration.ofMinutes(10)
+
+        /** How many tiles fetch at once: enough to be worth it, few enough to not flood the host. */
+        const val MAX_PARALLEL_TILES = 4
     }
 }

@@ -169,7 +169,7 @@ class RadarRepositoryTest {
         assertEquals(7, readings.size)
     }
 
-    /** The third tile and every one after it hang until cancelled; the first two return at once. */
+    /** The first two calls return at once; the third and every one after it hang until cancelled. */
     private class SlowApi : RainViewerApi {
         val times = listOf("0430", "0440", "0450", "0500", "0510", "0520", "0530", "0540")
         var tileCalls = 0
@@ -187,7 +187,16 @@ class RadarRepositoryTest {
         }
     }
 
-    /** A cancelled fetch must stop the loop, not be swallowed and retried on every frame left. */
+    /**
+     * A cancelled fetch must stop the loop, not be swallowed and retried on every frame left.
+     *
+     * The count is [RadarRepository.MAX_PARALLEL_TILES] plus the two that returned at once, not the
+     * old sequential three: four tiles start together, the first two of those (calls 1 and 2) return
+     * immediately and free their permits, which lets two more (calls 5 and 6) start and then hang —
+     * so by the time `cancel` runs, six calls have been made and four fetches are stuck mid-flight.
+     * Cancelling must stop it there rather than let the two still-queued frames (7 and 8) ever call
+     * the API at all, which is what this pins.
+     */
     @Test
     fun `cancelling readingsAt stops fetching further tiles`() = runTest {
         val api = SlowApi()
@@ -196,6 +205,42 @@ class RadarRepositoryTest {
         runCurrent()
         job.cancel()
         advanceUntilIdle()
-        assertEquals(3, api.tileCalls)
+        assertEquals(RadarRepository.MAX_PARALLEL_TILES + 2, api.tileCalls)
+        assertTrue("cancellation must stop it short of every frame", api.tileCalls < api.times.size)
+    }
+
+    /** The third dimension the old, strictly sequential fetch could not have: real concurrency. */
+    private class ConcurrencyApi : RainViewerApi {
+        val times = listOf("0430", "0440", "0450", "0500", "0510", "0520", "0530", "0540")
+        var tileCalls = 0
+        var inFlight = 0
+        var peakInFlight = 0
+        override suspend fun weatherMaps() = RainViewerMaps(
+            host = "https://tilecache.rainviewer.com",
+            radar = RainViewerRadar(past = times.map {
+                RainViewerFrame(Instant.parse("2026-09-14T${it.take(2)}:${it.drop(2)}:00Z").epochSecond, "/v2/radar/$it")
+            }),
+        )
+        override suspend fun tile(url: String): ResponseBody {
+            tileCalls++
+            inFlight++
+            peakInFlight = maxOf(peakInFlight, inFlight)
+            // Long enough that every tile still running overlaps every other one still running,
+            // rather than racing to finish before the next batch even starts.
+            delay(100)
+            inFlight--
+            val time = url.substringAfter("/v2/radar/").take(4)
+            return RadarFixtures.bytes("radar-z7-67-45-${time}Z.png").toResponseBody("image/png".toMediaType())
+        }
+    }
+
+    @Test
+    fun `tiles are fetched concurrently, at most four at a time`() = runTest {
+        val api = ConcurrencyApi()
+        val repo = RadarRepository(api, decoder, MovableClock(Instant.parse("2026-09-14T05:45:00Z")))
+        val readings = repo.readingsAt(lat, lon)
+        assertEquals(RadarRepository.MAX_PARALLEL_TILES, api.peakInFlight)
+        assertEquals(8, api.tileCalls)
+        assertEquals(8, readings.size)
     }
 }

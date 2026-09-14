@@ -55,10 +55,26 @@ class MapViewModel @Inject constructor(
             // drawn around the place. A failure here leaves the radar loop intact: the map was worth
             // looking at without a forecast until now, and still is.
             val ahead = place?.let { nowcast.forPlace(it).steps }.orEmpty()
-            val check = place?.let { PlaceCheck(it.lat, it.lon, radar.readingsAt(it.lat, it.lon)) }
-            val frames = MapUiState.timeline(past, ahead, check)
+            // The radar and the forecast are worth showing the instant both are in; the check against
+            // the place only annotates what is already on screen, and must not hold that back. A held
+            // check from the same place is reused here — its readings are keyed by frame time, so they
+            // are still good — rather than left blank until the second phase below replaces it.
+            val held = _state.value.check?.takeIf { place != null && it.lat == place.lat && it.lon == place.lon }
+            val frames = MapUiState.timeline(past, ahead, held)
             _state.update { state ->
-                state.copy(frames = frames, check = check, selected = state.selectionAfter(frames), loading = false)
+                state.copy(frames = frames, check = held, selected = state.selectionAfter(frames), loading = false)
+            }
+            if (place != null) {
+                val readings = radar.readingsAt(place.lat, place.lon)
+                val check = PlaceCheck(place.lat, place.lon, readings)
+                // The reader may have switched place while the tiles were still in flight; a check for
+                // the place they left must never land on the one they are looking at now.
+                if (_state.value.place?.istat == place.istat) {
+                    val checked = MapUiState.timeline(past, ahead, check)
+                    _state.update { state ->
+                        state.copy(frames = checked, check = check, selected = state.selectionAfter(checked))
+                    }
+                }
             }
         }
     }

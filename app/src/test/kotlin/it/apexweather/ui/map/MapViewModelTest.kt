@@ -34,6 +34,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -78,6 +80,9 @@ class MapViewModelTest {
     /** Thirteen frames ten minutes apart, as RainViewer serves them. */
     private class FakeRainViewer(private val t0: Instant) : RainViewerApi {
         var frames: Int = 13
+
+        /** Set to model a tile that has not answered yet, without ever actually answering it. */
+        var tileDelayMs: Long = 0
         override suspend fun weatherMaps() = RainViewerMaps(
             host = "https://example.invalid",
             radar = RainViewerRadar(
@@ -86,7 +91,10 @@ class MapViewModelTest {
                 },
             ),
         )
-        override suspend fun tile(url: String): okhttp3.ResponseBody = throw java.io.IOException("no tiles in this test")
+        override suspend fun tile(url: String): okhttp3.ResponseBody {
+            if (tileDelayMs > 0) delay(tileDelayMs)
+            throw java.io.IOException("no tiles in this test")
+        }
     }
 
     /** No forecast: this is a test about the loop, and one source of frames is enough to drive it. */
@@ -278,5 +286,25 @@ class MapViewModelTest {
         runCurrent()
         assertFalse(vm.state.value.playing)
         assertEquals(0, vm.state.value.selected)
+    }
+
+    /**
+     * The radar check against the place only marks cells that are already on screen as uncertain; it
+     * must not hold up drawing the radar and forecast the app already has in hand. Before this,
+     * `refresh` awaited every tile at the place before writing anything down at all, so one slow tile
+     * held the whole map back with nothing on screen.
+     */
+    @Test
+    fun `the map shows its frames before the radar check at the place resolves`() = mapTest { vm ->
+        // A place is needed for this to prove anything: with none, the old code skipped the check
+        // entirely and never exercised the bug.
+        vm.state.first { it.place != null }
+        rainViewer.frames = 6
+        rainViewer.tileDelayMs = 60_000
+        clock.now = clock.now.plus(java.time.Duration.ofMinutes(20))
+        vm.refresh()
+        runCurrent()
+        assertEquals("the frames must be drawn while the radar check is still pending", 6, vm.state.value.frames.size)
+        assertFalse(vm.state.value.loading)
     }
 }
