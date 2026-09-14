@@ -38,6 +38,15 @@ class RadarRepository @Inject constructor(
     private val clock: Clock,
 ) {
     private val mutex = Mutex()
+
+    /**
+     * Serialises whole [readingsAt] calls: init, the place collector and a tab resume can all ask
+     * for the same place close together, and without this each built its own missing list and its
+     * own semaphore, fetching the same tiles twice with up to twice [MAX_PARALLEL_TILES] in flight
+     * at once. A second caller now waits, finds the first caller's tiles already cached, and fetches
+     * nothing. [mutex] is unchanged and still guards only the maps themselves.
+     */
+    private val readingsLock = Mutex()
     private var frames: List<RadarFrame> = emptyList()
     private var fetchedAt: Instant? = null
 
@@ -58,41 +67,44 @@ class RadarRepository @Inject constructor(
      * A frame whose tile could not be fetched or decoded is absent from the result rather than
      * reported dry: an unknown must never overrule a forecast.
      *
-     * The fetches themselves run outside the lock: a network call can take a while, and holding the
+     * The fetches themselves run outside [mutex]: a network call can take a while, and holding the
      * mutex across thirteen of them serialised every one of them behind the last, which is what made
      * the radar check slow enough to be worth showing the map without. They run up to
-     * [MAX_PARALLEL_TILES] at a time instead, and the lock is only ever held around the in-memory
-     * map — working out what is missing, and writing back what came in.
+     * [MAX_PARALLEL_TILES] at a time instead, and [mutex] is only ever held around the in-memory
+     * map — working out what is missing, and writing back what came in. The whole call sits behind
+     * [readingsLock] as well, so two overlapping callers cannot each go fetch the same tiles.
      */
     suspend fun readingsAt(lat: Double, lon: Double): Map<Instant, RadarReading> {
         val current = frames()
         val pixel = RadarAtPlace.pixelOf(lat, lon)
-        val missing = mutex.withLock { current.filter { (it.time to pixel) !in readings } }
-        if (missing.isNotEmpty()) {
-            val semaphore = Semaphore(MAX_PARALLEL_TILES)
-            val fetched = coroutineScope {
-                missing.map { frame ->
-                    async {
-                        frame.time to semaphore.withPermit {
-                            runCatchingCancellable {
-                                val bytes = api.tile(frame.tileUrl(pixel.zoom, pixel.x, pixel.y)).use { it.bytes() }
-                                decoder.decode(bytes)?.let { RadarAtPlace.read(it.argb, it.width, pixel.px, pixel.py) }
-                            }.getOrNull()
+        return readingsLock.withLock {
+            val missing = mutex.withLock { current.filter { (it.time to pixel) !in readings } }
+            if (missing.isNotEmpty()) {
+                val semaphore = Semaphore(MAX_PARALLEL_TILES)
+                val fetched = coroutineScope {
+                    missing.map { frame ->
+                        async {
+                            frame.time to semaphore.withPermit {
+                                runCatchingCancellable {
+                                    val bytes = api.tile(frame.tileUrl(pixel.zoom, pixel.x, pixel.y)).use { it.bytes() }
+                                    decoder.decode(bytes)?.let { RadarAtPlace.read(it.argb, it.width, pixel.px, pixel.py) }
+                                }.getOrNull()
+                            }
                         }
-                    }
-                }.awaitAll()
+                    }.awaitAll()
+                }
+                mutex.withLock {
+                    fetched.forEach { (time, reading) -> if (reading != null) readings[time to pixel] = reading }
+                }
             }
             mutex.withLock {
-                fetched.forEach { (time, reading) -> if (reading != null) readings[time to pixel] = reading }
+                val out = LinkedHashMap<Instant, RadarReading>()
+                for (frame in current) {
+                    readings[frame.time to pixel]?.let { out[frame.time] = it }
+                }
+                readings.keys.retainAll { (time, _) -> current.any { it.time == time } }
+                out
             }
-        }
-        return mutex.withLock {
-            val out = LinkedHashMap<Instant, RadarReading>()
-            for (frame in current) {
-                readings[frame.time to pixel]?.let { out[frame.time] = it }
-            }
-            readings.keys.retainAll { (time, _) -> current.any { it.time == time } }
-            out
         }
     }
 

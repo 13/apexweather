@@ -7,6 +7,8 @@ import it.apexweather.data.remote.RainViewerMaps
 import it.apexweather.data.remote.RainViewerRadar
 import it.apexweather.domain.RadarReading
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -242,5 +244,28 @@ class RadarRepositoryTest {
         assertEquals(RadarRepository.MAX_PARALLEL_TILES, api.peakInFlight)
         assertEquals(8, api.tileCalls)
         assertEquals(8, readings.size)
+    }
+
+    /**
+     * Init, the place collector and a tab resume can all call `refresh` close together, and each of
+     * them used to build its own missing list and its own semaphore: the same eight tiles went out
+     * twice, sixteen requests for eight pictures, with up to twice the declared cap in flight at
+     * once. A second caller must instead wait for the first, find the tiles it fetched already
+     * cached, and fetch nothing.
+     */
+    @Test
+    fun `overlapping calls for the same place fetch each tile once and never exceed four at a time`() = runTest {
+        val api = ConcurrencyApi()
+        val repo = RadarRepository(api, decoder, MovableClock(Instant.parse("2026-09-14T05:45:00Z")))
+        val first = async { repo.readingsAt(lat, lon) }
+        val second = async { repo.readingsAt(lat, lon) }
+        val results = awaitAll(first, second)
+        assertEquals("the same eight tiles must not be fetched twice", 8, api.tileCalls)
+        assertTrue(
+            "in-flight must never exceed the declared cap, even with two callers",
+            api.peakInFlight <= RadarRepository.MAX_PARALLEL_TILES,
+        )
+        assertEquals(8, results[0].size)
+        assertEquals(8, results[1].size)
     }
 }
