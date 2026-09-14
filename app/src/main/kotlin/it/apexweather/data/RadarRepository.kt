@@ -6,6 +6,8 @@ import it.apexweather.data.remote.RainViewerMapper
 import it.apexweather.domain.RadarAtPlace
 import it.apexweather.domain.RadarReading
 import it.apexweather.domain.TilePixel
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -13,6 +15,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -32,11 +35,18 @@ import javax.inject.Singleton
  * the reader opens the map it tries again rather than waiting out the interval.
  */
 @Singleton
-class RadarRepository @Inject constructor(
+class RadarRepository internal constructor(
     private val api: RainViewerApi,
     private val decoder: TileDecoder,
     private val clock: Clock,
+    /** Where a tile's body is read. */
+    private val io: CoroutineDispatcher,
+    /** Where it is decoded and its pixels read. */
+    private val compute: CoroutineDispatcher,
 ) {
+    @Inject constructor(api: RainViewerApi, decoder: TileDecoder, clock: Clock) :
+        this(api, decoder, clock, Dispatchers.IO, Dispatchers.Default)
+
     private val mutex = Mutex()
 
     /**
@@ -86,8 +96,14 @@ class RadarRepository @Inject constructor(
                         async {
                             frame.time to semaphore.withPermit {
                                 runCatchingCancellable {
-                                    val bytes = api.tile(frame.tileUrl(pixel.zoom, pixel.x, pixel.y)).use { it.bytes() }
-                                    decoder.decode(bytes)?.let { RadarAtPlace.read(it.argb, it.width, pixel.px, pixel.py) }
+                                    val body = api.tile(frame.tileUrl(pixel.zoom, pixel.x, pixel.y))
+                                    // Retrofit resumes on the caller's dispatcher, which is the
+                                    // ViewModel's Main: reading the body, decoding the PNG and
+                                    // reading its pixels ran there thirteen times on a cold open.
+                                    val bytes = withContext(io) { body.use { it.bytes() } }
+                                    withContext(compute) {
+                                        decoder.decode(bytes)?.let { RadarAtPlace.read(it.argb, it.width, pixel.px, pixel.py) }
+                                    }
                                 }.getOrNull()
                             }
                         }

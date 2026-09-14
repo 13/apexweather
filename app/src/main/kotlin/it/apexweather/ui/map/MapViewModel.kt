@@ -6,7 +6,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import it.apexweather.data.NowcastRepository
 import it.apexweather.data.RadarRepository
 import it.apexweather.ui.WeatherStateHolder
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,16 +28,28 @@ import javax.inject.Inject
  * and asks for the forecast around the new one.
  */
 @HiltViewModel
-class MapViewModel @Inject constructor(
+class MapViewModel internal constructor(
     private val radar: RadarRepository,
     private val nowcast: NowcastRepository,
     holder: WeatherStateHolder,
+    /** Where the ribbon's bars are worked out: off the main thread, and a test's own dispatcher in tests. */
+    private val compute: CoroutineDispatcher,
 ) : ViewModel() {
+
+    @Inject constructor(radar: RadarRepository, nowcast: NowcastRepository, holder: WeatherStateHolder) :
+        this(radar, nowcast, holder, Dispatchers.Default)
 
     private val _state = MutableStateFlow(MapUiState())
     val state: StateFlow<MapUiState> = _state.asStateFlow()
 
     private var animation: Job? = null
+
+    /**
+     * The refresh in flight. Init, the place collector and every resume all ask for one, and they
+     * used to run side by side: a slow one's second phase could land after a newer one's first and
+     * put an older timeline back. A new refresh cancels the one before it.
+     */
+    private var refreshJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -49,7 +64,8 @@ class MapViewModel @Inject constructor(
     }
 
     fun refresh() {
-        viewModelScope.launch {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
             val past = radar.frames()
             val place = _state.value.place
             // The forecast is only asked for once a place is known, because the box it covers is
@@ -69,8 +85,9 @@ class MapViewModel @Inject constructor(
                 .filter { step -> present == null || (!step.time.isBefore(present.truncatedTo(ChronoUnit.HOURS)) && !step.time.isAfter(present.plus(MapUiState.TODAY_AHEAD))) }
             // Heute gets the same radar check as Jetzt, or the two zooms disagree about one hour.
             val outlook = MapUiState.markUnconfirmed(hours, lastSeen, heldCheck).map(MapFrame::Forecast)
+            val bars = withContext(compute) { MapUiState(frames = frames, outlook = outlook, check = heldCheck, place = place).withBars() }
             _state.update { state ->
-                val next = state.copy(frames = frames, outlook = outlook, check = heldCheck)
+                val next = state.copy(frames = frames, outlook = outlook, check = heldCheck, nowBars = bars.nowBars, todayBars = bars.todayBars)
                 next.copy(selected = state.selectionAfter(next.visible), loading = false)
             }
             if (place != null) {
@@ -81,8 +98,9 @@ class MapViewModel @Inject constructor(
                 if (_state.value.place?.istat == place.istat) {
                     val checked = MapUiState.timeline(past, ahead, check)
                     val checkedOutlook = MapUiState.markUnconfirmed(hours, lastSeen, check).map(MapFrame::Forecast)
+                    val checkedBars = withContext(compute) { MapUiState(frames = checked, outlook = checkedOutlook, check = check, place = place).withBars() }
                     _state.update { state ->
-                        val next = state.copy(frames = checked, outlook = checkedOutlook, check = check)
+                        val next = state.copy(frames = checked, outlook = checkedOutlook, check = check, nowBars = checkedBars.nowBars, todayBars = checkedBars.todayBars)
                         next.copy(selected = state.selectionAfter(next.visible))
                     }
                 }

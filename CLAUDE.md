@@ -504,6 +504,13 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   passed that render.
   **Crossfade and the ribbon look were not seen over real rain**: the day of implementation was dry
   across the province. The fixture goldens are the evidence.
+  **A new `MapViewModel.refresh` cancels the one before it.** Init, the place collector and every
+  resume all start one, and side by side a slow one's radar check landed after a newer one's first
+  phase and put its older timeline back (`MapViewModelTest` pins it).
+  **Nothing heavy runs on Main:** `RadarRepository` reads a tile's body on IO and decodes it on
+  Default, and the ribbon's bars are computed in `refresh` off Main for both zooms and carried in
+  `MapUiState` (`nowBars`/`todayBars`); the screen only reads `bars`. A hand-built state for a test
+  calls `withBars()`.
   **`MapViewModel.refresh` updates twice.** Radar and forecast go on screen first; the radar check
   at the place is applied after, only if the place has not changed meanwhile, because the check
   annotates the map and must not hold it back — before this, the first map open waited for thirteen

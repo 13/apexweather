@@ -55,12 +55,12 @@ class MapContentTest {
     private fun state(vararg frame: RadarFrame) = MapUiState(
         frames = MapUiState.timeline(frame.toList(), emptyList()),
         selected = 0, playing = false, place = place, loading = false,
-    )
+    ).withBars()
 
     private fun withForecast(selected: Int) = MapUiState(
         frames = MapUiState.timeline(frames, steps),
         selected = selected, playing = false, place = place, loading = false,
-    )
+    ).withBars()
 
     @Test
     fun theTimelineAndTheAttributionAreBothOnScreen() {
@@ -148,7 +148,7 @@ class MapContentTest {
         val state = MapUiState(
             frames = MapUiState.timeline(frames, steps, check), check = check,
             selected = 13, playing = false, place = place, loading = false,
-        )
+        ).withBars()
         rule.setContent { ApexTheme { MapContent(state, onPlayPause = {}, onSelect = {}) } }
         rule.onNodeWithText(context.getString(R.string.map_kind_unconfirmed)).assertIsDisplayed()
         rule.onNodeWithTag("map_radar_overrule").assertIsDisplayed()
@@ -209,7 +209,7 @@ class MapContentTest {
         val today = MapUiState(
             frames = MapUiState.timeline(frames, steps), outlook = outlook,
             zoom = MapZoom.TODAY, selected = 0, playing = false, place = place, loading = false,
-        )
+        ).withBars()
         rule.setContent { ApexTheme { MapContent(today, onPlayPause = {}, onSelect = {}) } }
         rule.onNodeWithTag("map_frame_offset").assertDoesNotExist()
     }

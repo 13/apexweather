@@ -162,7 +162,7 @@ fun MapContent(
 @Composable
 private fun Timeline(state: MapUiState, ready: Boolean, onPlayPause: () -> Unit, onSelect: (Int) -> Unit, onZoom: (MapZoom) -> Unit) {
     val formats = LocalFormats.current
-    val bars = remember(state.visible, state.check, state.place) { RibbonModel.bars(state) }
+    val bars = state.bars
     val bar = bars.getOrNull(state.selected)
     val word = bar?.let(RibbonModel::word)
     GlassCard(Modifier.fillMaxWidth().testTag("map_timeline")) {

@@ -202,7 +202,11 @@ class RadarRepositoryTest {
     @Test
     fun `cancelling readingsAt stops fetching further tiles`() = runTest {
         val api = SlowApi()
-        val repo = RadarRepository(api, decoder, MovableClock(Instant.parse("2026-09-14T05:45:00Z")))
+        // The body read and the decode run on the test's own scheduler here: the arithmetic below
+        // needs the first two tiles to finish inside runCurrent, which real IO and Default threads
+        // (where they run in the app, off the main thread) do not promise.
+        val work = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)
+        val repo = RadarRepository(api, decoder, MovableClock(Instant.parse("2026-09-14T05:45:00Z")), work, work)
         val job = launch { repo.readingsAt(lat, lon) }
         runCurrent()
         job.cancel()

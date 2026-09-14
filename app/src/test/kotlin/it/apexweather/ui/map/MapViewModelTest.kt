@@ -168,7 +168,7 @@ class MapViewModelTest {
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T = MapViewModel(
-                    RadarRepository(rainViewer, { null }, clock), NowcastRepository(NoNowcast(), clock), holder,
+                    RadarRepository(rainViewer, { null }, clock), NowcastRepository(NoNowcast(), clock), holder, mainDispatcher,
                 ) as T
             },
         )[MapViewModel::class.java]
@@ -306,6 +306,36 @@ class MapViewModelTest {
         runCurrent()
         assertEquals("the frames must be drawn while the radar check is still pending", 6, vm.state.value.frames.size)
         assertFalse(vm.state.value.loading)
+    }
+
+    /**
+     * Refreshes come from init, the place collector and every resume, and used to run side by side.
+     * A slow one's second phase — the radar check at the place — could then land after a newer
+     * refresh's first phase and put its own, older timeline back on screen.
+     */
+    @Test
+    fun `an older refresh whose readings resolve last never overwrites a newer one`() = mapTest { vm ->
+        vm.state.first { it.place != null }
+        runCurrent()
+        // A: thirteen frames, and a radar check that takes a long time.
+        rainViewer.tileDelayMs = 60_000
+        clock.now = clock.now.plus(java.time.Duration.ofMinutes(20))
+        vm.refresh()
+        runCurrent()
+        assertEquals(13, vm.state.value.frames.size)
+        // B: a newer list of six, started while A's tiles are still in flight.
+        rainViewer.frames = 6
+        clock.now = clock.now.plus(java.time.Duration.ofMinutes(20))
+        vm.refresh()
+        runCurrent()
+        assertEquals(6, vm.state.value.frames.size)
+        // Long enough for A's readings to resolve, but not for B's to have queued up behind them.
+        advanceTimeBy(250_000)
+        runCurrent()
+        assertEquals("the older refresh landed over the newer one", 6, vm.state.value.frames.size)
+        advanceTimeBy(1_000_000)
+        runCurrent()
+        assertEquals(6, vm.state.value.frames.size)
     }
 
     @Test

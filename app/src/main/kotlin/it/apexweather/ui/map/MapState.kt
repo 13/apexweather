@@ -60,7 +60,24 @@ data class MapUiState(
     val check: PlaceCheck? = null,
     /** Whether the reader has switched the sky's motion off; [FrameLayers] reads this too. */
     val animations: Boolean = true,
+    /** The ribbon's bars for Jetzt, worked out off the main thread (see [withBars]). */
+    val nowBars: List<RibbonBar> = emptyList(),
+    /** And for Heute; both are held so a zoom switch needs no recomputation. */
+    val todayBars: List<RibbonBar> = emptyList(),
 ) {
+    /**
+     * The ribbon for the zoom on screen. The screen only reads these: [RibbonModel.bars] measures
+     * the distance from the place to every cell of every step, and inside composition that ran on
+     * the main thread on every change to the frames or the check.
+     */
+    val bars: List<RibbonBar> get() = if (zoom == MapZoom.NOW) nowBars else todayBars
+
+    /** This state with both zooms' bars computed from its frames, outlook, check and place. */
+    fun withBars(): MapUiState = copy(
+        nowBars = RibbonModel.bars(copy(zoom = MapZoom.NOW)),
+        todayBars = RibbonModel.bars(copy(zoom = MapZoom.TODAY)),
+    )
+
     /** The frames the current zoom scrubs and plays through. */
     val visible: List<MapFrame> get() = if (zoom == MapZoom.NOW) frames else outlook
 
