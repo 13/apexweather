@@ -35,13 +35,25 @@ sealed interface MapFrame {
 /** What the radar saw at the place, frame by frame. A frame whose tile failed is absent. */
 data class PlaceCheck(val lat: Double, val lon: Double, val readings: Map<Instant, RadarReading>)
 
+/** How much of the day the ribbon spans. */
+enum class MapZoom {
+    /** Two hours of radar and three of forecast, a quarter hour a step. */
+    NOW,
+
+    /** The next day, an hour a step, from AROME's ensemble alone. */
+    TODAY,
+}
+
 /**
  * What the map tab draws. Pure, so the screen can be driven from a hand-built state in a test
  * without a network, a tile server or a real MapView.
  */
 data class MapUiState(
     val frames: List<MapFrame> = emptyList(),
-    /** Index into [frames]. Out-of-range values resolve to no frame rather than throwing. */
+    /** The Heute zoom's frames: AROME hours from the present to a day ahead. */
+    val outlook: List<MapFrame> = emptyList(),
+    val zoom: MapZoom = MapZoom.NOW,
+    /** Index into [visible]. Out-of-range values resolve to no frame rather than throwing. */
     val selected: Int = 0,
     val playing: Boolean = false,
     val place: Place? = null,
@@ -49,7 +61,10 @@ data class MapUiState(
     /** Null until the place and its readings are known; nothing is marked without it. */
     val check: PlaceCheck? = null,
 ) {
-    val frame: MapFrame? get() = frames.getOrNull(selected)
+    /** The frames the current zoom scrubs and plays through. */
+    val visible: List<MapFrame> get() = if (zoom == MapZoom.NOW) frames else outlook
+
+    val frame: MapFrame? get() = visible.getOrNull(selected)
 
     /** The radar could not be reached, and the map is basemap and marker only. */
     val radarUnavailable: Boolean get() = !loading && frames.none { it is MapFrame.Observed }
@@ -57,8 +72,11 @@ data class MapUiState(
     /** Whether the timeline reaches into the future at all; it does not when the nowcast fails. */
     val hasForecast: Boolean get() = frames.any { it is MapFrame.Forecast }
 
-    /** Where the past ends: the newest frame a radar actually saw, or -1 when there is none. */
-    val nowIndex: Int get() = frames.indexOfLast { it is MapFrame.Observed }
+    /** Where the past ends in the visible frames; in Heute the present is its first hour. */
+    val nowIndex: Int get() = if (zoom == MapZoom.NOW) frames.indexOfLast { it is MapFrame.Observed } else 0
+
+    /** The newest instant a radar saw, which is what every "in 35 min" is measured from. */
+    val presentTime: Instant? get() = frames.lastOrNull { it is MapFrame.Observed }?.time ?: visible.firstOrNull()?.time
 
     /** True when the frame on screen is a forecast rather than an observation. */
     val showingForecast: Boolean get() = frame is MapFrame.Forecast
@@ -95,12 +113,31 @@ data class MapUiState(
         return next.indices.minBy { i -> abs(next[i].time.epochSecond - was.epochSecond) }
     }
 
+    /** The same state in [zoom], on the same instant if that zoom has it and on the present otherwise. */
+    fun withZoom(zoom: MapZoom): MapUiState {
+        if (zoom == this.zoom) return this
+        val at = frame?.time
+        val next = copy(zoom = zoom, playing = false)
+        val list = next.visible
+        if (list.isEmpty()) return next.copy(selected = 0)
+        val inside = at != null && !at.isBefore(list.first().time) && !at.isAfter(list.last().time)
+        val index = if (inside) list.indices.minBy { abs(list[it].time.epochSecond - at!!.epochSecond) }
+            else next.nowIndex.coerceIn(0, list.lastIndex)
+        return next.copy(selected = index)
+    }
+
     companion object {
         /** How long after the newest radar frame its word about the place still counts. */
         val CHECK_WINDOW: Duration = Duration.ofMinutes(60)
 
         /** How far around the place the radar's word reaches: where the pixels were read. */
         const val CHECK_RADIUS_KM = 5.0
+
+        /** Jetzt: how far past the newest radar frame the forecast half of the timeline reaches. */
+        val NOW_AHEAD: Duration = Duration.ofHours(3)
+
+        /** Heute: how far past the present the outlook reaches. */
+        val TODAY_AHEAD: Duration = Duration.ofHours(24)
 
         /**
          * Merges the radar's past with the nowcast's future into one timeline.
@@ -126,6 +163,11 @@ data class MapUiState(
             val ahead = forecast
                 .filter { step -> lastSeen == null || step.time.isAfter(lastSeen) }
                 .sortedBy { it.time }
+                .filter { step ->
+                    // Comparable, not Duration.isPositive: that is Java 18 and minSdk is 31.
+                    val from = lastSeen ?: forecast.minOf { it.time }
+                    Duration.between(from, step.time) <= NOW_AHEAD
+                }
                 .map { step ->
                     if (!dryAtPlace || Duration.between(lastSeen, step.time) > CHECK_WINDOW) step
                     else step.copy(cells = step.cells.map { cell ->

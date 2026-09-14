@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.toArgb
 import it.apexweather.Fixtures
 import it.apexweather.RadarFixtures
 import it.apexweather.data.remote.NowcastCell
+import it.apexweather.data.remote.NowcastKind
 import it.apexweather.data.remote.NowcastMapper
 import it.apexweather.data.remote.NowcastResponse
 import it.apexweather.data.remote.NowcastStep
@@ -209,6 +210,48 @@ class MapTimelineTest {
         assertTrue(state.unconfirmedHere)
         // 04:30Z's 8 dBZ is an echo but not rain, so the dry run reaches back to the first frame.
         assertEquals(Instant.parse("2026-09-14T04:30:00Z"), state.radarDrySince)
+    }
+
+    // --- Zooms -----------------------------------------------------------------------------
+
+    private fun outlook(vararg hours: Long) = hours.map { h ->
+        MapFrame.Forecast(NowcastStep(t0.plusSeconds(h * 3600), listOf(NowcastCell(46.6, 11.1, 1.0)), NowcastKind.OUTLOOK))
+    }
+
+    @Test
+    fun `Jetzt reaches three hours past the newest radar frame and no further`() {
+        val frames = MapUiState.timeline(radar(-10, 0), steps(15, 180, 195))
+        assertEquals(t0.plusSeconds(180 * 60), frames.last().time)
+    }
+
+    @Test
+    fun `the zoom decides which frames are visible`() {
+        val s = MapUiState(frames = MapUiState.timeline(radar(-10, 0), steps(15)), outlook = outlook(1, 2, 3), loading = false)
+        assertEquals(3, s.visible.size)
+        assertEquals(3, s.withZoom(MapZoom.TODAY).visible.size)
+        assertTrue(s.withZoom(MapZoom.TODAY).visible.all { it is MapFrame.Forecast })
+    }
+
+    @Test
+    fun `switching zoom keeps the instant when the other zoom has it`() {
+        val s = MapUiState(
+            frames = MapUiState.timeline(radar(-10, 0), steps(15, 30, 45, 60)),
+            outlook = outlook(1, 2, 3), selected = 5, loading = false,
+        )
+        assertEquals(t0.plusSeconds(3600), s.frame?.time)
+        val today = s.withZoom(MapZoom.TODAY)
+        assertEquals(t0.plusSeconds(3600), today.frame?.time)
+    }
+
+    @Test
+    fun `switching zoom lands on the present when the other zoom does not have the instant`() {
+        val s = MapUiState(
+            frames = MapUiState.timeline(radar(-20, -10, 0), steps(15)),
+            outlook = outlook(1, 2, 3), selected = 0, loading = false,
+        )
+        assertEquals(0, s.withZoom(MapZoom.TODAY).selected)
+        assertFalse(s.withZoom(MapZoom.TODAY).playing)
+        assertEquals(2, s.withZoom(MapZoom.TODAY).withZoom(MapZoom.NOW).selected)
     }
 }
 

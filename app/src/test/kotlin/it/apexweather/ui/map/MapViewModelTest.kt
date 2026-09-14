@@ -307,4 +307,14 @@ class MapViewModelTest {
         assertEquals("the frames must be drawn while the radar check is still pending", 6, vm.state.value.frames.size)
         assertFalse(vm.state.value.loading)
     }
+
+    @Test
+    fun `switching zoom stops the loop`() = mapTest { vm ->
+        vm.play()
+        advanceTimeBy(1_000)
+        vm.setZoom(MapZoom.TODAY)
+        runCurrent()
+        assertFalse(vm.state.value.playing)
+        assertEquals(MapZoom.TODAY, vm.state.value.zoom)
+    }
 }

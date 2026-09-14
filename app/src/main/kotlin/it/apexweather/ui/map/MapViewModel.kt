@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
 /**
@@ -54,15 +55,21 @@ class MapViewModel @Inject constructor(
             // The forecast is only asked for once a place is known, because the box it covers is
             // drawn around the place. A failure here leaves the radar loop intact: the map was worth
             // looking at without a forecast until now, and still is.
-            val ahead = place?.let { nowcast.forPlace(it).steps }.orEmpty()
+            val held = place?.let { nowcast.forPlace(it) }
+            val ahead = held?.steps.orEmpty()
             // The radar and the forecast are worth showing the instant both are in; the check against
             // the place only annotates what is already on screen, and must not hold that back. A held
             // check from the same place is reused here — its readings are keyed by frame time, so they
             // are still good — rather than left blank until the second phase below replaces it.
-            val held = _state.value.check?.takeIf { place != null && it.lat == place.lat && it.lon == place.lon }
-            val frames = MapUiState.timeline(past, ahead, held)
+            val heldCheck = _state.value.check?.takeIf { place != null && it.lat == place.lat && it.lon == place.lon }
+            val frames = MapUiState.timeline(past, ahead, heldCheck)
+            val present = past.lastOrNull()?.time ?: ahead.firstOrNull()?.time
+            val outlook = held?.outlook.orEmpty()
+                .filter { step -> present == null || (!step.time.isBefore(present.truncatedTo(ChronoUnit.HOURS)) && !step.time.isAfter(present.plus(MapUiState.TODAY_AHEAD))) }
+                .map(MapFrame::Forecast)
             _state.update { state ->
-                state.copy(frames = frames, check = held, selected = state.selectionAfter(frames), loading = false)
+                val next = state.copy(frames = frames, outlook = outlook, check = heldCheck)
+                next.copy(selected = state.selectionAfter(next.visible), loading = false)
             }
             if (place != null) {
                 val readings = radar.readingsAt(place.lat, place.lon)
@@ -72,7 +79,8 @@ class MapViewModel @Inject constructor(
                 if (_state.value.place?.istat == place.istat) {
                     val checked = MapUiState.timeline(past, ahead, check)
                     _state.update { state ->
-                        state.copy(frames = checked, check = check, selected = state.selectionAfter(checked))
+                        val next = state.copy(frames = checked, check = check)
+                        next.copy(selected = state.selectionAfter(next.visible))
                     }
                 }
             }
@@ -81,7 +89,12 @@ class MapViewModel @Inject constructor(
 
     fun select(index: Int) {
         pause()
-        _state.update { it.copy(selected = index.coerceIn(0, (it.frames.size - 1).coerceAtLeast(0))) }
+        _state.update { it.copy(selected = index.coerceIn(0, (it.visible.size - 1).coerceAtLeast(0))) }
+    }
+
+    fun setZoom(zoom: MapZoom) {
+        pause()
+        _state.update { it.withZoom(zoom) }
     }
 
     /**
@@ -103,21 +116,23 @@ class MapViewModel @Inject constructor(
      * ViewModel outlives the trip; `MapScreen` now pauses on the way out.
      */
     fun play() {
-        if (_state.value.frames.size < 2) return
+        if (_state.value.visible.size < 2) return
         animation?.cancel()
         _state.update { it.copy(playing = true) }
         animation = viewModelScope.launch {
             while (true) {
-                // A beat on the last frame, so the eye can find where the loop restarts.
-                val atEnd = _state.value.let { it.selected >= it.frames.lastIndex }
-                delay(if (atEnd) LOOP_PAUSE_MS else FRAME_MS)
+                // A beat on the last frame and on "jetzt", so the eye can find where the loop
+                // restarts and where the past gives way to the forecast.
+                val s0 = _state.value
+                val hold = s0.selected >= s0.visible.lastIndex || s0.selected == s0.nowIndex
+                delay(if (hold) LOOP_PAUSE_MS else if (s0.zoom == MapZoom.NOW) NOW_FRAME_MS else TODAY_FRAME_MS)
                 var running = true
                 _state.update { s ->
-                    if (!s.playing || s.frames.size < 2) {
+                    if (!s.playing || s.visible.size < 2) {
                         running = false
                         s
                     } else {
-                        s.copy(selected = if (s.selected >= s.frames.lastIndex) 0 else s.selected + 1)
+                        s.copy(selected = if (s.selected >= s.visible.lastIndex) 0 else s.selected + 1)
                     }
                 }
                 if (!running) return@launch
@@ -136,7 +151,8 @@ class MapViewModel @Inject constructor(
     }
 
     private companion object {
-        const val FRAME_MS = 400L
+        const val NOW_FRAME_MS = 350L
+        const val TODAY_FRAME_MS = 450L
         const val LOOP_PAUSE_MS = 1200L
     }
 }

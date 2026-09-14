@@ -167,4 +167,24 @@ class NowcastRepositoryTest {
         repo.forPlace(DORF_TIROL)
         assertEquals(4, api.calls)
     }
+
+    /** Heute needs every AROME hour, including the ones INCA's finer steps already cover in Jetzt. */
+    @Test
+    fun `the outlook keeps every hour`() = runTest {
+        val api = object : NowcastApi {
+            override suspend fun precipitation(bbox: String, parameters: String, outputFormat: String) = NowcastResponse(
+                referenceTime = "2026-09-14T05:00+00:00",
+                timestamps = listOf("2026-09-14T06:00+00:00"),
+                features = listOf(NowcastFeature(NowcastGeometry(listOf(11.16, 46.69)), NowcastProperties(mapOf("rr" to NowcastParameter("", listOf(0.1)))))),
+            )
+            override suspend fun outlook(bbox: String, end: String, parameters: String, outputFormat: String) = NowcastResponse(
+                referenceTime = "2026-09-14T00:00+00:00",
+                timestamps = listOf("2026-09-14T06:00+00:00", "2026-09-14T07:00+00:00"),
+                features = listOf(NowcastFeature(NowcastGeometry(listOf(11.16, 46.69)), NowcastProperties(mapOf("rain_p50" to NowcastParameter("", listOf(1.0, 1.0)))))),
+            )
+        }
+        val result = NowcastRepository(api, MutableClock(t("05:36"))).forPlace(DORF_TIROL)
+        assertEquals(2, result.outlook.size)
+        assertEquals(2, result.steps.size) // INCA 06:00, then AROME 07:00 only
+    }
 }

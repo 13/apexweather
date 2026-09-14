@@ -57,17 +57,17 @@ class NowcastRepository @Inject constructor(
         // An answer with no steps is no answer: the mappers return EMPTY for a response without a
         // reference time, and treating that as a fetch would overwrite a good held run with nothing.
         val near = runCatchingCancellable { NowcastMapper.map(api.precipitation(box)) }.getOrNull()?.takeIf { it.steps.isNotEmpty() }
-        val far = runCatchingCancellable {
-            NowcastMapper.mapOutlook(
-                api.outlook(box, NowcastApi.endOf(now)),
-                after = near?.steps?.lastOrNull()?.time,
-            )
-        }.getOrNull()?.takeIf { it.steps.isNotEmpty() }
+        // The outlook is fetched whole, with nothing trimmed at INCA's end: Heute needs every AROME
+        // hour, including the ones Jetzt's [steps] drops as already covered by INCA's finer run.
+        val far = runCatchingCancellable { NowcastMapper.mapOutlook(api.outlook(box, NowcastApi.endOf(now)), after = null) }.getOrNull()
+            ?.takeIf { it.steps.isNotEmpty() }
+        val nearEnd = near?.steps?.lastOrNull()?.time
         val fetched = when {
             near == null && far == null -> null
             else -> PrecipNowcast(
                 issuedAt = near?.issuedAt ?: far!!.issuedAt,
-                steps = near?.steps.orEmpty() + far?.steps.orEmpty(),
+                steps = near?.steps.orEmpty() + far?.steps.orEmpty().filter { nearEnd == null || it.time.isAfter(nearEnd) },
+                outlook = far?.steps.orEmpty(),
             )
         }
         if (fetched != null) {

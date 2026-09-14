@@ -159,7 +159,12 @@ data class NowcastStep(
  * [issuedAt] is the model's own reference time, not the fetch, because a nowcast an hour old is
  * describing an hour that has happened.
  */
-data class PrecipNowcast(val issuedAt: Instant, val steps: List<NowcastStep>) {
+data class PrecipNowcast(
+    val issuedAt: Instant,
+    val steps: List<NowcastStep>,
+    /** Every hour of AROME's ensemble, for the Heute zoom; [steps] drops the ones INCA covers. */
+    val outlook: List<NowcastStep> = emptyList(),
+) {
     companion object { val EMPTY = PrecipNowcast(Instant.EPOCH, emptyList()) }
 }
 
