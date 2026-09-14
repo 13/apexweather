@@ -4,7 +4,6 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.MyLocation
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -189,11 +191,16 @@ private fun Timeline(state: MapUiState, ready: Boolean, onPlayPause: () -> Unit,
                     style = MaterialTheme.typography.titleLarge, color = Color.White,
                     modifier = Modifier.testTag("map_frame_time"),
                 )
-                if (time != null && present != null && time != present) {
+                // Not on the jetzt step itself: the outlook is hourly and the present rarely lands
+                // on the hour, so the jetzt step's own timestamp is almost never exactly
+                // presentTime — comparing the two times alone read "in 20 min" on the very step
+                // the ribbon beneath it calls "jetzt".
+                if (time != null && present != null && time != present && state.selected != state.nowIndex) {
                     val d = java.time.Duration.between(present, time)
                     Text(
                         stringResource(if (d.isNegative) R.string.map_ago else R.string.map_in, Format.shortDuration(d, formats)),
                         style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.65f),
+                        modifier = Modifier.testTag("map_frame_offset"),
                     )
                 }
                 if (state.place != null && word != null) {
@@ -220,15 +227,19 @@ private fun Timeline(state: MapUiState, ready: Boolean, onPlayPause: () -> Unit,
                 modifier = Modifier.testTag("map_radar_overrule"),
             )
         }
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = 8.dp).selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             ZoomChip(R.string.map_zoom_now, state.zoom == MapZoom.NOW, "map_zoom_now") { onZoom(MapZoom.NOW) }
             ZoomChip(R.string.map_zoom_today, state.zoom == MapZoom.TODAY, "map_zoom_today") { onZoom(MapZoom.TODAY) }
         }
         if (bars.size > 1) {
             val nowLabel = stringResource(R.string.map_now)
             val labels = RibbonModel.labelIndices(bars, state.zoom)
-                .filter { abs(it - state.nowIndex) > 1 }
-                .map { it to Format.hour(bars[it].time, SouthTyrol.ZONE, formats) } + (state.nowIndex to nowLabel)
+                .filter { state.nowIndex < 0 || abs(it - state.nowIndex) > 1 }
+                .map { it to Format.hour(bars[it].time, SouthTyrol.ZONE, formats) } +
+                (if (state.nowIndex in bars.indices) listOf(state.nowIndex to nowLabel) else emptyList())
             RainRibbon(
                 bars = bars, selected = state.selected, nowIndex = state.nowIndex,
                 labels = labels.filter { it.first in bars.indices }.sortedBy { it.first },
@@ -253,7 +264,9 @@ private fun ZoomChip(label: Int, selected: Boolean, tag: String, onClick: () -> 
         modifier = Modifier
             .clip(CircleShape)
             .background(if (selected) Color.White else Color.White.copy(alpha = 0.10f))
-            .clickable(onClick = onClick)
+            // Colour alone is not accessible; Jetzt/Heute behave as a tab pair, so the one that is
+            // on has to say so in its own semantics too, not only in a fill a reader may not see.
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 4.dp)
             .testTag(tag),
     )

@@ -1,6 +1,11 @@
 package it.apexweather.ui.map
 
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -8,6 +13,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import it.apexweather.R
 import it.apexweather.data.remote.NowcastCell
+import it.apexweather.data.remote.NowcastKind
 import it.apexweather.data.remote.NowcastStep
 import it.apexweather.data.remote.RadarFrame
 import it.apexweather.domain.NearbyStation
@@ -167,5 +173,44 @@ class MapContentTest {
     fun whileTilesLoadThePlayButtonSaysSo() {
         rule.setContent { ApexTheme { MapContent(state(*frames.toTypedArray()), onPlayPause = {}, onSelect = {}, ready = false) } }
         rule.onNodeWithTag("map_play_loading").assertIsDisplayed()
+    }
+
+    /** Colour alone is not accessible; the chip that is on has to say so in its semantics too. */
+    @Test
+    fun theSelectedZoomChipSaysSo() {
+        lateinit var mapState: MutableState<MapUiState>
+        rule.setContent {
+            mapState = remember { mutableStateOf(withForecast(selected = 0)) }
+            ApexTheme { MapContent(mapState.value, onPlayPause = {}, onSelect = {}) }
+        }
+        rule.onNodeWithTag("map_zoom_now").assertIsSelected()
+        rule.onNodeWithTag("map_zoom_today").assertIsNotSelected()
+        rule.runOnIdle { mapState.value = mapState.value.withZoom(MapZoom.TODAY) }
+        rule.onNodeWithTag("map_zoom_today").assertIsSelected()
+        rule.onNodeWithTag("map_zoom_now").assertIsNotSelected()
+    }
+
+    /**
+     * "vor 20 min" (or "in 20 min") on the very step the ribbon itself calls "jetzt" would
+     * contradict it — the outlook is hourly and the present rarely lands on the hour, so the
+     * jetzt step's own timestamp almost never equals [MapUiState.presentTime] exactly, even
+     * though it is the present step.
+     */
+    @Test
+    fun theJetztStepCarriesNoRelativeTime() {
+        // The radar's last frame (presentTime) lands on the hour; the outlook's first step is
+        // deliberately twenty minutes off it, exactly as GeoSphere's real hourly steps are.
+        val outlookStart = Instant.parse("2026-09-10T11:20:00Z")
+        val outlook = (0 until 24).map {
+            MapFrame.Forecast(
+                NowcastStep(outlookStart.plusSeconds(it * 3600L), listOf(NowcastCell(place.lat, place.lon, 0.0)), NowcastKind.OUTLOOK),
+            )
+        }
+        val today = MapUiState(
+            frames = MapUiState.timeline(frames, steps), outlook = outlook,
+            zoom = MapZoom.TODAY, selected = 0, playing = false, place = place, loading = false,
+        )
+        rule.setContent { ApexTheme { MapContent(today, onPlayPause = {}, onSelect = {}) } }
+        rule.onNodeWithTag("map_frame_offset").assertDoesNotExist()
     }
 }

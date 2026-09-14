@@ -46,6 +46,41 @@ internal fun ribbonIndexAt(x: Float, width: Int, count: Int): Int? =
     if (count <= 0 || width <= 0) null else (x / width * count).toInt().coerceIn(0, count - 1)
 
 /**
+ * Which labels actually get drawn, so two of them never touch.
+ *
+ * A label's rect is its centre clamped exactly as [RibbonLabels] places it — width either side,
+ * kept inside `0..totalWidth`. [priority] is tried first regardless of where it sits, because
+ * "jetzt" is worth more than whichever hour would otherwise occupy that spot; everything else is
+ * then tried left to right, and a label is kept only if its rect, widened by [gapPx] on each side,
+ * misses every rect already kept — so two labels are dropped for touching, not only for
+ * overlapping.
+ */
+internal fun visibleLabelSlots(centres: List<Float>, widths: List<Int>, priority: Int?, gapPx: Int, totalWidth: Int): List<Int> {
+    fun left(i: Int): Float {
+        val w = widths[i].toFloat()
+        return (centres[i] - w / 2f).coerceIn(0f, (totalWidth - w).coerceAtLeast(0f))
+    }
+    val order = if (priority != null && priority in centres.indices) {
+        listOf(priority) + centres.indices.filter { it != priority }
+    } else {
+        centres.indices.toList()
+    }
+    val kept = mutableListOf<Int>()
+    val keptRanges = mutableListOf<ClosedFloatingPointRange<Float>>()
+    for (i in order) {
+        val l = left(i)
+        val r = l + widths[i]
+        val widened = (l - gapPx)..(r + gapPx)
+        val collides = keptRanges.any { widened.start < it.endInclusive && it.start < widened.endInclusive }
+        if (!collides) {
+            kept += i
+            keptRanges += l..r
+        }
+    }
+    return kept.sorted()
+}
+
+/**
  * The map's timeline as rain at the reader's place: a bar per step, so the answer to "when does it
  * reach me" is on screen before anything plays.
  *
@@ -147,13 +182,18 @@ fun RainRibbon(
                 drawLine(Color.White, Offset(x, -2.dp.toPx()), Offset(x, size.height), strokeWidth = 2.dp.toPx())
             }
         }
-        RibbonLabels(bars.size, labels)
+        RibbonLabels(bars.size, labels, nowIndex)
     }
 }
 
-/** Hour labels centred under their bars, each clamped inside the ribbon's width. */
+/**
+ * Hour labels centred under their bars, each clamped inside the ribbon's width — but only the
+ * ones [visibleLabelSlots] keeps: two labels that would touch at a wide font scale must not both
+ * draw, and "jetzt" is the one of them worth keeping.
+ */
 @Composable
-private fun RibbonLabels(count: Int, labels: List<Pair<Int, String>>) {
+private fun RibbonLabels(count: Int, labels: List<Pair<Int, String>>, nowIndex: Int) {
+    val gapPx = with(LocalDensity.current) { 6.dp.roundToPx() }
     Layout(
         content = {
             labels.forEach { (_, text) ->
@@ -166,11 +206,15 @@ private fun RibbonLabels(count: Int, labels: List<Pair<Int, String>>) {
         val width = constraints.maxWidth
         val height = placeables.maxOfOrNull { it.height } ?: 0
         layout(width, height) {
-            if (count == 0) return@layout
+            if (count == 0 || labels.isEmpty()) return@layout
             val pitch = width.toFloat() / count
+            val centres = labels.map { it.first * pitch + pitch / 2f }
+            val widths = placeables.map { it.width }
+            val priority = labels.indexOfFirst { it.first == nowIndex }.takeIf { it >= 0 }
+            val visible = visibleLabelSlots(centres, widths, priority, gapPx, width).toSet()
             placeables.forEachIndexed { n, p ->
-                val centre = labels[n].first * pitch + pitch / 2f
-                p.placeRelative((centre - p.width / 2f).roundToInt().coerceIn(0, (width - p.width).coerceAtLeast(0)), 0)
+                if (n !in visible) return@forEachIndexed
+                p.placeRelative((centres[n] - p.width / 2f).roundToInt().coerceIn(0, (width - p.width).coerceAtLeast(0)), 0)
             }
         }
     }
