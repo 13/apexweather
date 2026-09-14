@@ -9,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import it.apexweather.Fixtures
+import it.apexweather.RadarFixtures
 import it.apexweather.data.remote.NowcastMapper
 import it.apexweather.data.remote.NowcastResponse
 import it.apexweather.data.remote.NowcastStep
@@ -60,9 +61,17 @@ import kotlin.math.max
  * native grid onto an axis-aligned one, not a truncation bug. `NowcastOverlay.fillHoles` closes a
  * transparent pixel with the average of its orthogonal neighbours wherever at least three of them
  * already have a colour, which [dimples] checks for directly rather than trusting the collision
- * count alone: a non-background pixel whose luminance is more than 18 below the mean of its eight
- * neighbours, with at least three non-background orthogonal ones — the same criterion used to spot
- * them by eye in the first place.
+ * count alone: a non-background pixel whose luminance is more than [DIMPLE_LUMINANCE_DROP] below
+ * the mean of its eight neighbours, with at least three non-background orthogonal ones — the same
+ * criterion used to spot them by eye in the first place.
+ *
+ * **That criterion was measured against a render with real dimples in it before being trusted.**
+ * It first shipped at a drop of `18.0`, which sounds strict; run against `nowcast_z9_dimpled.png`
+ * (this exact overlay, one round before `fillHoles`, with real dimples in it) it counted **zero** —
+ * the reviewer's own four spot-checked dimples read as drops of 14,7 / 13,4 / 12,6 and 11,1, every
+ * one of them under `18.0`, so the check would have shipped alongside the defect it was named for
+ * and never noticed. `the dimple check catches this morning's dimpled render` pins the fixed
+ * fixture against the lowered `12.0` so that regression cannot come back unnoticed either.
  *
  * Record after a deliberate change with `./gradlew :app:recordRoborazziDebug`, and look at the
  * result before committing it — a golden nobody looked at proves nothing.
@@ -150,18 +159,18 @@ class NowcastOverlayScreenshotTest {
     }
 
     /**
-     * How many pixels in [bitmap] read as a dark dimple: not the background, at least three of its
-     * four orthogonal neighbours are not the background either (so it sits inside filled territory
-     * rather than at an edge), and its own luminance is more than 18 below the mean of all eight
-     * neighbours around it — noticeably darker than the field it is surrounded by. The interior
-     * only, since a pixel on the canvas edge has fewer than eight neighbours and the field is never
-     * drawn out to the canvas edge in these fixtures.
+     * How many pixels in a [width] by [height] ARGB grid read as a dark dimple: not the
+     * background, at least three of its four orthogonal neighbours are not the background either
+     * (so it sits inside filled territory rather than at an edge), and its own luminance is more
+     * than [DIMPLE_LUMINANCE_DROP] below the mean of all eight neighbours around it — noticeably
+     * darker than the field it is surrounded by. The interior only, since a pixel on the canvas
+     * edge has fewer than eight neighbours and the field is never drawn out to the canvas edge in
+     * these fixtures. Takes a plain `IntArray` rather than a `Bitmap` so the same check can run
+     * against a rendered map and against a PNG fixture decoded with [RadarFixtures] — proving this
+     * criterion actually catches the defect it is named for, rather than only ever running against
+     * renders that are already clean.
      */
-    private fun dimples(bitmap: Bitmap): Int {
-        val width = bitmap.width
-        val height = bitmap.height
-        val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+    private fun dimples(pixels: IntArray, width: Int, height: Int): Int {
         fun at(x: Int, y: Int) = pixels[y * width + x]
         var count = 0
         for (y in 1 until height - 1) {
@@ -180,6 +189,14 @@ class NowcastOverlayScreenshotTest {
             }
         }
         return count
+    }
+
+    private fun dimples(bitmap: Bitmap): Int {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        return dimples(pixels, width, height)
     }
 
     @Test
@@ -208,6 +225,30 @@ class NowcastOverlayScreenshotTest {
         assertNoDimples(dimpleCount)
     }
 
+    /**
+     * `dimples` proven against a render that actually has some, not only against renders that
+     * happen to be clean. `nowcast_z9_dimpled.png` is `map_nowcast_z9_v2.png` from the round
+     * between the sub-pixel placement fix and `fillHoles` — this exact overlay, sub-pixel-precise
+     * and collision-free, but with no hole filling yet, so its dimples are real ones this class
+     * once shipped rather than a synthetic case built to pass. Measured against it directly: the
+     * four dimples the reviewer spot-checked by hand read as luminance drops of 14,7 / 13,4 / 12,6
+     * / 11,1, every one of them under the `18.0` this check first shipped with — so that threshold
+     * would have let this exact render through. `DIMPLE_LUMINANCE_DROP` is `12.0` now, which clears
+     * three of the four (11,1 stays just under 12,0, and this check does not need it to count that
+     * one too), so `>= 3` rather than `>= 4` is what the fixture actually supports — and both
+     * current goldens still count zero at that threshold.
+     */
+    @Test
+    fun `the dimple check catches this morning's dimpled render`() {
+        val (width, pixels) = RadarFixtures.decode(RadarFixtures.bytes("nowcast_z9_dimpled.png"))
+        val dimpleCount = dimples(pixels, width, pixels.size / width)
+        println("dimpled fixture: $dimpleCount dimples")
+        org.junit.Assert.assertTrue(
+            "expected at least 3 dimples in a render known to have some, found $dimpleCount",
+            dimpleCount >= 3,
+        )
+    }
+
     private fun assertNoCollisions(placed: Int, collided: Int) {
         org.junit.Assert.assertTrue("$placed cells placed but none had a colour to check", placed > 0)
         org.junit.Assert.assertEquals("$collided of $placed placed cells shared a bitmap slot with another", 0, collided)
@@ -222,8 +263,16 @@ class NowcastOverlayScreenshotTest {
         const val ALPHA = 130
         const val ONE_KM_OF_LON = 0.01306
 
-        /** How far below its neighbourhood's mean luminance a pixel has to sit to read as a dimple. */
-        const val DIMPLE_LUMINANCE_DROP = 18.0
+        /**
+         * How far below its neighbourhood's mean luminance a pixel has to sit to read as a
+         * dimple. `18.0` was too loose to catch the defect it was named for: measured directly
+         * against `nowcast_z9_dimpled.png`, the reviewer's own four spot-checked dimples read as
+         * drops of 14,7 / 13,4 / 12,6 / 11,1, every one of them under `18.0`, so the very render
+         * this check exists to catch would have passed it. `12.0` clears three of the four
+         * (proven by `the dimple check catches this morning's dimpled render`) while both current
+         * goldens — rendered with `fillHoles` in place — still count zero at that threshold.
+         */
+        const val DIMPLE_LUMINANCE_DROP = 12.0
 
         /** Matches `render`'s canvas fill; a pixel exactly this colour was never touched by the overlay. */
         val BACKGROUND = Color.rgb(20, 24, 36)

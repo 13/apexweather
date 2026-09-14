@@ -234,6 +234,16 @@ internal fun bitmapLayout(xs: List<Float>, ys: List<Float>, side: Float): Bitmap
  * Each channel — alpha, red, green, blue — is averaged on its own, never as one packed `Int`,
  * because an `Int` average would blend the channels' bits into each other.
  *
+ * **This cannot tell a tiling gap from a genuinely dry kilometre, because both arrive the same
+ * way.** A transparent pixel here means either the rotated native grid had no cell close enough to
+ * claim it, or the nearest cell really was dry — `NowcastMapper` drops dry cells before
+ * `NowcastOverlay` ever sees them, so both a tiling gap and a real dry cell reach this function as
+ * the identical, unlabelled nothing. A genuinely dry kilometre enclosed by rain would be painted
+ * over exactly like a gap. At this grid a single enclosed dry cell is below what the forecast
+ * resolves in the first place, so this is accepted rather than fixed; a dry corridor two or more
+ * pixels wide is never filled, since neither of its two transparent rows ever has three filled
+ * orthogonal neighbours.
+ *
  * Returns how many pixels were filled.
  */
 internal fun fillHoles(argb: IntArray, cols: Int, rows: Int): Int {
