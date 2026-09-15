@@ -19,6 +19,7 @@ import it.apexweather.data.remote.OdhApi
 import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.RainViewerApi
 import it.apexweather.data.remote.SiagApi
+import it.apexweather.data.remote.SourceMetaApi
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.SouthTyrol
 import kotlinx.coroutines.CoroutineScope
@@ -73,6 +74,10 @@ object AppModule {
     @Provides @Singleton fun rainViewer(c: OkHttpClient, j: Json): RainViewerApi = retrofit(RainViewerApi.BASE_URL, c, j).create(RainViewerApi::class.java)
     @Provides @Singleton fun tileDecoder(): it.apexweather.data.TileDecoder = it.apexweather.data.AndroidTileDecoder
     @Provides @Singleton fun nowcast(c: OkHttpClient, j: Json): NowcastApi = retrofit(NowcastApi.BASE_URL, c, j).create(NowcastApi::class.java)
+    // Five seconds for the whole call, not the forecast client's 45: this answers a sheet the reader
+    // is looking at, and "not available" beats a spinner that outlasts their interest.
+    @Provides @Singleton fun sourceMeta(c: OkHttpClient, j: Json): SourceMetaApi =
+        retrofit(SourceMetaApi.BASE_URL, c.newBuilder().callTimeout(5, TimeUnit.SECONDS).build(), j).create(SourceMetaApi::class.java)
 
     @Provides @Singleton fun database(@ApplicationContext ctx: Context): AppDatabase = AppDatabase.build(ctx)
     @Provides fun dao(db: AppDatabase): WeatherDao = db.weatherDao()
