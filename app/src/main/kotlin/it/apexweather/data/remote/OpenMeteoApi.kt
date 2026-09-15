@@ -220,7 +220,7 @@ data class StationReference(
     val bySource: Map<String, Map<Long, Double>> = emptyMap(),
     /** Source name → epoch second → rain in the hour ending then, mm. Empty in rows cached before rain was asked for. */
     val rainBySource: Map<String, Map<Long, Double>> = emptyMap(),
-    /** Source name → epoch second → wind speed, km/h. */
+    /** Source name → epoch second → wind speed, km/h. Empty in rows cached before wind was asked for. */
     val windBySource: Map<String, Map<Long, Double>> = emptyMap(),
 ) {
     /** Every model's temperature for that hour, keyed by source. */

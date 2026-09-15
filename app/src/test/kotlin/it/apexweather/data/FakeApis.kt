@@ -111,8 +111,8 @@ internal class FakeGeoSphere(var fail: Boolean = false, var cancel: Boolean = fa
      * fake that does not look at the request cannot fail for the one reason that mattered.
      *
      * There are two calls now and they run in parallel, so this is a list rather than a variable:
-     * the village's full forecast and the station's temperature alone, which is what gives GeoSphere
-     * AROME a row in `station_history` to be bias-corrected from.
+     * the village's full forecast and the station's temperature, rain and wind, which is what gives
+     * GeoSphere AROME a row in `station_history` to be bias-corrected from.
      */
     val asked: MutableList<Pair<String, String>> = java.util.Collections.synchronizedList(mutableListOf())
 
