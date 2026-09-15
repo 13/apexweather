@@ -339,14 +339,15 @@
     <string name="stats_quantity_temperature">Temperatura</string>
     <string name="stats_quantity_rain">Pioggia</string>
     <string name="stats_quantity_wind">Vento</string>
-    <string name="stats_period">%1$d g</string>
+    <string name="stats_period">%1$d g</string>
     <string name="stats_lead_now">ora</string>
-    <string name="stats_lead_hours">%1$d h</string>
+    <string name="stats_lead_hours">%1$d h</string>
     <plurals name="stats_basis">
-        <item quantity="one">%1$d ora dal %2$s · stazione %3$s</item>
-        <item quantity="many">%1$d ore dal %2$s · stazione %3$s</item>
-        <item quantity="other">%1$d ore dal %2$s · stazione %3$s</item>
+        <item quantity="one">%1$d ora dal %2$s · stazione %3$s · %4$s</item>
+        <item quantity="many">%1$d ore dal %2$s · stazione %3$s · %4$s</item>
+        <item quantity="other">%1$d ore dal %2$s · stazione %3$s · %4$s</item>
     </plurals>
+    <string name="stats_basis_ahead">%1$d h prima</string>
     <string name="stats_col_error">Ø errore</string>
     <string name="stats_col_hits">Centrati</string>
     <string name="stats_col_lean">Tendenza</string>
@@ -355,10 +356,10 @@
     <string name="stats_col_false_alarm">falso allarme</string>
     <string name="stats_consensus">Consenso</string>
     <string name="stats_persistence">come ieri</string>
-    <string name="stats_unranked">pochi dati (%1$d h)</string>
+    <string name="stats_unranked">pochi dati (%1$d h)</string>
     <string name="stats_percent">%1$s%%</string>
     <string name="stats_info">Come si calcola</string>
-    <string name="stats_info_body">Ø errore è lo scostamento medio dalla misura. Centrati conta le ore entro 2 K (vento: 5 km/h). Tendenza indica se un modello è di solito troppo caldo (+) o troppo freddo (−). Per la pioggia „pioggia giusta\" conta solo le ore in cui ha piovuto o era prevista pioggia, così un modello che non la prevede mai non vince. Sotto 24 ore (pioggia: 5 ore bagnate) non c\'è classifica. Se la misura di un\'ora si scosta dal consenso dei modelli di più di 15 K (vento: 60 km/h), quell\'ora è un errore di misura e non conta per nessuno. Consenso e „come ieri\" sono riferimenti. SIAG KMOS manca perché è interrogato per comune e non può essere verificato su una stazione.</string>
+    <string name="stats_info_body">Ø errore è lo scostamento medio dalla misura. Centrati conta le ore entro 2 K (vento: 5 km/h). Tendenza indica se un modello è di solito troppo caldo (+) o troppo freddo (−). Per la pioggia „pioggia giusta\" conta solo le ore in cui ha piovuto o era prevista pioggia, così un modello che non la prevede mai non vince. Sotto 24 ore (pioggia: 5 ore bagnate) non c\'è classifica. Se la misura di un\'ora si scosta dal consenso dei modelli di più di 15 K (vento: 60 km/h), quell\'ora è un errore di misura e non conta per nessuno. Consenso e „come ieri\" sono riferimenti. La riga Consenso è il valore mediano ponderato dei modelli alla stazione, senza la correzione che l\'app applica loro. SIAG KMOS manca perché è interrogato per comune e non può essere verificato su una stazione.</string>
     <plurals name="stats_info_excluded">
         <item quantity="one">%1$d ora esclusa come errore di misura.</item>
         <item quantity="many">%1$d ore escluse come errore di misura.</item>

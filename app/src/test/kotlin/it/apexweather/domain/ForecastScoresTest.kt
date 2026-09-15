@@ -247,20 +247,20 @@ class ForecastScoresTest {
     }
 
     @Test
-    fun `the rain consensus is the weighted mean, not the median`() {
-        // One wet model (ICON_D2, 1.0 mm) and three dry models, each its own family: weighted mean
-        // (1.0×1.0 + 0×1.0×3) / 4.0 = 0.25 mm, which is wet. The plain median of [0,0,0,1] is 0, dry.
-        val h = hours(6, { Triple(10.0, 1.0, 5.0) }) {
-            mapOf(
-                Source.ICON_D2 to Predicted(10.0, 1.0, 5.0),
-                Source.GEOSPHERE_AROME to Predicted(10.0, 0.0, 5.0),
-                Source.ECMWF to Predicted(10.0, 0.0, 5.0),
-                Source.GFS to Predicted(10.0, 0.0, 5.0),
-            )
+    fun `the rain consensus is the family-weighted mean, not the plain one`() {
+        // Hours 0..5 are wet and every model says so. On the 18 dry hours the four ICON runs say
+        // 0.2 mm and AROME, ECMWF and GFS say 0: weights 0.5 each for ICON (2.0) against 1.0 each for
+        // the other three (3.0), so the weighted mean is 0.2 × 2.0 / 5.0 = 0.08 mm, dry. The plain
+        // mean, 0.8 / 7 = 0.114 mm, would be wet and call every one of those hours a false alarm.
+        val icon = listOf(Source.ICON_CH1, Source.ICON_CH2, Source.ICON_2I, Source.ICON_D2)
+        val others = listOf(Source.GEOSPHERE_AROME, Source.ECMWF, Source.GFS)
+        val h = hours(24, { i -> Triple(10.0, if (i < 6) 1.0 else 0.0, 5.0) }) { i ->
+            icon.associateWith { Predicted(10.0, if (i < 6) 1.0 else 0.2, 5.0) } +
+                others.associateWith { Predicted(10.0, if (i < 6) 1.0 else 0.0, 5.0) }
         }
         val r = ForecastScores.rank(h, Quantity.RAIN, lead, since)
         val consensus = r.references.single { it.contender == Contender.Consensus }.score
-        // Every hour is observed wet and the consensus forecasts wet (0.25 mm), so all six are hits.
+        assertEquals("the dry hours are no false alarm", 0.0, consensus.lean!!, 1e-9)
         assertEquals(1.0, consensus.main!!, 1e-9)
     }
 
@@ -288,6 +288,17 @@ class ForecastScoresTest {
         }
         val r = ForecastScores.rank(h, Quantity.RAIN, lead, since)
         assertEquals(listOf(Contender.Model(Source.ICON_D2), Contender.Model(Source.GFS)), r.ranked.map { it.contender })
+    }
+
+    /** Thirty hours: the consensus has all of them, "same as yesterday" only the last six. */
+    @Test
+    fun `a reference row under the minimum is not shown`() {
+        val h = hours(30, { i -> Triple(10.0 + i % 3, 0.0, 5.0) }) { mapOf(Source.ICON_D2 to Predicted(11.0, 0.0, 5.0)) }
+        val r = ForecastScores.rank(h, Quantity.TEMPERATURE, lead, since)
+        assertTrue(r.references.any { it.contender == Contender.Consensus })
+        assertTrue(r.references.none { it.contender == Contender.SameAsYesterday })
+        // Rain: no wet hour at all, so neither is the consensus.
+        assertTrue(ForecastScores.rank(h, Quantity.RAIN, lead, since).references.isEmpty())
     }
 
     @Test

@@ -331,13 +331,14 @@
     <string name="stats_quantity_temperature">Temperature</string>
     <string name="stats_quantity_rain">Rain</string>
     <string name="stats_quantity_wind">Wind</string>
-    <string name="stats_period">%1$d d</string>
+    <string name="stats_period">%1$d d</string>
     <string name="stats_lead_now">now</string>
-    <string name="stats_lead_hours">%1$d h</string>
+    <string name="stats_lead_hours">%1$d h</string>
     <plurals name="stats_basis">
-        <item quantity="one">%1$d hour since %2$s · station %3$s</item>
-        <item quantity="other">%1$d hours since %2$s · station %3$s</item>
+        <item quantity="one">%1$d hour since %2$s · station %3$s · %4$s</item>
+        <item quantity="other">%1$d hours since %2$s · station %3$s · %4$s</item>
     </plurals>
+    <string name="stats_basis_ahead">%1$d h ahead</string>
     <string name="stats_col_error">Avg. error</string>
     <string name="stats_col_hits">Hits</string>
     <string name="stats_col_lean">Lean</string>
@@ -346,10 +347,10 @@
     <string name="stats_col_false_alarm">false alarm</string>
     <string name="stats_consensus">Consensus</string>
     <string name="stats_persistence">same as yesterday</string>
-    <string name="stats_unranked">not enough data (%1$d h)</string>
+    <string name="stats_unranked">not enough data (%1$d h)</string>
     <string name="stats_percent">%1$s%%</string>
     <string name="stats_info">How it is scored</string>
-    <string name="stats_info_body">Avg. error is the average difference from the measurement. Hits counts hours within 2 K (wind: 5 km/h). Lean shows whether a model usually runs warm (+) or cold (−). For rain, \"rain right\" counts only hours where it rained or rain was forecast, so a model that never forecasts rain cannot win. Below 24 hours (rain: 5 wet hours) nothing is ranked. If an hour\'s measurement is more than 15 K (wind: 60 km/h) away from the models\' consensus, that hour counts as a measurement fault and is left out for everyone. Consensus and \"same as yesterday\" are references. SIAG KMOS is missing because it is asked for by municipality and cannot be checked against a station.</string>
+    <string name="stats_info_body">Avg. error is the average difference from the measurement. Hits counts hours within 2 K (wind: 5 km/h). Lean shows whether a model usually runs warm (+) or cold (−). For rain, \"rain right\" counts only hours where it rained or rain was forecast, so a model that never forecasts rain cannot win. Below 24 hours (rain: 5 wet hours) nothing is ranked. If an hour\'s measurement is more than 15 K (wind: 60 km/h) away from the models\' consensus, that hour counts as a measurement fault and is left out for everyone. Consensus and \"same as yesterday\" are references. The Consensus row is the weighted middle of the models at the station, without the correction the app applies to them. SIAG KMOS is missing because it is asked for by municipality and cannot be checked against a station.</string>
     <plurals name="stats_info_excluded">
         <item quantity="one">%1$d hour was excluded as a measurement fault.</item>
         <item quantity="other">%1$d hours were excluded as measurement faults.</item>

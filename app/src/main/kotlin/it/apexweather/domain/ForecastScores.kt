@@ -73,14 +73,16 @@ object ForecastScores {
         }.filter { it.score.hours > 0 }
         val (rankable, notYet) = modelRows.partition { rankable(it.score, quantity) }
         val ranked = rankable.sortedWith(compare(quantity)).mapIndexed { i, row -> row.copy(rank = i + 1) }
+        // A reference row is held to the same minimum as a model: a Konsens over three hours sitting
+        // above twelve ranked models is an accident of the sample, not something to beat.
         val references = buildList {
-            score(pairs(scored, quantity) { consensus(it, lead, quantity) }, quantity).takeIf { it.hours > 0 }
+            score(pairs(scored, quantity) { consensus(it, lead, quantity) }, quantity).takeIf { rankable(it, quantity) }
                 ?.let { add(RankedRow(Contender.Consensus, it, null)) }
             if (quantity != Quantity.RAIN) {
                 val byTime = hours.associateBy { it.time }
                 // A faulty reading a day earlier is no forecast either.
                 score(pairs(scored, quantity) { byTime[it.time.minusSeconds(24 * 3600)]?.takeIf { y -> y.time !in faults }?.let { y -> observed(y, quantity) } }, quantity)
-                    .takeIf { it.hours > 0 }?.let { add(RankedRow(Contender.SameAsYesterday, it, null)) }
+                    .takeIf { rankable(it, quantity) }?.let { add(RankedRow(Contender.SameAsYesterday, it, null)) }
             }
         }
         return Ranking(

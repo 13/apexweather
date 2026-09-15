@@ -484,8 +484,13 @@ class WeatherRepositoryTest {
     @Test
     fun `the station calls ask for temperature, rain and wind`() = runTest {
         repo.refresh(DORF_TIROL, "de")
-        assertEquals(OpenMeteoStationMapper.STATION_HOURLY, openMeteo.stationHourly)
-        assertNotNull("AROME was not asked at the station with STATION_PARAMS", geoSphere.askedForStation)
+        // Literal strings rather than the constants, so a changed constant fails here.
+        assertEquals("temperature_2m,precipitation,wind_speed_10m", openMeteo.stationHourly)
+        val station = requireNotNull(DORF_TIROL.station)
+        assertEquals(
+            listOf("t2m,rr_acc,u10m,v10m"),
+            geoSphere.asked.filter { it.first == "${station.lat},${station.lon}" }.map { it.second },
+        )
     }
 
     /**

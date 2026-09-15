@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import it.apexweather.domain.ForecastScores
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -99,7 +101,7 @@ import kotlin.math.roundToInt
 @Composable
 internal fun mainValue(quantity: Quantity, score: Score, windUnit: WindUnit, f: Formats): String = when (quantity) {
     Quantity.TEMPERATURE -> score.main?.let { f.oneDecimal(it) + " K" } ?: MISSING
-    Quantity.WIND -> score.main?.let { Format.wind(it, windUnit, f) } ?: MISSING
+    Quantity.WIND -> score.main?.let { windDecimal(it, windUnit, f) } ?: MISSING
     Quantity.RAIN -> percent(score.main, f)
 }
 
@@ -110,9 +112,21 @@ internal fun percent(share: Double?, f: Formats): String =
 @Composable
 internal fun leanValue(quantity: Quantity, score: Score, windUnit: WindUnit, f: Formats): String = when (quantity) {
     Quantity.TEMPERATURE -> score.lean?.let { Format.kelvinDelta(it, f) } ?: MISSING
-    Quantity.WIND -> score.lean?.let { (if (it > 0) "+" else "") + Format.wind(it, windUnit, f) } ?: MISSING
+    Quantity.WIND -> score.lean?.let { lean ->
+        val tenths = Math.round(windUnit.fromKmh(lean) * 10.0) / 10.0
+        // Signed like Format.kelvinDelta: the locale supplies the minus, zero reads "±0,0".
+        (if (tenths > 0.0) "+" else if (tenths == 0.0) "±" else "") +
+            f.oneDecimal(if (tenths == 0.0) 0.0 else tenths) + Format.windUnitLabel(windUnit)
+    } ?: MISSING
     Quantity.RAIN -> percent(score.lean, f)
 }
+
+/**
+ * A wind error to one decimal in the reader's unit. `Format.wind` rounds km/h to whole numbers,
+ * which turns the gap between two models 0,4 km/h apart into a tie.
+ */
+internal fun windDecimal(kmh: Double, windUnit: WindUnit, f: Formats): String =
+    f.oneDecimal(windUnit.fromKmh(kmh)) + Format.windUnitLabel(windUnit)
 
 private const val MISSING = "–"
 
@@ -207,30 +221,32 @@ fun StatsContent(
             }
         }
         item {
-            FlowRow(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-                itemVerticalAlignment = Alignment.CenterVertically,
-            ) {
-                StatsPeriod.entries.forEach { p ->
-                    StatsChip(stringResource(R.string.stats_period, p.days.toInt()), state.period == p, "stats_period_${p.name}") { onPeriod(p) }
+            // Periods and leads each on a row of their own: in one flowing row a single chip could
+            // wrap onto the next line by itself and read as belonging to neither group.
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                ChipRow {
+                    StatsPeriod.entries.forEach { p ->
+                        StatsChip(stringResource(R.string.stats_period, p.days.toInt()), state.period == p, "stats_period_${p.name}") { onPeriod(p) }
+                    }
                 }
-                Spacer(Modifier.width(10.dp))
-                LeadBucket.entries.forEach { l ->
-                    val label = if (l == LeadBucket.NOW) stringResource(R.string.stats_lead_now)
-                    else stringResource(R.string.stats_lead_hours, l.hours.toInt())
-                    StatsChip(label, state.lead == l, "stats_lead_${l.name}") { onLead(l) }
+                ChipRow {
+                    LeadBucket.entries.forEach { l ->
+                        val label = if (l == LeadBucket.NOW) stringResource(R.string.stats_lead_now)
+                        else stringResource(R.string.stats_lead_hours, l.hours.toInt())
+                        StatsChip(label, state.lead == l, "stats_lead_${l.name}") { onLead(l) }
+                    }
                 }
             }
         }
         val first = state.firstHour
         if (state.observedHours > 0 && first != null) {
             item {
+                val lead = if (state.lead == LeadBucket.NOW) stringResource(R.string.stats_lead_now)
+                else stringResource(R.string.stats_basis_ahead, state.lead.hours.toInt())
                 Text(
                     pluralStringResource(
                         R.plurals.stats_basis, state.observedHours, state.observedHours,
-                        Format.dayMonth(first.atZone(SouthTyrol.ZONE).toLocalDate(), formats), state.stationName.orEmpty(),
+                        Format.dayMonth(first.atZone(SouthTyrol.ZONE).toLocalDate(), formats), state.stationName.orEmpty(), lead,
                     ),
                     style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.75f),
                     modifier = Modifier.padding(horizontal = 24.dp),
@@ -291,6 +307,15 @@ fun StatsContent(
             )
         }
     }
+}
+
+@Composable
+private fun ChipRow(content: @Composable () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) { content() }
 }
 
 @Composable
@@ -521,13 +546,15 @@ internal fun StatsDetailSheet(
         SheetHeading(R.string.stats_detail_by_part)
         DayPart.entries.forEach { part ->
             val score = detail.byPart[part] ?: Score(0, null, null, null)
+            // Rain split six ways runs thin fast: under the wet-hour minimum a percentage is noise.
+            val thin = detail.quantity == Quantity.RAIN && score.wetHours < ForecastScores.MIN_WET_HOURS
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(part.labelRes()), style = MaterialTheme.typography.bodyMedium, color = Color.White,
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
-                Text(mainValue(detail.quantity, score, windUnit, f), Modifier.width(col), style = MaterialTheme.typography.bodyMedium, color = Color.White, textAlign = TextAlign.End)
-                Text(percent(score.hitRate, f), Modifier.width(col), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f), textAlign = TextAlign.End)
+                Text(if (thin) MISSING else mainValue(detail.quantity, score, windUnit, f), Modifier.width(col), style = MaterialTheme.typography.bodyMedium, color = Color.White, textAlign = TextAlign.End)
+                Text(if (thin) MISSING else percent(score.hitRate, f), Modifier.width(col), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.8f), textAlign = TextAlign.End)
             }
         }
 
@@ -559,7 +586,7 @@ private fun DailyChart(detail: StatsDetail, windUnit: WindUnit) {
     val f = LocalFormats.current
     val values = detail.daily.map { it.second }
     val top = ceil(values.max()).coerceAtLeast(1.0)
-    fun label(v: Double): String = if (detail.quantity == Quantity.WIND) Format.wind(v, windUnit, f) else f.oneDecimal(v) + " K"
+    fun label(v: Double): String = if (detail.quantity == Quantity.WIND) windDecimal(v, windUnit, f) else f.oneDecimal(v) + " K"
     val firstDate = Format.dayMonth(detail.daily.first().first, f)
     val lastDate = Format.dayMonth(detail.daily.last().first, f)
     val description = listOf(

@@ -50,6 +50,33 @@ class BiasCorrectorTest {
         leadHours: Long = 0,
     ) = BiasCorrector.biases(samples, now, zone).at(source, at(hour), zone, leadHours)
 
+    /**
+     * `station_history` now holds 90 days for the statistics screen. The correction must not notice:
+     * older hours, whatever they say, change nothing.
+     */
+    @Test
+    fun `a ninety-day history gives exactly the biases of its last seven days`() {
+        val all = (1..90).flatMap { d ->
+            listOf(2, 8, 14, 20).map { h ->
+                val time = LocalDate.of(2026, 9, 10).minusDays(d.toLong()).atTime(LocalTime.of(h, 0)).atZone(zone).toInstant()
+                // Recent days run warm; older ones cold, and differently each day.
+                val error = if (d <= 7) 1.2 else -2.5 + d * 0.01
+                StationSample(
+                    time, 10.0,
+                    mapOf(
+                        LeadBucket.NOW to mapOf(Source.ICON_D2 to 10.0 + error, Source.GFS to 10.0 - error),
+                        LeadBucket.SIX to mapOf(Source.ICON_D2 to 10.0 + error / 2),
+                    ),
+                )
+            }
+        }
+        val week = all.filter { !it.time.isBefore(now.minus(java.time.Duration.ofDays(7))) }
+        assertTrue(week.size < all.size)
+        val fromAll = BiasCorrector.biases(all, now, zone)
+        assertEquals(BiasCorrector.biases(week, now, zone), fromAll)
+        assertEquals(1.2, fromAll.at(Source.ICON_D2, at(14), zone, 0)!!, 1e-9)
+    }
+
     @Test
     fun `a model that runs consistently warm is measured as warm`() {
         assertEquals(1.5, biasAt(samplesAt(hour = 14, days = 12, error = 1.5), hour = 14)!!, 1e-9)
