@@ -137,16 +137,21 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   as read, and each model's rain and wind at 0, 6 and 12 hours ahead in `modelsRainJson` /
   `modelsWindJson`. Columns were added rather than `modelsJson` reshaped, so `BiasCorrector`'s read
   path is untouched; it still filters its own seven-day `WINDOW` while `VerificationHistory.KEEP`
-  holds 90 days for `WeatherRepository.stationHistory`. An hour's rain is the difference of two daily
-  totals on the same local day, rounded to 0.01 mm (`VerificationHistory.hourlyRain`) — the first
-  hour of a day is its own total, a gap or a falling total is not scored — and it is off from
-  Open-Meteo's preceding-hour sum by the reading's minutes, which is accepted. `ForecastScores`
-  ranks temperature and wind by mean absolute error (hits within 2 K / 5 km/h, lean = mean signed
-  error) and rain by the critical success index, **never by plain accuracy**: 83 % of hours are dry,
-  so a model that never forecasts rain would win. Under 24 hours, or for rain under 5 wet hours, a
-  model is listed and not ranked; a miss beyond 15 K or 60 km/h is a station fault, excluded and
-  counted. The count shown is of hours, not of model misses. The consensus row is the weighted
-  median (mean for rain) and "wie gestern" the reading 24 hours earlier; neither is ranked.
+  holds 90 days for `WeatherRepository.stationHistory`, rounded as written (0.1 K and km/h, 0.01 mm).
+  An hour's rain is the rise of the station's daily total over the hour before, rounded to 0.01 mm
+  (`VerificationHistory.hourlyRain`), across a local midnight too: SIAG need not have reset by its
+  00:xx reading. A falling total is a reset only in the first hour of a local day, which is then its
+  own total; a gap, or a fall on any other hour, is not scored. The hour is off from Open-Meteo's
+  preceding-hour sum by the reading's minutes, which is accepted. `ForecastScores` ranks
+  temperature and wind by mean absolute error (hits within 2 K / 5 km/h, lean = mean signed error)
+  and rain by the critical success index, **never by plain accuracy**: 83 % of hours are dry, so a
+  model that never forecasts rain would win. Under 24 hours, or for rain under 5 wet hours, a model
+  is listed and not ranked, and a reference row is not shown. **A station fault is decided once per
+  hour**: a reading more than 15 K or 60 km/h from the models' weighted median at the chosen lead
+  drops that hour for every model and both reference rows, and is counted once. One model far off
+  while the station and the others agree has simply missed, and its miss counts. The consensus row
+  is the weighted median (mean for rain) of the models at the station, without the app's bias
+  correction, and "wie gestern" the reading 24 hours earlier; neither is ranked.
   The station calls ask for `temperature_2m,precipitation,wind_speed_10m` (3,3 kB gzipped against
   1,8 for temperature alone, 2026-09-15) and `t2m,rr_acc,u10m,v10m`.
   **A connected test run on the phone uninstalls the app and deletes this history**; run device
