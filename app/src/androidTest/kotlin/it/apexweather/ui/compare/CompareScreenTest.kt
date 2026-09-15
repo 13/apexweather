@@ -195,7 +195,7 @@ class CompareScreenTest {
                 CompareContent(
                     state, {}, {},
                     onOpenSource = { opened = it; detail = SourceDetailStateBuilder.build(it, failing, null, t0) },
-                    detail = detail, meta = SourceMetaUi.Unavailable, onCloseSource = { detail = null },
+                    detail = detail, meta = SourceMetaUi.Unavailable(Source.ICON_CH1), onCloseSource = { detail = null },
                 )
             }
         }

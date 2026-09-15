@@ -164,22 +164,30 @@ fun SourceDetailSheet(state: SourceDetailState, meta: SourceMetaUi, onClose: () 
 
 @Composable
 private fun MetaLines(meta: SourceMetaUi, state: SourceDetailState, formats: Formats) {
-    when (meta) {
+    // Meta for a source that is not the one this sheet shows is stale — the sheet switched sources
+    // faster than the fetch answered — and reads as still loading rather than as this source's fact.
+    val forThisSource = when (meta) {
+        is SourceMetaUi.Loading -> if (meta.source == state.source) meta else SourceMetaUi.Loading(state.source)
+        is SourceMetaUi.Loaded -> if (meta.source == state.source) meta else SourceMetaUi.Loading(state.source)
+        is SourceMetaUi.Unavailable -> if (meta.source == state.source) meta else SourceMetaUi.Loading(state.source)
+        SourceMetaUi.NotApplicable -> meta
+    }
+    when (forThisSource) {
         SourceMetaUi.NotApplicable -> Unit
-        SourceMetaUi.Loading -> Line(stringResource(R.string.source_run_loading), dim = true)
-        SourceMetaUi.Unavailable -> Line(stringResource(R.string.source_run_unavailable), dim = true)
+        is SourceMetaUi.Loading -> Line(stringResource(R.string.source_run_loading), dim = true)
+        is SourceMetaUi.Unavailable -> Line(stringResource(R.string.source_run_unavailable), dim = true)
         is SourceMetaUi.Loaded -> {
             // A provider's clock and the phone's are not the same clock; a run stamped a minute ahead
             // is shown as now rather than in the future. dayTime rather than timestamp: a run from
             // yesterday or before must carry a weekday, not the full date "14.09.2026" reads as.
             fun stamp(t: java.time.Instant) = Format.dayTime(minOf(t, state.now), SouthTyrol.ZONE, state.now, formats)
-            val run = meta.meta.runStartedAt
-            val published = meta.meta.publishedAt
+            val run = forThisSource.meta.runStartedAt
+            val published = forThisSource.meta.publishedAt
             when {
                 run != null && published != null -> Line(stringResource(R.string.source_run_published, stamp(run), stamp(published)))
                 run != null -> Line(stringResource(R.string.source_run, stamp(run)))
             }
-            meta.meta.updateEvery?.let { Line(stringResource(R.string.source_update_every, Format.shortDuration(it, formats))) }
+            forThisSource.meta.updateEvery?.let { Line(stringResource(R.string.source_update_every, Format.shortDuration(it, formats))) }
         }
     }
 }

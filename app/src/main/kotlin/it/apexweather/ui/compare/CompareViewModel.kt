@@ -238,9 +238,9 @@ class CompareViewModel @Inject constructor(
             _meta.value = SourceMetaUi.NotApplicable
             return
         }
-        _meta.value = SourceMetaUi.Loading
+        _meta.value = SourceMetaUi.Loading(source)
         metaJob = viewModelScope.launch {
-            _meta.value = metaRepository.metaFor(source)?.let { SourceMetaUi.Loaded(it) } ?: SourceMetaUi.Unavailable
+            _meta.value = metaRepository.metaFor(source)?.let { SourceMetaUi.Loaded(source, it) } ?: SourceMetaUi.Unavailable(source)
         }
     }
 

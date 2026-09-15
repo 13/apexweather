@@ -25,13 +25,20 @@ sealed interface StationBlock {
     data class Checked(val stationName: String, val cells: List<BiasCell>) : StationBlock
 }
 
-/** The one line fetched when the sheet opens. */
+/**
+ * The one line fetched when the sheet opens.
+ *
+ * [Loading], [Loaded] and [Unavailable] carry the [Source] they were fetched for, so the sheet can
+ * tell "still fetching" from "fetched for a source that is no longer open" — a sheet switched from
+ * one source to another used to show the first source's run line for an instant, or worse, the
+ * first source's meta once it arrived after the switch.
+ */
 sealed interface SourceMetaUi {
-    /** The provider publishes nothing to ask (KMOS). */
+    /** The provider publishes nothing to ask (KMOS), or no sheet is open. */
     data object NotApplicable : SourceMetaUi
-    data object Loading : SourceMetaUi
-    data class Loaded(val meta: SourceMeta) : SourceMetaUi
-    data object Unavailable : SourceMetaUi
+    data class Loading(val source: Source) : SourceMetaUi
+    data class Loaded(val source: Source, val meta: SourceMeta) : SourceMetaUi
+    data class Unavailable(val source: Source) : SourceMetaUi
 }
 
 data class SourceDetailState(

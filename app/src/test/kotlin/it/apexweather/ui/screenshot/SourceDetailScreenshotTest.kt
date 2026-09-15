@@ -52,7 +52,7 @@ class SourceDetailScreenshotTest {
             ))),
         )
         val state = SourceDetailStateBuilder.build(Source.ICON_CH1, snapshot, DORF_TIROL, hour(3))
-        val meta = SourceMetaUi.Loaded(SourceMeta(hour(0), hour(1), Duration.ofHours(3)))
+        val meta = SourceMetaUi.Loaded(Source.ICON_CH1, SourceMeta(hour(0), hour(1), Duration.ofHours(3)))
         captureRoboImage("src/test/screenshots/source_detail_icon_ch1.png") {
             ApexTheme {
                 CompositionLocalProvider(LocalFormats provides Formats(Locale.GERMANY, true)) {
