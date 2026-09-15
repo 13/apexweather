@@ -7,6 +7,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Upsert
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -37,13 +39,28 @@ interface StationHistoryDao {
  * one table has to be migrated. That is the whole point of the separation, and the day it feels
  * inconvenient is the day it is doing its job.
  */
-@Database(entities = [StationHistoryEntity::class], version = 1, exportSchema = false)
+@Database(entities = [StationHistoryEntity::class], version = 2, exportSchema = true)
 abstract class HistoryDatabase : RoomDatabase() {
     abstract fun stationHistoryDao(): StationHistoryDao
 
     companion object {
+        /**
+         * Version 2: rain and wind beside the temperature, for the statistics screen. Columns are
+         * added, never rewritten, because every existing row is evidence nobody can fetch again.
+         */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `station_history` ADD COLUMN `observedWindKmh` REAL")
+                db.execSQL("ALTER TABLE `station_history` ADD COLUMN `observedPrecipTodayMm` REAL")
+                db.execSQL("ALTER TABLE `station_history` ADD COLUMN `modelsRainJson` TEXT")
+                db.execSQL("ALTER TABLE `station_history` ADD COLUMN `modelsWindJson` TEXT")
+            }
+        }
+
         fun build(context: Context): HistoryDatabase =
-            Room.databaseBuilder(context, HistoryDatabase::class.java, "apexweather-history.db").build()
+            Room.databaseBuilder(context, HistoryDatabase::class.java, "apexweather-history.db")
+                .addMigrations(MIGRATION_1_2)
+                .build()
 
         fun inMemory(context: Context): HistoryDatabase =
             Room.inMemoryDatabaseBuilder(context, HistoryDatabase::class.java)

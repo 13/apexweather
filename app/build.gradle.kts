@@ -155,6 +155,9 @@ kotlin {
 
 ksp {
     arg("room.generateKotlin", "true")
+    // HistoryDatabase exports its schema so its migrations can be checked against the real shape.
+    // AppDatabase is a cache and keeps exportSchema = false.
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {

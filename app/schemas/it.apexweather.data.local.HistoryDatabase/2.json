@@ -1,0 +1,69 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "ca1041bc77aa0bf60cd63b784feac41c",
+    "entities": [
+      {
+        "tableName": "station_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`place` TEXT NOT NULL, `hourEpoch` INTEGER NOT NULL, `observedC` REAL, `modelsJson` TEXT NOT NULL, `observedWindKmh` REAL, `observedPrecipTodayMm` REAL, `modelsRainJson` TEXT, `modelsWindJson` TEXT, PRIMARY KEY(`place`, `hourEpoch`))",
+        "fields": [
+          {
+            "fieldPath": "place",
+            "columnName": "place",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hourEpoch",
+            "columnName": "hourEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observedC",
+            "columnName": "observedC",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "modelsJson",
+            "columnName": "modelsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observedWindKmh",
+            "columnName": "observedWindKmh",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "observedPrecipTodayMm",
+            "columnName": "observedPrecipTodayMm",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "modelsRainJson",
+            "columnName": "modelsRainJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "modelsWindJson",
+            "columnName": "modelsWindJson",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "place",
+            "hourEpoch"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ca1041bc77aa0bf60cd63b784feac41c')"
+    ]
+  }
+}

@@ -92,6 +92,17 @@ data class StationHistoryEntity(
     val observedC: Double?,
     /** Lead bucket name → source name → temperature at the station, as JSON. */
     val modelsJson: String,
+    /** The station's mean wind speed at the reading, km/h. Null in rows written before version 2. */
+    val observedWindKmh: Double? = null,
+    /**
+     * The station's rain since local midnight at the reading, mm — SIAG's `n`, stored as reported.
+     * The rain of one hour is derived from two consecutive rows; see `VerificationHistory`.
+     */
+    val observedPrecipTodayMm: Double? = null,
+    /** Lead bucket name → source name → rain in that hour, mm, as JSON. */
+    val modelsRainJson: String? = null,
+    /** Lead bucket name → source name → wind speed, km/h, as JSON. */
+    val modelsWindJson: String? = null,
 )
 
 @Entity(tableName = "refresh_meta")
