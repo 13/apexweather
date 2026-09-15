@@ -131,6 +131,25 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   the app will move a forecast, so a model measured four degrees warm is moved three, where it used
   to be moved *none* and the worst model on the list got the gentlest treatment; and faded from 15 h
   of lead time to nothing by 24 h.
+- **The statistics screen scores the models against the station, and its history is kept 90 days.**
+  `station_history` (version 2, `HistoryDatabase.MIGRATION_1_2`, schema exported to `app/schemas`)
+  carries rain and wind beside the temperature: the station's `ff` and its rain since midnight `n`
+  as read, and each model's rain and wind at 0, 6 and 12 hours ahead in `modelsRainJson` /
+  `modelsWindJson`. Columns were added rather than `modelsJson` reshaped, so `BiasCorrector`'s read
+  path is untouched; it still filters its own seven-day `WINDOW` while `VerificationHistory.KEEP`
+  holds 90 days for `WeatherRepository.stationHistory`. An hour's rain is the difference of two daily
+  totals on the same local day, rounded to 0.01 mm (`VerificationHistory.hourlyRain`) — the first hour of a day is its own
+  total, a gap or a falling total is not scored — and it is off from Open-Meteo's preceding-hour sum
+  by the reading's minutes, which is accepted. `ForecastScores` ranks temperature and wind by mean
+  absolute error (hits within 2 K / 5 km/h, lean = mean signed error) and rain by the critical
+  success index, **never by plain accuracy**: 83 % of hours are dry, so a model that never forecasts
+  rain would win. Under 24 hours, or for rain under 5 wet hours, a model is listed and not ranked; a
+  miss beyond 15 K or 60 km/h is a station fault, excluded and counted. The count shown is of hours, not of model misses. The consensus row is the
+  weighted median (mean for rain) and "wie gestern" the reading 24 hours earlier; neither is ranked.
+  The station calls ask for `temperature_2m,precipitation,wind_speed_10m` (3,3 kB gzipped against
+  1,8 for temperature alone, 2026-09-15) and `t2m,rr_acc,u10m,v10m`.
+  **A connected test run on the phone uninstalls the app and deletes this history**; run device
+  tests on an emulator, or ask first.
 - **The habit is measured per part of the day and per lead time, and both axes exist because the
   single average cancels.** A model that runs +2 K every afternoon and −2 K every night has a mean
   error of zero and used to be reported as the best model on the list — which is the error shape a
