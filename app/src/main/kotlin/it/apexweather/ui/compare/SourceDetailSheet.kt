@@ -27,6 +27,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import it.apexweather.R
 import it.apexweather.domain.BiasCorrector
@@ -37,6 +38,8 @@ import it.apexweather.domain.model.SourceStatus
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.Formats
 import it.apexweather.ui.common.LocalFormats
+import java.time.Duration
+import java.time.Instant
 
 /**
  * One source, in four blocks: what it is, whether it is working, how much it counts, and how wrong
@@ -108,9 +111,9 @@ fun SourceDetailSheet(state: SourceDetailState, meta: SourceMetaUi, onClose: () 
                         modifier = Modifier.padding(top = 4.dp).testTag("source_detail_error"),
                     )
                 }
-                failed.lastIssuedAt?.let { Line(stringResource(R.string.source_last_good, Format.dayTime(it, SouthTyrol.ZONE, state.now, formats))) }
+                failed.lastIssuedAt?.let { Line(stringResource(R.string.source_last_good, sheetStamp(it, state.now, formats))) }
             }
-            state.reachUntil?.let { Line(stringResource(R.string.source_reach, Format.dayTime(it, SouthTyrol.ZONE, state.now, formats))) }
+            state.reachUntil?.let { Line(stringResource(R.string.source_reach, sheetStamp(it, state.now, formats))) }
             MetaLines(meta, state, formats)
             Line(stringResource(R.string.source_stale_after, state.staleAfterHours), dim = true)
         }
@@ -143,11 +146,21 @@ fun SourceDetailSheet(state: SourceDetailState, meta: SourceMetaUi, onClose: () 
                     Line(pluralStringResource(R.plurals.source_station, windowDays, station.stationName, windowDays), dim = true)
                     station.cells.forEach { cell ->
                         Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                            Text(stringResource(cell.part.labelRes()), style = MaterialTheme.typography.bodyMedium, color = Color.White, modifier = Modifier.weight(1f))
+                            // The label is a single German compound word ("Nachmittags") that must
+                            // never break mid-word, so it takes its own natural width rather than a
+                            // weighted share; at a large font scale the unweighted value below would
+                            // otherwise claim its full width first and squeeze the label into pieces.
+                            Text(
+                                stringResource(cell.part.labelRes()),
+                                style = MaterialTheme.typography.bodyMedium, color = Color.White,
+                                modifier = Modifier.padding(end = 8.dp),
+                            )
                             Text(
                                 cell.kelvin?.let { Format.kelvinDelta(it, formats) } ?: stringResource(R.string.source_bias_too_few),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = if (cell.kelvin == null) Color.White.copy(alpha = 0.55f) else Color.White,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.weight(1f),
                             )
                         }
                     }
@@ -178,9 +191,8 @@ private fun MetaLines(meta: SourceMetaUi, state: SourceDetailState, formats: For
         is SourceMetaUi.Unavailable -> Line(stringResource(R.string.source_run_unavailable), dim = true)
         is SourceMetaUi.Loaded -> {
             // A provider's clock and the phone's are not the same clock; a run stamped a minute ahead
-            // is shown as now rather than in the future. dayTime rather than timestamp: a run from
-            // yesterday or before must carry a weekday, not the full date "14.09.2026" reads as.
-            fun stamp(t: java.time.Instant) = Format.dayTime(minOf(t, state.now), SouthTyrol.ZONE, state.now, formats)
+            // is shown as now rather than in the future.
+            fun stamp(t: Instant) = sheetStamp(minOf(t, state.now), state.now, formats)
             val run = forThisSource.meta.runStartedAt
             val published = forThisSource.meta.publishedAt
             when {
@@ -213,6 +225,21 @@ private fun Line(text: String, modifier: Modifier = Modifier, dim: Boolean = fal
         modifier = modifier.padding(top = 2.dp),
     )
 }
+
+/**
+ * A run, published or last-good time in this sheet: [Format.dayTime]'s weekday-and-clock for
+ * anything within the last [SHEET_STAMP_RECENT], [Format.timestamp]'s full date beyond that.
+ *
+ * The map's timeline is at most a few days deep, which is what [Format.dayTime] is built for; this
+ * sheet's times are not bounded that way — a source that stopped updating weeks ago (the GEM case
+ * this sheet exists to surface) must not read as "Di. 14:00", a weekday that could be any of the
+ * last fifty-two.
+ */
+internal fun sheetStamp(t: Instant, now: Instant, formats: Formats): String =
+    if (Duration.between(t, now) < SHEET_STAMP_RECENT) Format.dayTime(t, SouthTyrol.ZONE, now, formats)
+    else Format.timestamp(t, SouthTyrol.ZONE, now, formats)
+
+private val SHEET_STAMP_RECENT: Duration = Duration.ofDays(6)
 
 /** Whole kilometres without a decimal ("2"), the rest with one ("2,5"). */
 private fun kilometres(km: Double, f: Formats): String =

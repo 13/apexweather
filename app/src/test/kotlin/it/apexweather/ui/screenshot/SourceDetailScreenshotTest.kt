@@ -23,6 +23,7 @@ import it.apexweather.domain.point
 import it.apexweather.ui.common.Formats
 import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.compare.SourceDetailSheet
+import it.apexweather.ui.compare.SourceDetailState
 import it.apexweather.ui.compare.SourceDetailStateBuilder
 import it.apexweather.ui.compare.SourceMetaUi
 import it.apexweather.ui.theme.ApexTheme
@@ -39,8 +40,12 @@ import java.util.Locale
 @Config(qualifiers = "de-w400dp-h1400dp-xhdpi")
 class SourceDetailScreenshotTest {
 
-    @Test
-    fun `ICON-CH1 at Dorf Tirol`() {
+    /**
+     * Bias cells carry a lead time of six hours here — the same fixture both goldens render — so the
+     * afternoon cell's "+1,4 K" is a real value rather than a placeholder, and the font-scale golden
+     * exercises the same value/label pairing the normal-scale one does.
+     */
+    private fun buildState(): Pair<SourceDetailState, SourceMetaUi.Loaded> {
         val icons = listOf(Source.ICON_CH1, Source.ICON_CH2, Source.ICON_2I, Source.ICON_D2, Source.GEOSPHERE_AROME)
         val snapshot = WeatherSnapshot.EMPTY.copy(
             forecasts = icons.associateWith { s -> forecast(s, (0 until 34).map { point(it, 12.0) }) },
@@ -53,7 +58,34 @@ class SourceDetailScreenshotTest {
         )
         val state = SourceDetailStateBuilder.build(Source.ICON_CH1, snapshot, DORF_TIROL, hour(3))
         val meta = SourceMetaUi.Loaded(Source.ICON_CH1, SourceMeta(hour(0), hour(1), Duration.ofHours(3)))
+        return state to meta
+    }
+
+    @Test
+    fun `ICON-CH1 at Dorf Tirol`() {
+        val (state, meta) = buildState()
         captureRoboImage("src/test/screenshots/source_detail_icon_ch1.png") {
+            ApexTheme {
+                CompositionLocalProvider(LocalFormats provides Formats(Locale.GERMANY, true)) {
+                    Box(Modifier.background(Color(0xFF14213A)).width(400.dp)) {
+                        SourceDetailSheet(state, meta, onClose = {})
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * The station block's per-part-of-day row at 2x font scale. "Nachmittags" is the widest of the
+     * four labels and the one most likely to be squeezed by an unweighted value claiming its width
+     * first; a wider, taller viewport than the normal-scale golden's is needed to fit the whole
+     * doubled sheet.
+     */
+    @Test
+    @Config(qualifiers = "de-w400dp-h2000dp-xhdpi", fontScale = 2.0f)
+    fun `ICON-CH1 at Dorf Tirol, font scale 2`() {
+        val (state, meta) = buildState()
+        captureRoboImage("src/test/screenshots/source_detail_icon_ch1_font2.png") {
             ApexTheme {
                 CompositionLocalProvider(LocalFormats provides Formats(Locale.GERMANY, true)) {
                     Box(Modifier.background(Color(0xFF14213A)).width(400.dp)) {

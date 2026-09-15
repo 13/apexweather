@@ -19,6 +19,8 @@ import androidx.compose.ui.test.performScrollTo
 import it.apexweather.data.AppSettings
 import it.apexweather.data.CompareVariable
 import it.apexweather.domain.ConsensusBlender
+import it.apexweather.domain.NearbyStation
+import it.apexweather.domain.Place
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.HourlyPoint
 import it.apexweather.domain.model.Source
@@ -39,6 +41,13 @@ class CompareScreenTest {
     private fun fc(s: Source, off: Double) = SourceForecast(s, t0, t0, (0 until 72).map { HourlyPoint(t0.plusSeconds(it * 3600L), 10.0 + off, condition = Condition.CLEAR) }, emptyList())
     private val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = mapOf(Source.ICON_CH1 to fc(Source.ICON_CH1, 0.0), Source.ICON_D2 to fc(Source.ICON_D2, 3.0)))
     private val state = CompareStateBuilder.build(snapshot, AppSettings(), ConsensusBlender().blend(snapshot.forecasts), t0)
+
+    /** A place with a station, so a missing station block in the sheet is the fix, not `place = null`. */
+    private val placeWithStation = Place(
+        istat = "021101", nameDe = "Dorf Tirol", nameIt = "Tirolo", nameEn = "Tirol",
+        lat = 46.688958, lon = 11.156624, altitudeM = 594, district = 2,
+        station = NearbyStation("23200MS", "Meran", 46.688, 11.1366, 330, 1.53),
+    )
 
     /**
      * The screen is a lazy list, so anything below the fold is not composed at all. Scroll to it
@@ -228,6 +237,7 @@ class CompareScreenTest {
                 CompareContent(state, {}, {}, detail = detail, meta = SourceMetaUi.NotApplicable, onCloseSource = {})
             }
         }
+        rule.onNodeWithTag("source_detail_close").assertExists()
         rule.onNodeWithTag("source_detail_fills_gaps").assertDoesNotExist()
     }
 
@@ -237,12 +247,15 @@ class CompareScreenTest {
      */
     @Test
     fun aNeverLoadedSourceHasNoShareOrStationBlock() {
-        val detail = SourceDetailStateBuilder.build(Source.GEM, snapshot, null, t0)
+        // A place with a station: without the fix, the station block would be absent anyway because
+        // `place = null` yields StationBlock.NoStation on its own, and this assertion could not fail.
+        val detail = SourceDetailStateBuilder.build(Source.GEM, snapshot, placeWithStation, t0)
         rule.setContent {
             ApexTheme {
                 CompareContent(state, {}, {}, detail = detail, meta = SourceMetaUi.NotApplicable, onCloseSource = {})
             }
         }
+        rule.onNodeWithTag("source_detail_close").assertExists()
         rule.onNodeWithTag("source_detail_share").assertDoesNotExist()
         rule.onNodeWithTag("source_detail_station").assertDoesNotExist()
     }
