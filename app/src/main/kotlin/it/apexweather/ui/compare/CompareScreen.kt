@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -201,6 +202,10 @@ fun CompareContent(
                     val label = stringResource(R.string.source_detail_open, s.displayName, status)
                     Row(
                         Modifier.fillMaxWidth()
+                            // Measured at 93 px (33 dp) on the phone against the 44 dp floor CLAUDE.md
+                            // justifies for a full-width row; heightIn holds the touch target there
+                            // without changing how the content itself sits.
+                            .heightIn(min = 44.dp)
                             // Tappable because this is where "what is this model, and why is it red"
                             // gets asked; the sheet answers it. The row reads as one button.
                             .clickable(role = Role.Button) { onOpenSource(s) }
