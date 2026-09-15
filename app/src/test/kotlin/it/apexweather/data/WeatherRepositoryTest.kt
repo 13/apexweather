@@ -7,6 +7,7 @@ import it.apexweather.data.local.HistoryDatabase
 import it.apexweather.data.local.SourceForecastEntity
 import it.apexweather.data.local.WeatherDao
 import it.apexweather.data.remote.GeoSphereApi
+import it.apexweather.data.remote.GeoSphereMapper
 import it.apexweather.data.remote.GeoSphereResponse
 import it.apexweather.data.remote.KmosResponse
 import it.apexweather.data.remote.OdhApi
@@ -144,12 +145,15 @@ class WeatherRepositoryTest {
      * this closes one of them; SIAG KMOS is addressed by municipality and cannot be closed at all.
      */
     @Test
-    fun `geosphere is asked about the station as well, for the temperature alone`() = runTest {
+    fun `geosphere is asked about the station as well, for temperature, rain and wind`() = runTest {
         repo.refresh(DORF_TIROL, "de")
         val station = requireNotNull(DORF_TIROL.station)
         assertEquals("${station.lat},${station.lon}", geoSphere.askedForStation)
         assertNotEquals(geoSphere.askedFor, geoSphere.askedForStation)
-        assertEquals(listOf("t2m"), geoSphere.asked.filter { it.first == geoSphere.askedForStation }.map { it.second })
+        assertEquals(
+            listOf(GeoSphereMapper.STATION_PARAMS),
+            geoSphere.asked.filter { it.first == geoSphere.askedForStation }.map { it.second },
+        )
     }
 
     /** And it lands in the reference series the history is written from. */

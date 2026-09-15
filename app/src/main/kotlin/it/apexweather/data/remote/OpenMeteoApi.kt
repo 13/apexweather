@@ -39,6 +39,9 @@ interface OpenMeteoApi {
      * colder the village is than the station at a given hour, so that the station's live reading can
      * be carried up the hill instead of being quoted 300 m too low. Yesterday is included because an
      * observation may be up to ninety minutes old and can therefore belong to the previous day.
+     *
+     * Rain and wind are asked for too, for the statistics screen: 3,3 kB gzipped for the eleven
+     * models against 1,8 kB for temperature alone, measured 2026-09-15.
      */
     @GET("v1/forecast")
     suspend fun stationForecast(
@@ -53,7 +56,7 @@ interface OpenMeteoApi {
         // BiasCorrector splits on. It costs about 1,8 kB.
         @Query("forecast_days") forecastDays: Int = 2,
         @Query("models") models: String = OpenMeteoMapper.MODELS.values.joinToString(","),
-        @Query("hourly") hourly: String = "temperature_2m",
+        @Query("hourly") hourly: String = OpenMeteoStationMapper.STATION_HOURLY,
     ): OpenMeteoStationResponse
 
     companion object { const val BASE_URL = "https://api.open-meteo.com/" }
@@ -215,13 +218,25 @@ data class StationReference(
     val elevationM: Double,
     /** Source name → epoch second → temperature. Names, because a JSON map key is a string anyway. */
     val bySource: Map<String, Map<Long, Double>> = emptyMap(),
+    /** Source name → epoch second → rain in the hour ending then, mm. Empty in rows cached before rain was asked for. */
+    val rainBySource: Map<String, Map<Long, Double>> = emptyMap(),
+    /** Source name → epoch second → wind speed, km/h. */
+    val windBySource: Map<String, Map<Long, Double>> = emptyMap(),
 ) {
-    /** Every model's value for that hour, keyed by source. */
-    fun at(t: Instant): Map<Source, Double> {
+    /** Every model's temperature for that hour, keyed by source. */
+    fun at(t: Instant): Map<Source, Double> = valuesAt(bySource, t)
+
+    /** Every model's rain for that hour, keyed by source. */
+    fun rainAt(t: Instant): Map<Source, Double> = valuesAt(rainBySource, t)
+
+    /** Every model's wind speed for that hour, keyed by source. */
+    fun windAt(t: Instant): Map<Source, Double> = valuesAt(windBySource, t)
+
+    private fun valuesAt(series: Map<String, Map<Long, Double>>, t: Instant): Map<Source, Double> {
         val second = t.truncatedTo(java.time.temporal.ChronoUnit.HOURS).epochSecond
-        return bySource.mapNotNull { (name, series) ->
+        return series.mapNotNull { (name, values) ->
             val source = runCatching { Source.valueOf(name) }.getOrNull() ?: return@mapNotNull null
-            series[second]?.let { source to it }
+            values[second]?.let { source to it }
         }.toMap()
     }
 
@@ -277,24 +292,38 @@ data class StationReference(
      * SIAG KMOS is the one that genuinely cannot: it is addressed by municipality, and there is no
      * municipality whose forecast is a forecast for the thermometer.
      */
-    fun plus(source: Source, hourly: List<HourlyPoint>): StationReference = copy(
-        bySource = bySource + (
-            source.name to hourly.associate {
-                it.time.truncatedTo(java.time.temporal.ChronoUnit.HOURS).epochSecond to it.tempC
-            }
-            ),
-    )
+    fun plus(source: Source, hourly: List<HourlyPoint>): StationReference {
+        fun key(p: HourlyPoint) = p.time.truncatedTo(java.time.temporal.ChronoUnit.HOURS).epochSecond
+        val wind = hourly.mapNotNull { p -> p.windKmh?.let { key(p) to it } }.toMap()
+        return copy(
+            bySource = bySource + (source.name to hourly.associate { key(it) to it.tempC }),
+            rainBySource = rainBySource + (source.name to hourly.associate { key(it) to it.precipMm }),
+            windBySource = if (wind.isEmpty()) windBySource else windBySource + (source.name to wind),
+        )
+    }
 }
 
 object OpenMeteoStationMapper {
+    /** What the station call asks for: the temperature for the hill, rain and wind for the statistics. */
+    const val STATION_HOURLY = "temperature_2m,precipitation,wind_speed_10m"
+
     fun map(resp: OpenMeteoStationResponse, fetchedAt: Instant): StationReference {
         val times = resp.hourly.strings("time").map { parseLocal(it!!, SouthTyrol.ZONE) }
-        val bySource = OpenMeteoMapper.MODELS.mapNotNull { (source, key) ->
-            val values = resp.hourly.doubles("temperature_2m_$key")
+        fun series(variable: String): Map<String, Map<Long, Double>> = OpenMeteoMapper.MODELS.mapNotNull { (source, key) ->
+            val name = "${variable}_$key"
+            // A response recorded before a variable was asked for simply has no such key.
+            if (!resp.hourly.containsKey(name)) return@mapNotNull null
+            val values = resp.hourly.doubles(name)
             // A model that does not reach these hours contributes nothing rather than a zero.
-            val series = times.indices.mapNotNull { i -> values.getOrNull(i)?.let { times[i].epochSecond to it } }.toMap()
-            if (series.isEmpty()) null else source.name to series
+            val byHour = times.indices.mapNotNull { i -> values.getOrNull(i)?.let { times[i].epochSecond to it } }.toMap()
+            if (byHour.isEmpty()) null else source.name to byHour
         }.toMap()
-        return StationReference(fetchedAt = fetchedAt, elevationM = resp.elevation, bySource = bySource)
+        return StationReference(
+            fetchedAt = fetchedAt,
+            elevationM = resp.elevation,
+            bySource = series("temperature_2m"),
+            rainBySource = series("precipitation"),
+            windBySource = series("wind_speed_10m"),
+        )
     }
 }

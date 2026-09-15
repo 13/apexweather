@@ -4,6 +4,7 @@ import it.apexweather.Fixtures
 import it.apexweather.data.remote.EnsembleApi
 import it.apexweather.data.remote.EnsembleResponse
 import it.apexweather.data.remote.GeoSphereApi
+import it.apexweather.data.remote.GeoSphereMapper
 import it.apexweather.data.remote.GeoSphereResponse
 import it.apexweather.data.remote.KmosResponse
 import it.apexweather.data.remote.MeteoAlarmApi
@@ -53,6 +54,12 @@ internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
     /** The station's coordinates and the elevation given with them. */
     var stationAt: Triple<Double, Double, Int>? = null
 
+    /** The recording the station call answers with; tests about rain and wind choose the newer one. */
+    var stationFixture: String = "openmeteo_station.json"
+
+    /** The `hourly` the station call last asked for. */
+    var stationHourly: String? = null
+
     open override suspend fun forecast(
         latitude: Double, longitude: Double, timezone: String, forecastDays: Int,
         models: String, hourly: String, daily: String, minutely: String, minutelySteps: Int,
@@ -73,6 +80,7 @@ internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
         pastDays: Int, forecastDays: Int, models: String, hourly: String,
     ): OpenMeteoStationResponse {
         stationAt = Triple(latitude, longitude, elevation)
+        stationHourly = hourly
         requirePlausible(latitude, longitude)
         if (fail) throw IOException("open-meteo down")
         // Recorded with a wider past window than the live request asks for (`past_days=3`, not 1),
@@ -82,7 +90,7 @@ internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
         // Meran on the clear afternoon of 2026-09-11 — are the case StationSun is documented and
         // calibrated against. Nothing else about the request differs, so this is still a recording
         // of what the app sends; only the window is longer. Re-record both together.
-        return Fixtures.json.decodeFromString(OpenMeteoStationResponse.serializer(), Fixtures.read("openmeteo_station.json"))
+        return Fixtures.json.decodeFromString(OpenMeteoStationResponse.serializer(), Fixtures.read(stationFixture))
     }
 
     /** Somewhere in this province, which is the only place this app ever asks about. */
@@ -109,10 +117,10 @@ internal class FakeGeoSphere(var fail: Boolean = false, var cancel: Boolean = fa
     val asked: MutableList<Pair<String, String>> = java.util.Collections.synchronizedList(mutableListOf())
 
     /** The village call — the one that asks for every parameter — as last asked for. */
-    val askedFor: String? get() = asked.lastOrNull { it.second != "t2m" }?.first
+    val askedFor: String? get() = asked.lastOrNull { it.second != GeoSphereMapper.STATION_PARAMS }?.first
 
-    /** The station call, which asks for the temperature and nothing else, as last asked for. */
-    val askedForStation: String? get() = asked.lastOrNull { it.second == "t2m" }?.first
+    /** The station call, which asks for temperature, rain and wind, as last asked for. */
+    val askedForStation: String? get() = asked.lastOrNull { it.second == GeoSphereMapper.STATION_PARAMS }?.first
 
     override suspend fun forecast(latLon: String, parameters: String): GeoSphereResponse {
         asked += latLon to parameters

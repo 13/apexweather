@@ -359,9 +359,9 @@ class WeatherRepository @Inject constructor(
                         // is no municipality that is a forecast for a thermometer, so it stays
                         // uncorrected and that is a fact about the upstream rather than an omission.
                         //
-                        // `t2m` alone: this series exists to be compared with a temperature.
+                        // Temperature for the bias correction, rain and wind for the statistics screen.
                         val aromeAtStation = attempt("GEOSPHERE_AROME_STATION") {
-                            GeoSphereMapper.map(geoSphere.forecast("${station.lat},${station.lon}", parameters = "t2m"), now)
+                            GeoSphereMapper.map(geoSphere.forecast("${station.lat},${station.lon}", parameters = GeoSphereMapper.STATION_PARAMS), now)
                         }
                         val prev = dao.stationReferenceOnce(place.istat)
                         // Merged onto what is already stored rather than written over it. The two

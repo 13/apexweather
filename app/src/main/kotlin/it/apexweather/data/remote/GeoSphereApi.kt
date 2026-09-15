@@ -47,6 +47,8 @@ object GeoSphereMapper {
     /** Fog is cloud on the ground, so the sky above has to be covered too. */
     private const val FOG_CLOUD_FRACTION = 0.9
     const val PARAMS = "t2m,rr_acc,snow_acc,rh2m,u10m,v10m,ugust,vgust,tcc,sp,cape"
+    /** The station call: temperature, rain and wind — the three quantities the statistics score. */
+    const val STATION_PARAMS = "t2m,rr_acc,u10m,v10m"
 
     fun map(resp: GeoSphereResponse, fetchedAt: Instant): SourceForecast {
         val zone = SouthTyrol.ZONE
