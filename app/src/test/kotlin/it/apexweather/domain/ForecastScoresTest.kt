@@ -127,17 +127,18 @@ class ForecastScoresTest {
     @Test
     fun `a station fault drops the hour for every model and both references`() {
         val fault = 30
-        val h = hours(48, { i -> Triple(if (i == fault) 51.0 else 10.0, 0.0, 5.0) }, agreeing())
+        // 49 hours, so "wie gestern" still has the 24 it needs to be shown once the fault is dropped.
+        val h = hours(49, { i -> Triple(if (i == fault) 51.0 else 10.0, 0.0, 5.0) }, agreeing())
         val r = ForecastScores.rank(h, Quantity.TEMPERATURE, lead, since)
         assertEquals(1, r.excludedHours)
         listOf(Source.ICON_D2, Source.GEOSPHERE_AROME, Source.ECMWF, Source.GFS).forEach { s ->
-            assertEquals("$s", 47, model(r, s).score.hours)
+            assertEquals("$s", 48, model(r, s).score.hours)
             assertEquals("$s", 1.0, model(r, s).score.main!!, 1e-9)
         }
-        assertEquals(47, r.references.single { it.contender == Contender.Consensus }.score.hours)
-        // Hours 24..47 have a reading a day earlier; the fault hour is one of them.
+        assertEquals(48, r.references.single { it.contender == Contender.Consensus }.score.hours)
+        // Hours 24..48 have a reading a day earlier; the fault hour is one of them.
         val yesterday = r.references.single { it.contender == Contender.SameAsYesterday }.score
-        assertEquals(23, yesterday.hours)
+        assertEquals(24, yesterday.hours)
         assertEquals(0.0, yesterday.main!!, 1e-9)
     }
 
