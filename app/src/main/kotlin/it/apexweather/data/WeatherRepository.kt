@@ -503,11 +503,7 @@ class WeatherRepository @Inject constructor(
         if (reference != null) {
             listOf(LeadBucket.SIX, LeadBucket.TWELVE).forEach { lead ->
                 val target = thisHour.plusSeconds(lead.hours * 3600)
-                val forecasts = HourForecasts(
-                    temps = reference.at(target).mapKeys { it.key.name },
-                    rain = reference.rainAt(target).mapKeys { it.key.name },
-                    wind = reference.windAt(target).mapKeys { it.key.name },
-                )
+                val forecasts = HourForecasts.at(reference, target)
                 // A model whose run does not reach that far contributes nothing rather than a gap
                 // that later reads as agreement.
                 if (forecasts.temps.isNotEmpty()) mergeStationHour(place, target, lead = lead, forecasts = forecasts)
@@ -521,13 +517,7 @@ class WeatherRepository @Inject constructor(
             ?.let { decode("observation", StationObservation.serializer(), it) }
         if (observation?.tempC != null) {
             val hour = observation.time.truncatedTo(ChronoUnit.HOURS)
-            val atHour = reference?.let {
-                HourForecasts(
-                    temps = it.at(hour).mapKeys { e -> e.key.name },
-                    rain = it.rainAt(hour).mapKeys { e -> e.key.name },
-                    wind = it.windAt(hour).mapKeys { e -> e.key.name },
-                )
-            }
+            val atHour = reference?.let { HourForecasts.at(it, hour) }
             mergeStationHour(place, hour, reading = observation, lead = LeadBucket.NOW, forecasts = atHour)
         }
         history.prune(now.minus(VerificationHistory.KEEP).epochSecond)
@@ -538,7 +528,20 @@ class WeatherRepository @Inject constructor(
         val temps: Map<String, Double>,
         val rain: Map<String, Double>,
         val wind: Map<String, Double>,
-    )
+    ) {
+        companion object {
+            /**
+             * Rounded to what each quantity honestly carries — 0.1 K, 0.01 mm, 0.1 km/h — because a
+             * wind derived from u and v or rain differenced from an accumulation otherwise arrives
+             * with fifteen digits of float noise, and history keeps it ninety days.
+             */
+            fun at(reference: StationReference, hour: Instant) = HourForecasts(
+                temps = reference.at(hour).entries.associate { it.key.name to tenths(it.value) },
+                rain = reference.rainAt(hour).entries.associate { it.key.name to hundredths(it.value) },
+                wind = reference.windAt(hour).entries.associate { it.key.name to tenths(it.value) },
+            )
+        }
+    }
 
     /**
      * Read, change, write one history row. A reading is written where it is given and the stored one
@@ -563,10 +566,11 @@ class WeatherRepository @Inject constructor(
             StationHistoryEntity(
                 place = place.istat,
                 hourEpoch = hour.epochSecond,
-                observedC = reading?.tempC ?: existing?.observedC,
+                // The reading rounded like the forecasts beside it (see HourForecasts.at).
+                observedC = reading?.tempC?.let(::tenths) ?: existing?.observedC,
                 modelsJson = json.encodeToString(LEAD_MODEL_TEMPS, temps),
-                observedWindKmh = reading?.windKmh ?: existing?.observedWindKmh,
-                observedPrecipTodayMm = reading?.precipTodayMm ?: existing?.observedPrecipTodayMm,
+                observedWindKmh = reading?.windKmh?.let(::tenths) ?: existing?.observedWindKmh,
+                observedPrecipTodayMm = reading?.precipTodayMm?.let(::hundredths) ?: existing?.observedPrecipTodayMm,
                 modelsRainJson = rain.takeIf { it.isNotEmpty() }?.let { json.encodeToString(LEAD_MODEL_TEMPS, it) },
                 modelsWindJson = wind.takeIf { it.isNotEmpty() }?.let { json.encodeToString(LEAD_MODEL_TEMPS, it) },
             ),
@@ -640,6 +644,9 @@ class WeatherRepository @Inject constructor(
         /** Lead bucket name → source name → temperature, which is what a history row holds. */
         private val LEAD_MODEL_TEMPS: KSerializer<Map<String, Map<String, Double>>> =
             MapSerializer(String.serializer(), MapSerializer(String.serializer(), Double.serializer()))
+
+        private fun tenths(v: Double): Double = Math.round(v * 10.0) / 10.0
+        private fun hundredths(v: Double): Double = Math.round(v * 100.0) / 100.0
 
         /** MeteoAlarm publishes a few times a day; six hours without one means we are behind. */
         private val WARNINGS_STALE_AFTER: Duration = Duration.ofHours(6)

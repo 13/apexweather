@@ -488,6 +488,34 @@ class WeatherRepositoryTest {
         assertNotNull("AROME was not asked at the station with STATION_PARAMS", geoSphere.askedForStation)
     }
 
+    /**
+     * What goes into history is rounded to what the quantity can honestly carry: a wind derived from
+     * u and v, or rain differenced from an accumulation, otherwise arrives with fifteen digits of
+     * float noise and is stored ninety days.
+     */
+    @Test
+    fun `history values are rounded before they are written`() = runTest {
+        openMeteo.stationFixture = "openmeteo_station_rain_wind.json"
+        clock.now = Instant.parse("2026-09-09T20:00:00Z")
+        repo.refresh(DORF_TIROL, "de")
+        val rows = history.stationHistoryDao().history(DORF_TIROL.istat, 0L).first()
+        assertTrue(rows.any { it.modelsRainJson != null && it.modelsWindJson != null })
+        fun check(label: String, v: Double, scale: Double) =
+            assertEquals("$label $v is not rounded", Math.round(v * scale) / scale, v, 0.0)
+        fun values(text: String?) = text?.let { Fixtures.json.decodeFromString(leadModel, it) }.orEmpty()
+            .values.flatMap { it.entries }
+        var checked = 0
+        rows.forEach { row ->
+            row.observedC?.let { check("observed temperature", it, 10.0) }
+            row.observedWindKmh?.let { check("observed wind", it, 10.0) }
+            row.observedPrecipTodayMm?.let { check("observed rain total", it, 100.0) }
+            values(row.modelsJson).forEach { (s, v) -> check("$s temperature", v, 10.0); checked++ }
+            values(row.modelsRainJson).forEach { (s, v) -> check("$s rain", v, 100.0); checked++ }
+            values(row.modelsWindJson).forEach { (s, v) -> check("$s wind", v, 10.0); checked++ }
+        }
+        assertTrue(checked > 0)
+    }
+
     @Test
     fun `a reading writes the station's wind and its rain total`() = runTest {
         repo.refresh(DORF_TIROL, "de")
