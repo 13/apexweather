@@ -237,14 +237,12 @@ class CompareViewModel @Inject constructor(
     private val _meta = MutableStateFlow<SourceMetaUi>(SourceMetaUi.NotApplicable)
     val meta: StateFlow<SourceMetaUi> = _meta.asStateFlow()
     private var metaJob: Job? = null
-    private var metaFor: Source? = null
 
     init {
-        // The sheet opens from outside too: the statistics screen sets this key on the way back.
-        // A name already being fetched for is not fetched again.
-        viewModelScope.launch {
-            openSourceName.collect { name -> sourceNamed(name)?.takeIf { it != metaFor }?.let(::fetchMeta) }
-        }
+        // A sheet restored after process death asks for its run line again. Opening it from the
+        // statistics screen goes through openSource: the navigation entry's handle carries that
+        // handoff, never this view model's own (see ReceiveSourceHandoff).
+        sourceNamed(openSourceName.value)?.let(::fetchMeta)
     }
 
     fun openSource(source: Source) {
@@ -256,12 +254,10 @@ class CompareViewModel @Inject constructor(
         savedState[SOURCE_KEY] = null
         metaJob?.cancel()
         metaJob = null
-        metaFor = null
         _meta.value = SourceMetaUi.NotApplicable
     }
 
     private fun fetchMeta(source: Source) {
-        metaFor = source
         metaJob?.cancel()
         if (SourceMetaRepository.urlFor(source) == null) {
             _meta.value = SourceMetaUi.NotApplicable

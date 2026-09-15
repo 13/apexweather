@@ -196,22 +196,4 @@ class CompareViewModelTest {
         runCurrent()
         assertEquals(SourceMetaUi.Unavailable(Source.ICON_D2), vm.meta.value)
     }
-
-    /**
-     * The statistics screen opens the sheet by writing the saved-state key directly, not by calling
-     * `openSource` — the collector added to the ViewModel's `init` is what picks that up.
-     */
-    @Test
-    fun `the sheet opens when compare_source is set from outside`() = compareTest { vm, api, handle ->
-        api.delayMs = 1_000
-        handle["compare_source"] = Source.ICON_D2.name
-        runCurrent()
-        assertEquals(SourceMetaUi.Loading(Source.ICON_D2), vm.meta.value)
-        advanceTimeBy(1_000)
-        runCurrent()
-        val loaded = vm.meta.value
-        assertTrue("expected Loaded, got $loaded", loaded is SourceMetaUi.Loaded)
-        assertEquals(Source.ICON_D2, (loaded as SourceMetaUi.Loaded).source)
-        assertEquals(listOf("https://api.open-meteo.com/data/dwd_icon_d2/static/meta.json"), api.urls)
-    }
 }

@@ -24,10 +24,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.dropUnlessResumed
+import androidx.navigation.NavBackStackEntry
+import it.apexweather.domain.model.Source
+import it.apexweather.ui.compare.CompareViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
@@ -79,6 +85,49 @@ internal fun NavHostController.openTopLevel(route: Any) {
         popUpTo(HomeRoute) { saveState = true }
         launchSingleTop = true
         restoreState = true
+    }
+}
+
+/** The key the statistics screen leaves on the comparison screen's back-stack entry. */
+internal const val COMPARE_SOURCE_KEY = "compare_source"
+
+/**
+ * What a tab in the bar does. The comparison tab stays selected while the statistics show, and
+ * [openTopLevel] would save and restore that same two-entry stack, so tapping it did nothing;
+ * from there it pops back to the comparison instead.
+ */
+internal fun NavHostController.selectTab(route: Any) {
+    if (route == CompareRoute && currentDestination?.hasRoute(StatsRoute::class) == true) {
+        popBackStack(CompareRoute, inclusive = false)
+    } else {
+        openTopLevel(route)
+    }
+}
+
+/**
+ * "Details zur Quelle": leaves [source] on the comparison entry's own handle and pops back to it,
+ * where [ReceiveSourceHandoff] picks it up. Only while the statistics are on top, so a double tap
+ * cannot pop the comparison screen as well.
+ */
+internal fun NavHostController.handSourceToCompare(source: Source) {
+    if (currentDestination?.hasRoute(StatsRoute::class) != true) return
+    getBackStackEntry<CompareRoute>().savedStateHandle[COMPARE_SOURCE_KEY] = source.name
+    popBackStack(CompareRoute, inclusive = false)
+}
+
+/**
+ * The receiving half of [handSourceToCompare]. It reads the **entry's** handle: a Hilt view model's
+ * `SavedStateHandle` is a different object, keyed per view model, and never sees this key — which
+ * is why the source sheet once never opened. The key is cleared once delivered.
+ */
+@Composable
+internal fun ReceiveSourceHandoff(entry: NavBackStackEntry, onSource: (Source) -> Unit) {
+    val pending by entry.savedStateHandle.getStateFlow<String?>(COMPARE_SOURCE_KEY, null).collectAsState()
+    val deliver by rememberUpdatedState(onSource)
+    LaunchedEffect(pending) {
+        val name = pending ?: return@LaunchedEffect
+        Source.entries.firstOrNull { it.name == name }?.let(deliver)
+        entry.savedStateHandle[COMPARE_SOURCE_KEY] = null
     }
 }
 
@@ -151,7 +200,7 @@ fun ApexApp() {
                             (item.route == CompareRoute && dest?.hasRoute(StatsRoute::class) == true)
                         NavigationBarItem(
                             selected = selected,
-                            onClick = { nav.openTopLevel(item.route) },
+                            onClick = { nav.selectTab(item.route) },
                             icon = { Icon(item.icon, null) },
                             // Five items share the width whatever the reader's text size, so the
                             // label is held to CompactLabel's ceiling; the icon above it still
@@ -198,16 +247,17 @@ fun ApexApp() {
                 }
                 composable<PlacePickerRoute> { PlacePickerScreen(onBack = { nav.popBackStack() }) }
                 composable<MapRoute> { MapScreen() }
-                composable<CompareRoute> { CompareScreen(onOpenStats = { nav.navigate(StatsRoute) }) }
+                composable<CompareRoute> { entry ->
+                    val compareVm: CompareViewModel = hiltViewModel()
+                    // The statistics screen hands a source back on this entry's handle.
+                    ReceiveSourceHandoff(entry, compareVm::openSource)
+                    CompareScreen(onOpenStats = dropUnlessResumed { nav.navigate(StatsRoute) }, viewModel = compareVm)
+                }
                 composable<StatsRoute> {
                     StatsScreen(
-                        onBack = { nav.popBackStack() },
-                        // The source sheet lives on the comparison screen; its view model opens it
-                        // when this key appears on its own entry.
-                        onOpenSource = { source ->
-                            nav.getBackStackEntry<CompareRoute>().savedStateHandle["compare_source"] = source.name
-                            nav.popBackStack()
-                        },
+                        // Dropped unless resumed, so a double tap on the arrow pops once.
+                        onBack = dropUnlessResumed { nav.popBackStack() },
+                        onOpenSource = nav::handSourceToCompare,
                     )
                 }
                 composable<BulletinRoute> { BulletinScreen() }
