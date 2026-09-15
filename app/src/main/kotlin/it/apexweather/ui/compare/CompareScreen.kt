@@ -66,19 +66,22 @@ import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.GlassCard
 import it.apexweather.ui.common.SourceColors
+import it.apexweather.ui.stats.StatsCard
 import java.time.temporal.ChronoUnit
 import java.time.Instant
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
-fun CompareScreen(viewModel: CompareViewModel = hiltViewModel()) {
+fun CompareScreen(onOpenStats: () -> Unit = {}, viewModel: CompareViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val detail by viewModel.detail.collectAsStateWithLifecycle()
     val meta by viewModel.meta.collectAsStateWithLifecycle()
+    val stats by viewModel.stats.collectAsStateWithLifecycle()
     CompareContent(
         state, viewModel::toggleSource, viewModel::setVariable, viewModel::setDay,
         onOpenSource = viewModel::openSource, detail = detail, meta = meta, onCloseSource = viewModel::closeSource,
+        stats = stats, onOpenStats = onOpenStats,
     )
 }
 
@@ -93,6 +96,8 @@ fun CompareContent(
     detail: SourceDetailState? = null,
     meta: SourceMetaUi = SourceMetaUi.NotApplicable,
     onCloseSource: () -> Unit = {},
+    stats: CompareStats = CompareStats(),
+    onOpenStats: () -> Unit = {},
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val locale = LocalConfiguration.current.locales[0]
@@ -193,6 +198,9 @@ fun CompareContent(
             }
         }
         item {
+            StatsCard(stats.card, state.settings.windUnit, onOpenStats, Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+        }
+        item {
             GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("status_list")) {
                 Text(stringResource(R.string.compare_status), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
                 Spacer(Modifier.height(8.dp))
@@ -264,7 +272,7 @@ fun CompareContent(
             containerColor = MaterialTheme.colorScheme.surface,
             modifier = Modifier.testTag("source_detail_sheet"),
         ) {
-            SourceDetailSheet(detail, meta, onCloseSource)
+            SourceDetailSheet(detail, meta, onCloseSource, rank = stats.ranks[detail.source])
         }
     }
 }

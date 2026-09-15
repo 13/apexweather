@@ -329,4 +329,48 @@
     <string name="source_part_morning">Morgens</string>
     <string name="source_part_afternoon">Nachmittags</string>
     <string name="source_part_evening">Abends</string>
+    <!-- Statistics: how right each model has been at the station. -->
+    <string name="stats_title">Treffsicherheit</string>
+    <string name="stats_card_title">TREFFSICHERHEIT</string>
+    <string name="stats_card_subtitle">Temperatur · 30 Tage · 6 h voraus</string>
+    <string name="stats_card_all">Alle Statistiken ›</string>
+    <string name="stats_not_enough">Noch zu wenig Daten – erste Werte nach etwa einem Tag</string>
+    <string name="stats_no_station">Für diesen Ort gibt es keine Station in der Nähe, gegen die geprüft werden kann.</string>
+    <string name="stats_quantity_temperature">Temperatur</string>
+    <string name="stats_quantity_rain">Regen</string>
+    <string name="stats_quantity_wind">Wind</string>
+    <string name="stats_period">%1$d T</string>
+    <string name="stats_lead_now">jetzt</string>
+    <string name="stats_lead_hours">%1$d h</string>
+    <plurals name="stats_basis">
+        <item quantity="one">%1$d Stunde seit %2$s · Station %3$s</item>
+        <item quantity="other">%1$d Stunden seit %2$s · Station %3$s</item>
+    </plurals>
+    <string name="stats_col_error">Ø Fehler</string>
+    <string name="stats_col_hits">Treffer</string>
+    <string name="stats_col_lean">Tendenz</string>
+    <string name="stats_col_rain_right">Regen richtig</string>
+    <string name="stats_col_detected">erkannt</string>
+    <string name="stats_col_false_alarm">Fehlalarm</string>
+    <string name="stats_consensus">Konsens</string>
+    <string name="stats_persistence">wie gestern</string>
+    <string name="stats_unranked">zu wenig Daten (%1$d h)</string>
+    <string name="stats_percent">%1$s %%</string>
+    <string name="stats_info">So wird gerechnet</string>
+    <string name="stats_info_body">Ø Fehler ist die durchschnittliche Abweichung von der Messung. Treffer zählt Stunden innerhalb von 2 K (Wind: 5 km/h). Tendenz zeigt, ob ein Modell meist zu warm (+) oder zu kalt (−) liegt. Beim Regen zählt „Regen richtig\" nur Stunden, in denen es geregnet hat oder Regen vorhergesagt war, damit ein Modell, das nie Regen meldet, nicht gewinnt. Unter 24 Stunden (Regen: 5 nasse Stunden) wird nicht gereiht. Konsens und „wie gestern\" sind Vergleichswerte. SIAG KMOS fehlt, weil es nach Gemeinde abgefragt wird und nicht gegen eine Station prüfbar ist.</string>
+    <plurals name="stats_info_excluded">
+        <item quantity="one">%1$d Stunde wurde als Messfehler ausgeschlossen.</item>
+        <item quantity="other">%1$d Stunden wurden als Messfehler ausgeschlossen.</item>
+    </plurals>
+    <string name="stats_row_desc_ranked">Platz %1$d, %2$s, %3$s</string>
+    <string name="stats_row_desc_other">%1$s, %2$s</string>
+    <string name="stats_detail_by_part">NACH TAGESZEIT</string>
+    <string name="stats_detail_daily">TÄGLICHER Ø FEHLER</string>
+    <string name="stats_detail_open_source">Details zur Quelle ›</string>
+    <!-- Plural on the number of ranked models (%2$d), which PluralsCandidate asks for. -->
+    <plurals name="source_rank_line">
+        <item quantity="one">Treffsicherheit: Platz %1$d von %2$d · Ø %3$s (30 Tage, 6 h)</item>
+        <item quantity="other">Treffsicherheit: Platz %1$d von %2$d · Ø %3$s (30 Tage, 6 h)</item>
+    </plurals>
+    <string name="source_rank_not_enough">Treffsicherheit: noch zu wenig Daten</string>
 </resources>

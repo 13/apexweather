@@ -46,6 +46,8 @@ data class StatsUiState(
 )
 
 data class StatsCardState(
+    /** True until the station history has been read: "no station" and "not enough data" both wait for it. */
+    val loading: Boolean = true,
     val hasStation: Boolean = true,
     val top: List<StatsRow> = emptyList(),
     val enoughData: Boolean = false,
@@ -92,9 +94,10 @@ object StatsStateBuilder {
     }
 
     fun card(hours: List<VerificationHour>, place: Place?, now: Instant): StatsCardState {
-        if (place?.station == null) return StatsCardState(hasStation = false)
+        if (place?.station == null) return StatsCardState(loading = false, hasStation = false)
         val ranking = cardRanking(hours, now)
         return StatsCardState(
+            loading = false,
             hasStation = true,
             top = ranking.ranked.take(3).map { StatsRow(it.contender, it.rank, it.score) },
             enoughData = ranking.ranked.isNotEmpty(),

@@ -329,4 +329,50 @@
     <string name="source_part_morning">Mattina</string>
     <string name="source_part_afternoon">Pomeriggio</string>
     <string name="source_part_evening">Sera</string>
+    <!-- Statistics: how right each model has been at the station. -->
+    <string name="stats_title">Affidabilità</string>
+    <string name="stats_card_title">AFFIDABILITÀ</string>
+    <string name="stats_card_subtitle">Temperatura · 30 giorni · 6 h prima</string>
+    <string name="stats_card_all">Tutte le statistiche ›</string>
+    <string name="stats_not_enough">Ancora pochi dati – i primi valori dopo circa un giorno</string>
+    <string name="stats_no_station">Per questo luogo non c\'è una stazione vicina con cui verificare.</string>
+    <string name="stats_quantity_temperature">Temperatura</string>
+    <string name="stats_quantity_rain">Pioggia</string>
+    <string name="stats_quantity_wind">Vento</string>
+    <string name="stats_period">%1$d g</string>
+    <string name="stats_lead_now">ora</string>
+    <string name="stats_lead_hours">%1$d h</string>
+    <plurals name="stats_basis">
+        <item quantity="one">%1$d ora dal %2$s · stazione %3$s</item>
+        <item quantity="many">%1$d ore dal %2$s · stazione %3$s</item>
+        <item quantity="other">%1$d ore dal %2$s · stazione %3$s</item>
+    </plurals>
+    <string name="stats_col_error">Ø errore</string>
+    <string name="stats_col_hits">Centrati</string>
+    <string name="stats_col_lean">Tendenza</string>
+    <string name="stats_col_rain_right">Pioggia giusta</string>
+    <string name="stats_col_detected">rilevata</string>
+    <string name="stats_col_false_alarm">falso allarme</string>
+    <string name="stats_consensus">Consenso</string>
+    <string name="stats_persistence">come ieri</string>
+    <string name="stats_unranked">pochi dati (%1$d h)</string>
+    <string name="stats_percent">%1$s%%</string>
+    <string name="stats_info">Come si calcola</string>
+    <string name="stats_info_body">Ø errore è lo scostamento medio dalla misura. Centrati conta le ore entro 2 K (vento: 5 km/h). Tendenza indica se un modello è di solito troppo caldo (+) o troppo freddo (−). Per la pioggia „pioggia giusta\" conta solo le ore in cui ha piovuto o era prevista pioggia, così un modello che non la prevede mai non vince. Sotto 24 ore (pioggia: 5 ore bagnate) non c\'è classifica. Consenso e „come ieri\" sono riferimenti. SIAG KMOS manca perché è interrogato per comune e non può essere verificato su una stazione.</string>
+    <plurals name="stats_info_excluded">
+        <item quantity="one">%1$d ora esclusa come errore di misura.</item>
+        <item quantity="many">%1$d ore escluse come errore di misura.</item>
+        <item quantity="other">%1$d ore escluse come errore di misura.</item>
+    </plurals>
+    <string name="stats_row_desc_ranked">%1$d° posto, %2$s, %3$s</string>
+    <string name="stats_row_desc_other">%1$s, %2$s</string>
+    <string name="stats_detail_by_part">PER FASCIA ORARIA</string>
+    <string name="stats_detail_daily">Ø ERRORE GIORNALIERO</string>
+    <string name="stats_detail_open_source">Dettagli della fonte ›</string>
+    <plurals name="source_rank_line">
+        <item quantity="one">Affidabilità: %1$d° su %2$d · Ø %3$s (30 giorni, 6 h)</item>
+        <item quantity="many">Affidabilità: %1$d° su %2$d · Ø %3$s (30 giorni, 6 h)</item>
+        <item quantity="other">Affidabilità: %1$d° su %2$d · Ø %3$s (30 giorni, 6 h)</item>
+    </plurals>
+    <string name="source_rank_not_enough">Affidabilità: ancora pochi dati</string>
 </resources>

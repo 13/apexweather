@@ -226,7 +226,7 @@ class CompareViewModel @Inject constructor(
         .map { it.place }
         .distinctUntilChanged { a, b -> a?.istat == b?.istat }
         .flatMapLatest { p ->
-            if (p?.station == null) flowOf(CompareStats(StatsCardState(hasStation = false)))
+            if (p?.station == null) flowOf(CompareStats(StatsCardState(loading = false, hasStation = false)))
             else combine(repository.stationHistory(p), holder.weather.map { it.now.truncatedTo(ChronoUnit.HOURS) }.distinctUntilChanged()) { hours, now ->
                 CompareStats(StatsStateBuilder.card(hours, p, now), StatsStateBuilder.sourceRanks(hours, now))
             }

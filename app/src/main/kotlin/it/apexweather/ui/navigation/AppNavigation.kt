@@ -63,6 +63,7 @@ import it.apexweather.update.UpdateSection
 import it.apexweather.ui.settings.SettingsViewModel
 import it.apexweather.ui.sky.SkyBackground
 import it.apexweather.ui.sky.SkyViewModel
+import it.apexweather.ui.stats.StatsScreen
 import kotlinx.serialization.Serializable
 
 /**
@@ -92,6 +93,12 @@ internal fun NavHostController.openTopLevel(route: Any) {
 @Serializable object MapRoute
 @Serializable object CompareRoute
 @Serializable object BulletinRoute
+
+/**
+ * The statistics screen. Reached from the comparison screen's card with a plain navigate, like the
+ * place picker: it is opened and left again, and the comparison tab stays selected while it shows.
+ */
+@Serializable object StatsRoute
 
 /**
  * Settings, which used to be a sheet. Making it a destination is what lets its bar item be
@@ -140,7 +147,8 @@ fun ApexApp() {
                     )
                     val barColors = NavigationBarItemDefaults.colors(selectedIconColor = Color.White, selectedTextColor = Color.White, indicatorColor = Color(0x33FFFFFF), unselectedIconColor = Color(0xAAFFFFFF), unselectedTextColor = Color(0xAAFFFFFF))
                     items.forEach { item ->
-                        val selected = dest?.hasRoute(item.route::class) == true
+                        val selected = dest?.hasRoute(item.route::class) == true ||
+                            (item.route == CompareRoute && dest?.hasRoute(StatsRoute::class) == true)
                         NavigationBarItem(
                             selected = selected,
                             onClick = { nav.openTopLevel(item.route) },
@@ -190,7 +198,18 @@ fun ApexApp() {
                 }
                 composable<PlacePickerRoute> { PlacePickerScreen(onBack = { nav.popBackStack() }) }
                 composable<MapRoute> { MapScreen() }
-                composable<CompareRoute> { CompareScreen() }
+                composable<CompareRoute> { CompareScreen(onOpenStats = { nav.navigate(StatsRoute) }) }
+                composable<StatsRoute> {
+                    StatsScreen(
+                        onBack = { nav.popBackStack() },
+                        // The source sheet lives on the comparison screen; its view model opens it
+                        // when this key appears on its own entry.
+                        onOpenSource = { source ->
+                            nav.getBackStackEntry<CompareRoute>().savedStateHandle["compare_source"] = source.name
+                            nav.popBackStack()
+                        },
+                    )
+                }
                 composable<BulletinRoute> { BulletinScreen() }
                 composable<SettingsRoute> {
                     SettingsScreen(

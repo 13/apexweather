@@ -27,6 +27,7 @@ import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceForecast
 import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.WeatherSnapshot
+import it.apexweather.ui.stats.StatsCardState
 import it.apexweather.ui.theme.ApexTheme
 import androidx.compose.ui.semantics.SemanticsNode
 import org.junit.Assert.assertEquals
@@ -214,6 +215,24 @@ class CompareScreenTest {
         rule.onNodeWithTag("source_detail_error").performScrollTo().assertIsDisplayed().assertTextEquals(reason)
         rule.onNodeWithTag("source_detail_close").performScrollTo().performClick()
         rule.onNodeWithTag("source_detail_sheet").assertDoesNotExist()
+    }
+
+    /** The statistics card is the way into the statistics screen. */
+    @Test
+    fun theStatsCardOpensTheStatistics() {
+        var openedStats = false
+        rule.setContent {
+            ApexTheme {
+                CompareContent(
+                    state, {}, {},
+                    stats = CompareStats(StatsCardState(loading = false, hasStation = true, enoughData = false)),
+                    onOpenStats = { openedStats = true },
+                )
+            }
+        }
+        scrollTo("stats_card")
+        rule.onNodeWithTag("stats_card_open").performClick()
+        assertTrue(openedStats)
     }
 
     /**

@@ -38,6 +38,7 @@ import it.apexweather.domain.model.SourceStatus
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.Formats
 import it.apexweather.ui.common.LocalFormats
+import it.apexweather.ui.stats.SourceRank
 import java.time.Duration
 import java.time.Instant
 
@@ -49,7 +50,7 @@ import java.time.Instant
  * its half state, so it carries a cross (see CLAUDE.md on bottom sheets).
  */
 @Composable
-fun SourceDetailSheet(state: SourceDetailState, meta: SourceMetaUi, onClose: () -> Unit) {
+fun SourceDetailSheet(state: SourceDetailState, meta: SourceMetaUi, onClose: () -> Unit, rank: SourceRank? = null) {
     val formats = LocalFormats.current
     val uri = LocalUriHandler.current
     val info = state.info
@@ -129,6 +130,13 @@ fun SourceDetailSheet(state: SourceDetailState, meta: SourceMetaUi, onClose: () 
                     )
                 }
                 Line(stringResource(if (state.inConsensus) R.string.source_in_consensus else R.string.source_not_in_consensus))
+                rank?.let { r ->
+                    Line(
+                        if (r.rank != null && r.score?.main != null) pluralStringResource(R.plurals.source_rank_line, r.of, r.rank, r.of, formats.oneDecimal(r.score.main) + " K")
+                        else stringResource(R.string.source_rank_not_enough),
+                        modifier = Modifier.testTag("source_detail_rank"),
+                    )
+                }
                 // Only while it is actually filling a gap: a stale, failed or otherwise excluded
                 // global counts nothing right now, and this sentence must not claim otherwise.
                 if (state.onlyFillsGaps) {
@@ -245,7 +253,7 @@ private val SHEET_STAMP_RECENT: Duration = Duration.ofDays(6)
 private fun kilometres(km: Double, f: Formats): String =
     if (km % 1.0 == 0.0) f.whole(km.toInt()) else f.oneDecimal(km)
 
-private fun DayPart.labelRes(): Int = when (this) {
+internal fun DayPart.labelRes(): Int = when (this) {
     DayPart.NIGHT -> R.string.source_part_night
     DayPart.MORNING -> R.string.source_part_morning
     DayPart.AFTERNOON -> R.string.source_part_afternoon

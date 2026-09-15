@@ -321,4 +321,47 @@
     <string name="source_part_morning">Morning</string>
     <string name="source_part_afternoon">Afternoon</string>
     <string name="source_part_evening">Evening</string>
+    <!-- Statistics: how right each model has been at the station. -->
+    <string name="stats_title">Accuracy</string>
+    <string name="stats_card_title">ACCURACY</string>
+    <string name="stats_card_subtitle">Temperature · 30 days · 6 h ahead</string>
+    <string name="stats_card_all">All statistics ›</string>
+    <string name="stats_not_enough">Not enough data yet – first values after about a day</string>
+    <string name="stats_no_station">There is no station near this place to check the forecasts against.</string>
+    <string name="stats_quantity_temperature">Temperature</string>
+    <string name="stats_quantity_rain">Rain</string>
+    <string name="stats_quantity_wind">Wind</string>
+    <string name="stats_period">%1$d d</string>
+    <string name="stats_lead_now">now</string>
+    <string name="stats_lead_hours">%1$d h</string>
+    <plurals name="stats_basis">
+        <item quantity="one">%1$d hour since %2$s · station %3$s</item>
+        <item quantity="other">%1$d hours since %2$s · station %3$s</item>
+    </plurals>
+    <string name="stats_col_error">Avg. error</string>
+    <string name="stats_col_hits">Hits</string>
+    <string name="stats_col_lean">Lean</string>
+    <string name="stats_col_rain_right">Rain right</string>
+    <string name="stats_col_detected">detected</string>
+    <string name="stats_col_false_alarm">false alarm</string>
+    <string name="stats_consensus">Consensus</string>
+    <string name="stats_persistence">same as yesterday</string>
+    <string name="stats_unranked">not enough data (%1$d h)</string>
+    <string name="stats_percent">%1$s%%</string>
+    <string name="stats_info">How it is scored</string>
+    <string name="stats_info_body">Avg. error is the average difference from the measurement. Hits counts hours within 2 K (wind: 5 km/h). Lean shows whether a model usually runs warm (+) or cold (−). For rain, \"rain right\" counts only hours where it rained or rain was forecast, so a model that never forecasts rain cannot win. Below 24 hours (rain: 5 wet hours) nothing is ranked. Consensus and \"same as yesterday\" are references. SIAG KMOS is missing because it is asked for by municipality and cannot be checked against a station.</string>
+    <plurals name="stats_info_excluded">
+        <item quantity="one">%1$d hour was excluded as a measurement fault.</item>
+        <item quantity="other">%1$d hours were excluded as measurement faults.</item>
+    </plurals>
+    <string name="stats_row_desc_ranked">Rank %1$d, %2$s, %3$s</string>
+    <string name="stats_row_desc_other">%1$s, %2$s</string>
+    <string name="stats_detail_by_part">BY TIME OF DAY</string>
+    <string name="stats_detail_daily">DAILY AVG. ERROR</string>
+    <string name="stats_detail_open_source">Source details ›</string>
+    <plurals name="source_rank_line">
+        <item quantity="one">Accuracy: rank %1$d of %2$d · avg. %3$s (30 days, 6 h)</item>
+        <item quantity="other">Accuracy: rank %1$d of %2$d · avg. %3$s (30 days, 6 h)</item>
+    </plurals>
+    <string name="source_rank_not_enough">Accuracy: not enough data yet</string>
 </resources>
