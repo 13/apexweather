@@ -8,6 +8,7 @@ import it.apexweather.data.AppSettings
 import it.apexweather.data.CompareVariable
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.SourceMetaRepository
+import it.apexweather.data.WeatherRepository
 import it.apexweather.domain.DailyAggregator
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.ConsensusForecast
@@ -16,6 +17,9 @@ import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.ui.WeatherStateHolder
+import it.apexweather.ui.stats.SourceRank
+import it.apexweather.ui.stats.StatsCardState
+import it.apexweather.ui.stats.StatsStateBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -26,6 +30,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -98,6 +104,9 @@ data class CompareUiState(
      */
     val now: Instant = Instant.EPOCH,
 )
+
+/** The Treffsicherheit card and each source's rank, from the station's recorded hours. */
+data class CompareStats(val card: StatsCardState = StatsCardState(), val ranks: Map<Source, SourceRank> = emptyMap())
 
 object CompareStateBuilder {
     private const val SWEEP_HOURS = 72L
@@ -178,6 +187,7 @@ class CompareViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val savedState: SavedStateHandle,
     private val metaRepository: SourceMetaRepository,
+    private val repository: WeatherRepository,
 ) : ViewModel() {
     /**
      * Which day the chart shows. This is view state rather than a preference, so it lives here and
@@ -211,13 +221,30 @@ class CompareViewModel @Inject constructor(
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** The Treffsicherheit card and each source's rank, from the station's recorded hours. */
+    val stats: StateFlow<CompareStats> = holder.weather
+        .map { it.place }
+        .distinctUntilChanged { a, b -> a?.istat == b?.istat }
+        .flatMapLatest { p ->
+            if (p?.station == null) flowOf(CompareStats(StatsCardState(hasStation = false)))
+            else combine(repository.stationHistory(p), holder.weather.map { it.now.truncatedTo(ChronoUnit.HOURS) }.distinctUntilChanged()) { hours, now ->
+                CompareStats(StatsStateBuilder.card(hours, p, now), StatsStateBuilder.sourceRanks(hours, now))
+            }
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CompareStats())
+
     private val _meta = MutableStateFlow<SourceMetaUi>(SourceMetaUi.NotApplicable)
     val meta: StateFlow<SourceMetaUi> = _meta.asStateFlow()
     private var metaJob: Job? = null
+    private var metaFor: Source? = null
 
     init {
-        // A sheet restored after process death asks for its run line again.
-        sourceNamed(openSourceName.value)?.let(::fetchMeta)
+        // The sheet opens from outside too: the statistics screen sets this key on the way back.
+        // A name already being fetched for is not fetched again.
+        viewModelScope.launch {
+            openSourceName.collect { name -> sourceNamed(name)?.takeIf { it != metaFor }?.let(::fetchMeta) }
+        }
     }
 
     fun openSource(source: Source) {
@@ -229,10 +256,12 @@ class CompareViewModel @Inject constructor(
         savedState[SOURCE_KEY] = null
         metaJob?.cancel()
         metaJob = null
+        metaFor = null
         _meta.value = SourceMetaUi.NotApplicable
     }
 
     private fun fetchMeta(source: Source) {
+        metaFor = source
         metaJob?.cancel()
         if (SourceMetaRepository.urlFor(source) == null) {
             _meta.value = SourceMetaUi.NotApplicable

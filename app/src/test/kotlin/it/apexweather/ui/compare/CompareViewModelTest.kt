@@ -102,35 +102,37 @@ class CompareViewModelTest {
      */
     private fun compareTest(
         savedState: Map<String, Any?> = emptyMap(),
-        body: suspend TestScope.(CompareViewModel, FakeMetaApi) -> Unit,
+        body: suspend TestScope.(CompareViewModel, FakeMetaApi, SavedStateHandle) -> Unit,
     ) = runTest(mainDispatcher.scheduler) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val db = AppDatabase.inMemory(context)
         val history = HistoryDatabase.inMemory(context)
         val scope = CoroutineScope(UnconfinedTestDispatcher())
+        val weatherRepository = WeatherRepository(
+            db.weatherDao(), history.stationHistoryDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(),
+            FakeMeteoAlarm(), FakeEnsemble(), Fixtures.json, clock,
+        )
         val holder = WeatherStateHolder(
-            WeatherRepository(
-                db.weatherDao(), history.stationHistoryDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(),
-                FakeMeteoAlarm(), FakeEnsemble(), Fixtures.json, clock,
-            ),
+            weatherRepository,
             settings, PlaceCatalogue(context), WarningDismissals(context),
             ConsensusBlender(SouthTyrol.ZONE), clock, scope,
         )
         val metaApi = FakeMetaApi()
         val metaRepository = SourceMetaRepository(metaApi, clock)
         val store = ViewModelStore()
+        val handle = SavedStateHandle(savedState)
         val vm = ViewModelProvider(
             store,
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T = CompareViewModel(
-                    holder, settings, SavedStateHandle(savedState), metaRepository,
+                    holder, settings, handle, metaRepository, weatherRepository,
                 ) as T
             },
         )[CompareViewModel::class.java]
         runCurrent()
         try {
-            body(vm, metaApi)
+            body(vm, metaApi, handle)
         } finally {
             store.clear()
             runCurrent()
@@ -142,7 +144,7 @@ class CompareViewModelTest {
     }
 
     @Test
-    fun `opening a source fetches its meta at the model's own dataset URL`() = compareTest { vm, api ->
+    fun `opening a source fetches its meta at the model's own dataset URL`() = compareTest { vm, api, _ ->
         vm.openSource(Source.ICON_D2)
         assertEquals(SourceMetaUi.Loading(Source.ICON_D2), vm.meta.value)
         runCurrent()
@@ -153,7 +155,7 @@ class CompareViewModelTest {
     }
 
     @Test
-    fun `closing a source while its fetch is in flight cancels it`() = compareTest { vm, api ->
+    fun `closing a source while its fetch is in flight cancels it`() = compareTest { vm, api, _ ->
         api.delayMs = 60_000
         vm.openSource(Source.ICON_D2)
         runCurrent()
@@ -170,7 +172,7 @@ class CompareViewModelTest {
     /** A sheet restored after process death asks for its run line again — see the ViewModel's init. */
     @Test
     fun `a source restored in SavedStateHandle fetches its meta on construction`() =
-        compareTest(savedState = mapOf("compare_source" to Source.GEOSPHERE_AROME.name)) { vm, api ->
+        compareTest(savedState = mapOf("compare_source" to Source.GEOSPHERE_AROME.name)) { vm, api, _ ->
             runCurrent()
             val meta = vm.meta.value
             assertTrue("expected Loaded, got $meta", meta is SourceMetaUi.Loaded)
@@ -180,7 +182,7 @@ class CompareViewModelTest {
 
     /** KMOS's run time is already its status time; there is nothing to ask. */
     @Test
-    fun `opening KMOS asks for nothing`() = compareTest { vm, api ->
+    fun `opening KMOS asks for nothing`() = compareTest { vm, api, _ ->
         vm.openSource(Source.SIAG_KMOS)
         runCurrent()
         assertEquals(SourceMetaUi.NotApplicable, vm.meta.value)
@@ -188,10 +190,28 @@ class CompareViewModelTest {
     }
 
     @Test
-    fun `a failing fetch gives Unavailable for the source that was asked`() = compareTest { vm, api ->
+    fun `a failing fetch gives Unavailable for the source that was asked`() = compareTest { vm, api, _ ->
         api.fail = true
         vm.openSource(Source.ICON_D2)
         runCurrent()
         assertEquals(SourceMetaUi.Unavailable(Source.ICON_D2), vm.meta.value)
+    }
+
+    /**
+     * The statistics screen opens the sheet by writing the saved-state key directly, not by calling
+     * `openSource` — the collector added to the ViewModel's `init` is what picks that up.
+     */
+    @Test
+    fun `the sheet opens when compare_source is set from outside`() = compareTest { vm, api, handle ->
+        api.delayMs = 1_000
+        handle["compare_source"] = Source.ICON_D2.name
+        runCurrent()
+        assertEquals(SourceMetaUi.Loading(Source.ICON_D2), vm.meta.value)
+        advanceTimeBy(1_000)
+        runCurrent()
+        val loaded = vm.meta.value
+        assertTrue("expected Loaded, got $loaded", loaded is SourceMetaUi.Loaded)
+        assertEquals(Source.ICON_D2, (loaded as SourceMetaUi.Loaded).source)
+        assertEquals(listOf("https://api.open-meteo.com/data/dwd_icon_d2/static/meta.json"), api.urls)
     }
 }
