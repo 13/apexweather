@@ -11,6 +11,11 @@ import androidx.compose.ui.test.performClick
 import org.junit.Assert.assertNotEquals
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.performScrollTo
 import it.apexweather.data.AppSettings
 import it.apexweather.data.CompareVariable
 import it.apexweather.domain.ConsensusBlender
@@ -18,6 +23,7 @@ import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.HourlyPoint
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceForecast
+import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.ui.theme.ApexTheme
 import androidx.compose.ui.semantics.SemanticsNode
@@ -174,4 +180,30 @@ class CompareScreenTest {
         rule.onNodeWithTag("readout_hour").fetchSemanticsNode()
             .config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString { it.text }
 
+    /**
+     * The status row is where "what is this model and why is it red" gets asked. The error line on
+     * the card is cut at 40 characters; the sheet must carry all of it.
+     */
+    @Test
+    fun tappingAStatusRowOpensTheSourceSheetAndTheCrossClosesIt() {
+        val reason = "java.net.UnknownHostException: Unable to resolve host \"api.open-meteo.com\": No address associated with hostname"
+        val failing = snapshot.copy(status = mapOf(Source.ICON_CH1 to SourceStatus.Failed(reason, t0)))
+        var opened: Source? = null
+        var detail by mutableStateOf<SourceDetailState?>(null)
+        rule.setContent {
+            ApexTheme {
+                CompareContent(
+                    state, {}, {},
+                    onOpenSource = { opened = it; detail = SourceDetailStateBuilder.build(it, failing, null, t0) },
+                    detail = detail, meta = SourceMetaUi.Unavailable, onCloseSource = { detail = null },
+                )
+            }
+        }
+        scrollTo("status_row_ICON_CH1")
+        rule.onNodeWithTag("status_row_ICON_CH1").performClick()
+        assertEquals(Source.ICON_CH1, opened)
+        rule.onNodeWithTag("source_detail_error").performScrollTo().assertIsDisplayed().assertTextEquals(reason)
+        rule.onNodeWithTag("source_detail_close").performScrollTo().performClick()
+        rule.onNodeWithTag("source_detail_sheet").assertDoesNotExist()
+    }
 }

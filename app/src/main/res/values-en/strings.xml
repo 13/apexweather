@@ -279,4 +279,42 @@
 
     <!-- The quarter-hour the rain starts, where a regional model published one. -->
     <string name="rain_starts_at">Precipitation from %1$s</string>
+
+    <string name="source_detail_open">%1$s, %2$s, open details</string>
+    <string name="source_block_what">WHAT IT IS</string>
+    <string name="source_block_state">STATUS</string>
+    <string name="source_block_share">SHARE OF THE CONSENSUS</string>
+    <string name="source_block_station">AGAINST THE STATION</string>
+    <string name="source_provider_province">South Tyrol weather service</string>
+    <string name="source_family">Model core: %1$s</string>
+    <string name="source_grid_regional">%1$s km grid, regional</string>
+    <string name="source_grid_global">%1$s km grid, global</string>
+    <string name="source_grid_municipality">Point forecast per municipality</string>
+    <string name="source_delivery_open_meteo">Fetched through Open-Meteo</string>
+    <string name="source_delivery_geosphere">Fetched through the GeoSphere Data Hub</string>
+    <string name="source_delivery_siag">Fetched through the province\'s weather API</string>
+    <string name="source_licence">Licence: %1$s</string>
+    <string name="source_website">Open the %1$s website</string>
+    <string name="source_stale_after">Counts as stale after %1$d h without a new run, and then leaves the consensus.</string>
+    <string name="source_last_good">Last good data: %1$s</string>
+    <string name="source_reach">Reaches until %1$s</string>
+    <string name="source_run_published">Run of %1$s, published %2$s</string>
+    <string name="source_run">Run of %1$s</string>
+    <string name="source_update_every">New run every %1$s</string>
+    <string name="source_run_loading">Fetching run time …</string>
+    <string name="source_run_unavailable">Run time not available</string>
+    <plurals name="source_weight_shared">
+        <item quantity="one">Counts %1$s votes – %2$d model shares the %3$s core</item>
+        <item quantity="other">Counts %1$s votes – %2$d models share the %3$s core</item>
+    </plurals>
+    <string name="source_weight_alone">Full vote – the only model with the %1$s core</string>
+    <string name="source_in_consensus">In the consensus: yes</string>
+    <string name="source_not_in_consensus">In the consensus: no</string>
+    <string name="source_fills_gaps">As a global model it only counts in hours that fewer than two regional models reach.</string>
+    <string name="source_station">Station %1$s: error 6 hours ahead, last 7 days</string>
+    <string name="source_bias_too_few">too few hours yet</string>
+    <string name="source_part_night">Night</string>
+    <string name="source_part_morning">Morning</string>
+    <string name="source_part_afternoon">Afternoon</string>
+    <string name="source_part_evening">Evening</string>
 </resources>

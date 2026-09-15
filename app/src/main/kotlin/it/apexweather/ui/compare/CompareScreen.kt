@@ -1,6 +1,7 @@
 package it.apexweather.ui.compare
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,13 +24,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +47,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -68,15 +73,25 @@ import kotlin.math.roundToInt
 @Composable
 fun CompareScreen(viewModel: CompareViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    CompareContent(state, viewModel::toggleSource, viewModel::setVariable, viewModel::setDay)
+    val detail by viewModel.detail.collectAsStateWithLifecycle()
+    val meta by viewModel.meta.collectAsStateWithLifecycle()
+    CompareContent(
+        state, viewModel::toggleSource, viewModel::setVariable, viewModel::setDay,
+        onOpenSource = viewModel::openSource, detail = detail, meta = meta, onCloseSource = viewModel::closeSource,
+    )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompareContent(
     state: CompareUiState,
     onToggleSource: (Source) -> Unit,
     onVariable: (CompareVariable) -> Unit,
     onDay: (DaySelection) -> Unit = {},
+    onOpenSource: (Source) -> Unit = {},
+    detail: SourceDetailState? = null,
+    meta: SourceMetaUi = SourceMetaUi.NotApplicable,
+    onCloseSource: () -> Unit = {},
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val locale = LocalConfiguration.current.locales[0]
@@ -182,12 +197,24 @@ fun CompareContent(
                 Spacer(Modifier.height(8.dp))
                 Source.entries.forEach { s ->
                     val st = state.statuses[s]
-                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    val status = statusText(s, st, state.now, formats)
+                    val label = stringResource(R.string.source_detail_open, s.displayName, status)
+                    Row(
+                        Modifier.fillMaxWidth()
+                            // Tappable because this is where "what is this model, and why is it red"
+                            // gets asked; the sheet answers it. The row reads as one button.
+                            .clickable(role = Role.Button) { onOpenSource(s) }
+                            .semantics(mergeDescendants = true) { contentDescription = label }
+                            .padding(vertical = 8.dp)
+                            .testTag("status_row_${s.name}"),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Box(Modifier.size(8.dp).clip(CircleShape).background(SourceColors.of(s)))
                             Text(s.displayName, style = MaterialTheme.typography.bodyMedium, color = Color.White)
                         }
-                        Text(statusText(s, st, state.now, formats), style = MaterialTheme.typography.labelSmall, color = statusColor(st))
+                        Text(status, style = MaterialTheme.typography.labelSmall, color = statusColor(st))
                     }
                 }
                 // A model answering perfectly and never being checked against the thermometer looks
@@ -221,6 +248,18 @@ fun CompareContent(
                     )
                 }
             }
+        }
+    }
+    if (detail != null) {
+        ModalBottomSheet(
+            onDismissRequest = onCloseSource,
+            // Full height: four blocks run past half a phone, and at a large font scale past a whole
+            // one. The sheet scrolls, so it carries a cross (CLAUDE.md, bottom sheets).
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.testTag("source_detail_sheet"),
+        ) {
+            SourceDetailSheet(detail, meta, onCloseSource)
         }
     }
 }
@@ -377,7 +416,7 @@ private fun variableLabel(v: CompareVariable) = stringResource(
 )
 
 @Composable
-private fun statusText(source: Source, st: SourceStatus?, now: java.time.Instant, formats: it.apexweather.ui.common.Formats): String = when (st) {
+internal fun statusText(source: Source, st: SourceStatus?, now: java.time.Instant, formats: it.apexweather.ui.common.Formats): String = when (st) {
     null -> stringResource(R.string.status_none)
     // Only the sources that publish a run time can claim one; for the rest the timestamp is the fetch time.
     is SourceStatus.Ok -> stringResource(
@@ -388,7 +427,7 @@ private fun statusText(source: Source, st: SourceStatus?, now: java.time.Instant
     is SourceStatus.Failed -> stringResource(R.string.status_failed, st.reason.take(40))
 }
 
-private fun statusColor(st: SourceStatus?): Color = when (st) {
+internal fun statusColor(st: SourceStatus?): Color = when (st) {
     is SourceStatus.Ok -> Color(0xFF7CE0A5)
     is SourceStatus.Stale -> Color(0xFFFFD166)
     else -> Color(0xFFFF8A80)

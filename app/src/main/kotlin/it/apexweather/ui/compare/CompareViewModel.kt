@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import it.apexweather.data.AppSettings
 import it.apexweather.data.CompareVariable
 import it.apexweather.data.SettingsRepository
+import it.apexweather.data.SourceMetaRepository
 import it.apexweather.domain.DailyAggregator
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.ConsensusForecast
@@ -17,8 +18,11 @@ import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.ui.WeatherStateHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.StateFlow
@@ -173,6 +177,7 @@ class CompareViewModel @Inject constructor(
     holder: WeatherStateHolder,
     private val settingsRepository: SettingsRepository,
     private val savedState: SavedStateHandle,
+    private val metaRepository: SourceMetaRepository,
 ) : ViewModel() {
     /**
      * Which day the chart shows. This is view state rather than a preference, so it lives here and
@@ -191,6 +196,53 @@ class CompareViewModel @Inject constructor(
         .distinctUntilChanged()
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CompareUiState())
+
+    /** Which source's sheet is open, by name, so it survives process death like the day does. */
+    private val openSourceName: StateFlow<String?> = savedState.getStateFlow<String?>(SOURCE_KEY, null)
+
+    /**
+     * The open sheet, rebuilt from the same weather flow as the screen: a refresh while it is open
+     * changes its status and timestamps at once.
+     */
+    val detail: StateFlow<SourceDetailState?> = combine(holder.weather, openSourceName) { weather, name ->
+        sourceNamed(name)?.let { SourceDetailStateBuilder.build(it, weather.snapshot, weather.place, weather.now) }
+    }
+        .distinctUntilChanged()
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val _meta = MutableStateFlow<SourceMetaUi>(SourceMetaUi.NotApplicable)
+    val meta: StateFlow<SourceMetaUi> = _meta.asStateFlow()
+    private var metaJob: Job? = null
+
+    init {
+        // A sheet restored after process death asks for its run line again.
+        sourceNamed(openSourceName.value)?.let(::fetchMeta)
+    }
+
+    fun openSource(source: Source) {
+        savedState[SOURCE_KEY] = source.name
+        fetchMeta(source)
+    }
+
+    fun closeSource() {
+        savedState[SOURCE_KEY] = null
+        metaJob?.cancel()
+        metaJob = null
+        _meta.value = SourceMetaUi.NotApplicable
+    }
+
+    private fun fetchMeta(source: Source) {
+        metaJob?.cancel()
+        if (SourceMetaRepository.urlFor(source) == null) {
+            _meta.value = SourceMetaUi.NotApplicable
+            return
+        }
+        _meta.value = SourceMetaUi.Loading
+        metaJob = viewModelScope.launch {
+            _meta.value = metaRepository.metaFor(source)?.let { SourceMetaUi.Loaded(it) } ?: SourceMetaUi.Unavailable
+        }
+    }
 
     fun toggleSource(source: Source) = viewModelScope.launch { settingsRepository.toggleCompareSource(source) }
 
@@ -214,5 +266,9 @@ class CompareViewModel @Inject constructor(
 
         fun selectionOf(offset: Int): DaySelection =
             if (offset < 0) DaySelection.Sweep else DaySelection.Day(offset)
+
+        const val SOURCE_KEY = "compare_source"
+
+        fun sourceNamed(name: String?): Source? = name?.let { n -> Source.entries.firstOrNull { it.name == n } }
     }
 }

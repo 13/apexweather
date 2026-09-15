@@ -282,4 +282,44 @@
 
     <!-- The quarter-hour the rain starts, where a regional model published one. -->
     <string name="rain_starts_at">Niederschlag ab %1$s</string>
+
+    <string name="source_detail_open">%1$s, %2$s, Details öffnen</string>
+    <string name="source_block_what">WAS ES IST</string>
+    <string name="source_block_state">ZUSTAND</string>
+    <string name="source_block_share">ANTEIL AM KONSENS</string>
+    <string name="source_block_station">GEGEN DIE STATION</string>
+    <string name="source_provider_province">Landeswetterdienst Südtirol</string>
+    <string name="source_family">Modellkern: %1$s</string>
+    <string name="source_grid_regional">%1$s-km-Gitter, regional</string>
+    <string name="source_grid_global">%1$s-km-Gitter, global</string>
+    <string name="source_grid_municipality">Punktvorhersage je Gemeinde</string>
+    <string name="source_delivery_open_meteo">Abgerufen über Open-Meteo</string>
+    <string name="source_delivery_geosphere">Abgerufen über den GeoSphere Data Hub</string>
+    <string name="source_delivery_siag">Abgerufen über die Wetter-API des Landes</string>
+    <string name="source_licence">Lizenz: %1$s</string>
+    <string name="source_website">Website von %1$s öffnen</string>
+    <string name="source_stale_after">Gilt nach %1$d h ohne neuen Lauf als veraltet und zählt dann nicht mehr zum Konsens.</string>
+    <string name="source_last_good">Letzte gute Daten: %1$s</string>
+    <string name="source_reach">Reicht bis %1$s</string>
+    <string name="source_run_published">Lauf von %1$s, veröffentlicht %2$s</string>
+    <string name="source_run">Lauf von %1$s</string>
+    <string name="source_update_every">Neuer Lauf alle %1$s</string>
+    <string name="source_run_loading">Laufzeit wird abgerufen …</string>
+    <string name="source_run_unavailable">Laufzeit nicht abrufbar</string>
+    <!-- Only ever shown for familySize > 1 (see SourceDetailSheet), but a genuine plural: lint's
+         PluralsCandidate is right that %d next to "Modell(e)" needs a grammatical singular too. -->
+    <plurals name="source_weight_shared">
+        <item quantity="one">Zählt %1$s Stimmen – %2$d Modell teilt den %3$s-Kern</item>
+        <item quantity="other">Zählt %1$s Stimmen – %2$d Modelle teilen den %3$s-Kern</item>
+    </plurals>
+    <string name="source_weight_alone">Volle Stimme – einziges Modell mit %1$s-Kern</string>
+    <string name="source_in_consensus">Im Konsens: ja</string>
+    <string name="source_not_in_consensus">Im Konsens: nein</string>
+    <string name="source_fills_gaps">Als globales Modell zählt es nur in Stunden, die weniger als zwei regionale Modelle erreichen.</string>
+    <string name="source_station">Station %1$s: Fehler 6 Stunden voraus, letzte 7 Tage</string>
+    <string name="source_bias_too_few">noch zu wenige Stunden</string>
+    <string name="source_part_night">Nachts</string>
+    <string name="source_part_morning">Morgens</string>
+    <string name="source_part_afternoon">Nachmittags</string>
+    <string name="source_part_evening">Abends</string>
 </resources>

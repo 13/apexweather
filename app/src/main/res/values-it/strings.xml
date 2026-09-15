@@ -285,4 +285,43 @@
 
     <!-- The quarter-hour the rain starts, where a regional model published one. -->
     <string name="rain_starts_at">Precipitazioni dalle %1$s</string>
+
+    <string name="source_detail_open">%1$s, %2$s, apri dettagli</string>
+    <string name="source_block_what">COS\'È</string>
+    <string name="source_block_state">STATO</string>
+    <string name="source_block_share">PESO NEL CONSENSO</string>
+    <string name="source_block_station">CONFRONTO CON LA STAZIONE</string>
+    <string name="source_provider_province">Servizio Meteo Alto Adige</string>
+    <string name="source_family">Nucleo del modello: %1$s</string>
+    <string name="source_grid_regional">griglia di %1$s km, regionale</string>
+    <string name="source_grid_global">griglia di %1$s km, globale</string>
+    <string name="source_grid_municipality">previsione puntuale per comune</string>
+    <string name="source_delivery_open_meteo">Ottenuto tramite Open-Meteo</string>
+    <string name="source_delivery_geosphere">Ottenuto tramite il GeoSphere Data Hub</string>
+    <string name="source_delivery_siag">Ottenuto tramite l\'API meteo della Provincia</string>
+    <string name="source_licence">Licenza: %1$s</string>
+    <string name="source_website">Apri il sito di %1$s</string>
+    <string name="source_stale_after">Senza una nuova corsa per %1$d h è considerato obsoleto e non conta più nel consenso.</string>
+    <string name="source_last_good">Ultimi dati validi: %1$s</string>
+    <string name="source_reach">Arriva fino a %1$s</string>
+    <string name="source_run_published">Corsa delle %1$s, pubblicata %2$s</string>
+    <string name="source_run">Corsa delle %1$s</string>
+    <string name="source_update_every">Nuova corsa ogni %1$s</string>
+    <string name="source_run_loading">Recupero dell\'orario della corsa …</string>
+    <string name="source_run_unavailable">Orario della corsa non disponibile</string>
+    <plurals name="source_weight_shared">
+        <item quantity="one">Vale %1$s voti – %2$d modello condivide il nucleo %3$s</item>
+        <item quantity="many">Vale %1$s voti – %2$d modelli condividono il nucleo %3$s</item>
+        <item quantity="other">Vale %1$s voti – %2$d modelli condividono il nucleo %3$s</item>
+    </plurals>
+    <string name="source_weight_alone">Voto pieno – unico modello con nucleo %1$s</string>
+    <string name="source_in_consensus">Nel consenso: sì</string>
+    <string name="source_not_in_consensus">Nel consenso: no</string>
+    <string name="source_fills_gaps">Come modello globale conta solo nelle ore raggiunte da meno di due modelli regionali.</string>
+    <string name="source_station">Stazione %1$s: errore a 6 ore, ultimi 7 giorni</string>
+    <string name="source_bias_too_few">ore ancora insufficienti</string>
+    <string name="source_part_night">Notte</string>
+    <string name="source_part_morning">Mattina</string>
+    <string name="source_part_afternoon">Pomeriggio</string>
+    <string name="source_part_evening">Sera</string>
 </resources>
