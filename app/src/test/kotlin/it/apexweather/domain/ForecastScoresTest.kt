@@ -102,13 +102,93 @@ class ForecastScoresTest {
         )
     }
 
+    /** Three models, each its own family, agreeing on 11 at every hour; [odd] replaces GFS's value. */
+    private fun agreeing(odd: (Int) -> Double = { 11.0 }, wind: Double = 5.0) = { i: Int ->
+        mapOf(
+            Source.ICON_D2 to Predicted(11.0, 0.0, wind),
+            Source.GEOSPHERE_AROME to Predicted(11.0, 0.0, wind),
+            Source.ECMWF to Predicted(11.0, 0.0, wind),
+            Source.GFS to Predicted(odd(i), 0.0, wind),
+        )
+    }
+
+    /** The station and the consensus agree; one model is 16 K off. That is the model's miss, not a fault. */
     @Test
-    fun `an absurd miss is excluded and counted`() {
-        val h = hours(25, { Triple(10.0, 0.0, 5.0) }) { i -> mapOf(Source.ICON_D2 to Predicted(if (i == 0) 40.0 else 11.0, 0.0, 5.0)) }
-        val s = model(ForecastScores.rank(h, Quantity.TEMPERATURE, lead, since), Source.ICON_D2).score
-        assertEquals(24, s.hours)
-        assertEquals(1, s.excluded)
-        assertEquals(1.0, s.main!!, 1e-9)
+    fun `one model far off while the station and the consensus agree is scored, not excluded`() {
+        val h = hours(25, { Triple(10.0, 0.0, 5.0) }, agreeing(odd = { i -> if (i == 0) 26.0 else 11.0 }))
+        val r = ForecastScores.rank(h, Quantity.TEMPERATURE, lead, since)
+        val gfs = model(r, Source.GFS).score
+        assertEquals(25, gfs.hours)
+        assertEquals((16.0 + 24 * 1.0) / 25, gfs.main!!, 1e-9)
+        assertEquals(0, r.excludedHours)
+    }
+
+    /** The station reads 40 K off from every model on one hour: that hour goes for everyone. */
+    @Test
+    fun `a station fault drops the hour for every model and both references`() {
+        val fault = 30
+        val h = hours(48, { i -> Triple(if (i == fault) 51.0 else 10.0, 0.0, 5.0) }, agreeing())
+        val r = ForecastScores.rank(h, Quantity.TEMPERATURE, lead, since)
+        assertEquals(1, r.excludedHours)
+        listOf(Source.ICON_D2, Source.GEOSPHERE_AROME, Source.ECMWF, Source.GFS).forEach { s ->
+            assertEquals("$s", 47, model(r, s).score.hours)
+            assertEquals("$s", 1.0, model(r, s).score.main!!, 1e-9)
+        }
+        assertEquals(47, r.references.single { it.contender == Contender.Consensus }.score.hours)
+        // Hours 24..47 have a reading a day earlier; the fault hour is one of them.
+        val yesterday = r.references.single { it.contender == Contender.SameAsYesterday }.score
+        assertEquals(23, yesterday.hours)
+        assertEquals(0.0, yesterday.main!!, 1e-9)
+    }
+
+    /** Foehn: 72 km/h at the station, 70 in the models, and one model at 8 — kept, and its miss counts. */
+    @Test
+    fun `a foehn hour is kept, and a model that missed it by more than the limit is charged`() {
+        val h = hours(24, { i -> Triple(10.0, 0.0, if (i == 0) 72.0 else 5.0) }) { i ->
+            val w = if (i == 0) 70.0 else 5.0
+            mapOf(
+                Source.ICON_D2 to Predicted(10.0, 0.0, w),
+                Source.GEOSPHERE_AROME to Predicted(10.0, 0.0, w),
+                Source.ECMWF to Predicted(10.0, 0.0, w),
+                Source.GFS to Predicted(10.0, 0.0, if (i == 0) 8.0 else 5.0),
+            )
+        }
+        val r = ForecastScores.rank(h, Quantity.WIND, lead, since)
+        assertEquals(0, r.excludedHours)
+        assertEquals(24, model(r, Source.ICON_D2).score.hours)
+        assertEquals(2.0 / 24, model(r, Source.ICON_D2).score.main!!, 1e-9)
+        assertEquals(24, model(r, Source.GFS).score.hours)
+        assertEquals(64.0 / 24, model(r, Source.GFS).score.main!!, 1e-9)
+    }
+
+    @Test
+    fun `a station exactly at the fault limit from the consensus is kept, just past it is dropped`() {
+        // Every model says 25.0 on hour 0 against an observed 10.0: exactly TEMP_FAULT_K from the consensus.
+        val kept = hours(25, { Triple(10.0, 0.0, 5.0) }, agreeing()).mapIndexed { i, hour ->
+            if (i == 0) hour.copy(predicted = mapOf(lead to hour.predicted.getValue(lead).mapValues { it.value.copy(tempC = 25.0) })) else hour
+        }
+        val rk = ForecastScores.rank(kept, Quantity.TEMPERATURE, lead, since)
+        assertEquals(0, rk.excludedHours)
+        assertEquals(25, model(rk, Source.ICON_D2).score.hours)
+        assertEquals(25, rk.references.single { it.contender == Contender.Consensus }.score.hours)
+
+        val dropped = kept.mapIndexed { i, hour ->
+            if (i == 0) hour.copy(predicted = mapOf(lead to hour.predicted.getValue(lead).mapValues { it.value.copy(tempC = 25.0001) })) else hour
+        }
+        val rd = ForecastScores.rank(dropped, Quantity.TEMPERATURE, lead, since)
+        assertEquals(1, rd.excludedHours)
+        assertEquals(24, model(rd, Source.ICON_D2).score.hours)
+        assertEquals(24, rd.references.single { it.contender == Contender.Consensus }.score.hours)
+    }
+
+    @Test
+    fun `a wind station exactly at the fault limit from the consensus is kept, just past it is dropped`() {
+        val at = hours(24, { i -> Triple(10.0, 0.0, if (i == 0) 65.0 else 5.0) }, agreeing())
+        assertEquals(0, ForecastScores.rank(at, Quantity.WIND, lead, since).excludedHours)
+        val past = hours(24, { i -> Triple(10.0, 0.0, if (i == 0) 65.0001 else 5.0) }, agreeing())
+        val r = ForecastScores.rank(past, Quantity.WIND, lead, since)
+        assertEquals(1, r.excludedHours)
+        assertEquals(23, model(r, Source.ICON_D2).score.hours)
     }
 
     @Test
@@ -117,20 +197,6 @@ class ForecastScoresTest {
         val h = hours(24, { Triple(10.0, 0.0, 5.0) }) { mapOf(Source.ICON_D2 to Predicted(12.0, 0.0, 5.0)) }
         val s = model(ForecastScores.rank(h, Quantity.TEMPERATURE, lead, since), Source.ICON_D2).score
         assertEquals(1.0, s.hitRate!!, 1e-9)
-    }
-
-    @Test
-    fun `a temperature miss of exactly the fault limit is kept, just past it is excluded`() {
-        // Hour 0's forecast is 25.0 against observed 10.0: error exactly +15.0 K, exactly TEMP_FAULT_K.
-        val kept = hours(25, { Triple(10.0, 0.0, 5.0) }) { i -> mapOf(Source.ICON_D2 to Predicted(if (i == 0) 25.0 else 11.0, 0.0, 5.0)) }
-        val keptScore = model(ForecastScores.rank(kept, Quantity.TEMPERATURE, lead, since), Source.ICON_D2).score
-        assertEquals(25, keptScore.hours)
-        assertEquals(0, keptScore.excluded)
-        // 25.0001 is 0.0001 K past the fault limit and is excluded.
-        val excluded = hours(25, { Triple(10.0, 0.0, 5.0) }) { i -> mapOf(Source.ICON_D2 to Predicted(if (i == 0) 25.0001 else 11.0, 0.0, 5.0)) }
-        val excludedScore = model(ForecastScores.rank(excluded, Quantity.TEMPERATURE, lead, since), Source.ICON_D2).score
-        assertEquals(24, excludedScore.hours)
-        assertEquals(1, excludedScore.excluded)
     }
 
     @Test
@@ -143,7 +209,7 @@ class ForecastScoresTest {
 
     @Test
     fun `excludedHours counts hours, not model misses`() {
-        // 25 hours, only hour 0's observation is a station fault; both models miss it by more than 15 K.
+        // 25 hours, only hour 0's observation is a station fault: 25 K from the consensus of 35.
         val h = hours(25, { Triple(10.0, 0.0, 5.0) }) { i ->
             mapOf(
                 Source.ICON_D2 to Predicted(if (i == 0) 40.0 else 11.0, 0.0, 5.0), // hour 0: error 30 K
@@ -152,8 +218,8 @@ class ForecastScoresTest {
         }
         val r = ForecastScores.rank(h, Quantity.TEMPERATURE, lead, since)
         assertEquals(1, r.excludedHours)
-        assertEquals(1, model(r, Source.ICON_D2).score.excluded)
-        assertEquals(1, model(r, Source.GFS).score.excluded)
+        assertEquals(24, model(r, Source.ICON_D2).score.hours)
+        assertEquals(24, model(r, Source.GFS).score.hours)
     }
 
     @Test

@@ -349,7 +349,7 @@
     <string name="stats_unranked">not enough data (%1$d h)</string>
     <string name="stats_percent">%1$s%%</string>
     <string name="stats_info">How it is scored</string>
-    <string name="stats_info_body">Avg. error is the average difference from the measurement. Hits counts hours within 2 K (wind: 5 km/h). Lean shows whether a model usually runs warm (+) or cold (−). For rain, \"rain right\" counts only hours where it rained or rain was forecast, so a model that never forecasts rain cannot win. Below 24 hours (rain: 5 wet hours) nothing is ranked. Consensus and \"same as yesterday\" are references. SIAG KMOS is missing because it is asked for by municipality and cannot be checked against a station.</string>
+    <string name="stats_info_body">Avg. error is the average difference from the measurement. Hits counts hours within 2 K (wind: 5 km/h). Lean shows whether a model usually runs warm (+) or cold (−). For rain, \"rain right\" counts only hours where it rained or rain was forecast, so a model that never forecasts rain cannot win. Below 24 hours (rain: 5 wet hours) nothing is ranked. If an hour\'s measurement is more than 15 K (wind: 60 km/h) away from the models\' consensus, that hour counts as a measurement fault and is left out for everyone. Consensus and \"same as yesterday\" are references. SIAG KMOS is missing because it is asked for by municipality and cannot be checked against a station.</string>
     <plurals name="stats_info_excluded">
         <item quantity="one">%1$d hour was excluded as a measurement fault.</item>
         <item quantity="other">%1$d hours were excluded as measurement faults.</item>

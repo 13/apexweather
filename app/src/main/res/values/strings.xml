@@ -357,7 +357,7 @@
     <string name="stats_unranked">zu wenig Daten (%1$d h)</string>
     <string name="stats_percent">%1$s %%</string>
     <string name="stats_info">So wird gerechnet</string>
-    <string name="stats_info_body">Ø Fehler ist die durchschnittliche Abweichung von der Messung. Treffer zählt Stunden innerhalb von 2 K (Wind: 5 km/h). Tendenz zeigt, ob ein Modell meist zu warm (+) oder zu kalt (−) liegt. Beim Regen zählt „Regen richtig\" nur Stunden, in denen es geregnet hat oder Regen vorhergesagt war, damit ein Modell, das nie Regen meldet, nicht gewinnt. Unter 24 Stunden (Regen: 5 nasse Stunden) wird nicht gereiht. Konsens und „wie gestern\" sind Vergleichswerte. SIAG KMOS fehlt, weil es nach Gemeinde abgefragt wird und nicht gegen eine Station prüfbar ist.</string>
+    <string name="stats_info_body">Ø Fehler ist die durchschnittliche Abweichung von der Messung. Treffer zählt Stunden innerhalb von 2 K (Wind: 5 km/h). Tendenz zeigt, ob ein Modell meist zu warm (+) oder zu kalt (−) liegt. Beim Regen zählt „Regen richtig\" nur Stunden, in denen es geregnet hat oder Regen vorhergesagt war, damit ein Modell, das nie Regen meldet, nicht gewinnt. Unter 24 Stunden (Regen: 5 nasse Stunden) wird nicht gereiht. Liegt die Messung einer Stunde mehr als 15 K (Wind: 60 km/h) neben dem Konsens der Modelle, gilt die Stunde als Messfehler und zählt für niemanden. Konsens und „wie gestern\" sind Vergleichswerte. SIAG KMOS fehlt, weil es nach Gemeinde abgefragt wird und nicht gegen eine Station prüfbar ist.</string>
     <plurals name="stats_info_excluded">
         <item quantity="one">%1$d Stunde wurde als Messfehler ausgeschlossen.</item>
         <item quantity="other">%1$d Stunden wurden als Messfehler ausgeschlossen.</item>

@@ -32,8 +32,6 @@ data class Score(
     val lean: Double?,
     /** Rain: hours wet observed or forecast. */
     val wetHours: Int = 0,
-    /** Hours left out as a station fault, counted for this contender alone. */
-    val excluded: Int = 0,
 )
 
 data class RankedRow(val contender: Contender, val score: Score, val rank: Int?)
@@ -48,9 +46,9 @@ data class Ranking(
     val observedHours: Int,
     val firstHour: Instant?,
     /**
-     * Distinct hours left out because at least one model's miss was a station fault — a bad
-     * thermometer reading with twelve models reporting is one excluded hour, not twelve. Always 0
-     * for rain, which has no fault limit. Compare [Score.excluded], which is per model.
+     * Hours in the period taken to be a station fault: the reading is further from the models'
+     * consensus than the fault limit (see [ForecastScores.faultHours]). Each is dropped for every
+     * contender, so there is no per-contender count. Always 0 for rain, which has no fault rule.
      */
     val excludedHours: Int,
 )
@@ -67,18 +65,21 @@ object ForecastScores {
     private val MODELS: List<Source> = Source.entries.filter { it.checkableAtStation }
 
     fun rank(hours: List<VerificationHour>, quantity: Quantity, lead: LeadBucket, since: Instant): Ranking {
+        val faults = faultHours(hours, quantity, lead)
         val period = hours.filter { !it.time.isBefore(since) && observed(it, quantity) != null }
+        val scored = period.filter { it.time !in faults }
         val modelRows = MODELS.map { source ->
-            RankedRow(Contender.Model(source), score(pairs(period, quantity) { predicted(it, lead, source, quantity) }, quantity), rank = null)
-        }.filter { it.score.hours > 0 || it.score.excluded > 0 }
+            RankedRow(Contender.Model(source), score(pairs(scored, quantity) { predicted(it, lead, source, quantity) }, quantity), rank = null)
+        }.filter { it.score.hours > 0 }
         val (rankable, notYet) = modelRows.partition { rankable(it.score, quantity) }
         val ranked = rankable.sortedWith(compare(quantity)).mapIndexed { i, row -> row.copy(rank = i + 1) }
         val references = buildList {
-            score(pairs(period, quantity) { consensus(it, lead, quantity) }, quantity).takeIf { it.hours > 0 }
+            score(pairs(scored, quantity) { consensus(it, lead, quantity) }, quantity).takeIf { it.hours > 0 }
                 ?.let { add(RankedRow(Contender.Consensus, it, null)) }
             if (quantity != Quantity.RAIN) {
                 val byTime = hours.associateBy { it.time }
-                score(pairs(period, quantity) { byTime[it.time.minusSeconds(24 * 3600)]?.let { y -> observed(y, quantity) } }, quantity)
+                // A faulty reading a day earlier is no forecast either.
+                score(pairs(scored, quantity) { byTime[it.time.minusSeconds(24 * 3600)]?.takeIf { y -> y.time !in faults }?.let { y -> observed(y, quantity) } }, quantity)
                     .takeIf { it.hours > 0 }?.let { add(RankedRow(Contender.SameAsYesterday, it, null)) }
             }
         }
@@ -86,12 +87,34 @@ object ForecastScores {
             quantity = quantity, lead = lead, ranked = ranked, references = references,
             unranked = notYet.sortedBy { (it.contender as Contender.Model).source.ordinal },
             observedHours = period.size, firstHour = period.minOfOrNull { it.time },
-            excludedHours = excludedHourCount(period, quantity, lead),
+            excludedHours = period.count { it.time in faults },
         )
     }
 
+    /**
+     * The hours whose reading is taken to be a station fault, at [lead]: the observation is further
+     * than [TEMP_FAULT_K] or [WIND_FAULT_KMH] from the models' consensus (the weighted median).
+     *
+     * Judged once per hour against the consensus, never per model: a single model far off while the
+     * station and the others agree has simply missed, and that miss counts against it. Rain has no
+     * fault rule. An hour no model forecast at [lead] cannot be judged and is not a fault.
+     */
+    fun faultHours(hours: List<VerificationHour>, quantity: Quantity, lead: LeadBucket): Set<Instant> {
+        val limit = when (quantity) {
+            Quantity.TEMPERATURE -> TEMP_FAULT_K
+            Quantity.WIND -> WIND_FAULT_KMH
+            Quantity.RAIN -> return emptySet()
+        }
+        return hours.filter { hour ->
+            val o = observed(hour, quantity) ?: return@filter false
+            val c = consensus(hour, lead, quantity) ?: return@filter false
+            abs(o - c) > limit
+        }.mapTo(HashSet()) { it.time }
+    }
+
     fun byPart(hours: List<VerificationHour>, quantity: Quantity, lead: LeadBucket, since: Instant, source: Source, zone: ZoneId): Map<DayPart, Score> {
-        val period = hours.filter { !it.time.isBefore(since) }
+        val faults = faultHours(hours, quantity, lead)
+        val period = hours.filter { !it.time.isBefore(since) && it.time !in faults }
         return DayPart.entries.associateWith { part ->
             score(pairs(period.filter { DayPart.of(it.time, zone) == part }, quantity) { predicted(it, lead, source, quantity) }, quantity)
         }
@@ -100,7 +123,8 @@ object ForecastScores {
     /** Mean absolute error per local day, oldest first. Empty for rain. */
     fun dailyError(hours: List<VerificationHour>, quantity: Quantity, lead: LeadBucket, since: Instant, source: Source, zone: ZoneId): List<Pair<LocalDate, Double>> {
         if (quantity == Quantity.RAIN) return emptyList()
-        return hours.filter { !it.time.isBefore(since) }
+        val faults = faultHours(hours, quantity, lead)
+        return hours.filter { !it.time.isBefore(since) && it.time !in faults }
             .groupBy { it.time.atZone(zone).toLocalDate() }
             .toSortedMap()
             .mapNotNull { (day, dayHours) ->
@@ -115,19 +139,6 @@ object ForecastScores {
         return byMain
             .thenByDescending { it.score.hitRate ?: -1.0 }
             .thenBy { (it.contender as? Contender.Model)?.source?.ordinal ?: -1 }
-    }
-
-    /** How many distinct [period] hours have at least one model missing by more than the fault limit. */
-    private fun excludedHourCount(period: List<VerificationHour>, quantity: Quantity, lead: LeadBucket): Int {
-        val fault = when (quantity) {
-            Quantity.TEMPERATURE -> TEMP_FAULT_K
-            Quantity.WIND -> WIND_FAULT_KMH
-            Quantity.RAIN -> return 0
-        }
-        return period.count { hour ->
-            val o = observed(hour, quantity) ?: return@count false
-            MODELS.any { source -> predicted(hour, lead, source, quantity)?.let { abs(it - o) > fault } == true }
-        }
     }
 
     private fun rankable(score: Score, quantity: Quantity): Boolean =
@@ -159,22 +170,19 @@ object ForecastScores {
         hours.mapNotNull { h -> val o = observed(h, quantity) ?: return@mapNotNull null; forecast(h)?.let { it to o } }
 
     private fun score(pairs: List<Pair<Double, Double>>, quantity: Quantity): Score = when (quantity) {
-        Quantity.TEMPERATURE -> continuous(pairs, TEMP_HIT_K, TEMP_FAULT_K)
-        Quantity.WIND -> continuous(pairs, WIND_HIT_KMH, WIND_FAULT_KMH)
+        Quantity.TEMPERATURE -> continuous(pairs, TEMP_HIT_K)
+        Quantity.WIND -> continuous(pairs, WIND_HIT_KMH)
         Quantity.RAIN -> rain(pairs)
     }
 
-    private fun continuous(pairs: List<Pair<Double, Double>>, hit: Double, fault: Double): Score {
+    private fun continuous(pairs: List<Pair<Double, Double>>, hit: Double): Score {
+        if (pairs.isEmpty()) return Score(0, null, null, null)
         val errors = pairs.map { (p, o) -> p - o }
-        val kept = errors.filter { abs(it) <= fault }
-        val excluded = errors.size - kept.size
-        if (kept.isEmpty()) return Score(0, null, null, null, excluded = excluded)
         return Score(
-            hours = kept.size,
-            main = kept.sumOf { abs(it) } / kept.size,
-            hitRate = kept.count { abs(it) <= hit }.toDouble() / kept.size,
-            lean = kept.sum() / kept.size,
-            excluded = excluded,
+            hours = errors.size,
+            main = errors.sumOf { abs(it) } / errors.size,
+            hitRate = errors.count { abs(it) <= hit }.toDouble() / errors.size,
+            lean = errors.sum() / errors.size,
         )
     }
 
