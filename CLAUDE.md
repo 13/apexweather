@@ -666,6 +666,19 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   than read backwards — which costs a reader who had hidden something one visit, in the safe
   direction. `CompareUiState.selectedInOrder` carries the column order, because the header row and
   the cells beneath it have to agree and two separate sorts is one more place for them not to.
+- **Tapping a source in Quellenstatus opens its sheet** (`SourceDetailSheet`, built by the pure
+  `SourceDetailStateBuilder`). Four blocks: what it is (`domain/SourceInfo.kt`, every value checked
+  against the provider's documentation on 2026-09-15 — change one only with a source for it),
+  whether it is working (the **full** error text, which the card cuts at 40 characters), its share of
+  the consensus (worked out as the blender does: among the regional runs when two report, otherwise
+  among everything in the blend), and its six-hour error per part of the day at the station
+  (`LeadBucket.SIX`). The one live fact is the run time, fetched when the sheet opens by
+  `SourceMetaRepository` — Open-Meteo's `/data/<dataset>/static/meta.json`, whose dataset name is
+  **not** the forecast's model id (`icon_d2` is `dwd_icon_d2`, `gfs_seamless` is read as
+  `ncep_gfs013`), and GeoSphere's `/v1/timeseries/…/metadata`. It is kept ten minutes in memory,
+  times out after 5 s and changes nothing but that line. **Reach comes from the cached forecast,
+  never from `meta.json`**: its `data_end_time` gave UKMO 61 h and ECMWF IFS 147 h on 2026-09-14,
+  against 171 h and 336 h on the real call.
 - **The in-app updater checks the length as well as the checksum.** A connection dropped mid-stream
   is not an error — the stream simply ends — and `GitHubAsset.sha256` is nullable, which is why
   `digestVerified` exists at all; on a release that published no digest a truncated APK would have
