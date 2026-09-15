@@ -47,6 +47,20 @@ object Format {
     fun tempDelta(c: Double, f: Formats): String =
         (if (c > 0) "+" else "") + f.oneDecimal(c) + "°"
 
+    /**
+     * A model's error in kelvin, for the source sheet. Always signed; anything that rounds to zero
+     * reads "±0,0 K", because "-0,0" is a rounding artefact and not a measurement.
+     */
+    fun kelvinDelta(k: Double, f: Formats): String {
+        val tenths = kotlin.math.round(k * 10.0) / 10.0
+        val sign = when {
+            tenths > 0.0 -> "+"
+            tenths < 0.0 -> ""
+            else -> "±"
+        }
+        return sign + f.oneDecimal(if (tenths == 0.0) 0.0 else tenths) + " K"
+    }
+
     /** The speed alone, in the reader's unit, for a column whose header says which unit that is. */
     fun windValue(kmh: Double, unit: WindUnit, f: Formats): String = when (unit) {
         WindUnit.KMH -> f.whole(unit.fromKmh(kmh).roundToInt())
