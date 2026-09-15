@@ -53,19 +53,27 @@ object VerificationHistory {
 
     /**
      * The station publishes rain since local midnight, so one hour's rain is this reading's total
-     * minus the previous hour's — on the same local day. The first hour of a day is its own total.
-     * A missing previous hour, or a total that went down (a station reset), is not guessed at.
+     * minus the previous hour's. Nothing assumes *when* the station resets:
+     *
+     * - A total at or above the previous one is a difference, across a local midnight too — a
+     *   00:xx reading that is still climbing has simply not reset yet.
+     * - A total below the previous one is a reset. In the first hour of a local day that hour's rain
+     *   is its own total; on any other hour the reset is unexpected and the hour is not scored.
+     * - Without the previous hour nothing is scored, the first hour of a day included: a reset
+     *   cannot be proven there.
      */
     fun hourlyRain(row: StationHistoryRow, previous: StationHistoryRow?, zone: ZoneId): Double? {
         val total = row.precipTodayMm ?: return null
-        val day = row.time.atZone(zone).toLocalDate()
-        if (row.time.minusSeconds(3600).atZone(zone).toLocalDate() != day) return total
         val before = previous?.precipTodayMm ?: return null
         // Rounded to the station's own precision: an unrounded 0.3 - 0.2 is 0.09999999999999998, which
         // reads as dry against ForecastScores.WET_MM even though the station meant exactly 0.1 mm.
-        val diff = Math.round((total - before) * 100.0) / 100.0
-        return if (diff < 0.0) null else diff
+        val diff = hundredths(total - before)
+        if (diff >= 0.0) return diff
+        val firstHourOfDay = row.time.minusSeconds(3600).atZone(zone).toLocalDate() != row.time.atZone(zone).toLocalDate()
+        return if (firstHourOfDay) hundredths(total) else null
     }
+
+    private fun hundredths(v: Double): Double = Math.round(v * 100.0) / 100.0
 
     private fun merge(row: StationHistoryRow): Map<LeadBucket, Map<Source, Predicted>> =
         (row.temps.keys + row.rain.keys + row.wind.keys).associateWith { lead ->

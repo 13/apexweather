@@ -26,10 +26,24 @@ class VerificationHistoryTest {
     }
 
     @Test
-    fun `the first hour of a local day is its own total`() {
+    fun `a total that has reset in the first hour of a local day is that hour's own total`() {
         // 00:00 local on 2026-09-11 is 22:00Z the day before.
         val hours = VerificationHistory.hours(listOf(row("2026-09-10T21:00:00Z", 5.0), row("2026-09-10T22:00:00Z", 0.2)), rome)
         assertEquals(0.2, hours[1].observedRainMm!!, 1e-9)
+    }
+
+    /** SIAG need not have reset by the 00:xx reading: a total still climbing is still yesterday's. */
+    @Test
+    fun `a total that has not reset yet across midnight is still a difference`() {
+        val hours = VerificationHistory.hours(listOf(row("2026-09-10T21:00:00Z", 5.0), row("2026-09-10T22:00:00Z", 5.3)), rome)
+        assertEquals(0.3, hours[1].observedRainMm!!, 1e-9)
+    }
+
+    /** Without the hour before, a first hour's total cannot be proven to be a fresh one. */
+    @Test
+    fun `the first hour of a local day without the hour before is not scored`() {
+        val hours = VerificationHistory.hours(listOf(row("2026-09-10T22:00:00Z", 0.2)), rome)
+        assertNull(hours.single().observedRainMm)
     }
 
     @Test
@@ -40,7 +54,7 @@ class VerificationHistoryTest {
     }
 
     @Test
-    fun `a missing hour or a falling total is not scored for rain`() {
+    fun `a missing hour or a total falling in the middle of the day is not scored for rain`() {
         val gap = VerificationHistory.hours(listOf(row("2026-09-10T10:00:00Z", 1.0), row("2026-09-10T12:00:00Z", 1.6)), rome)
         assertNull(gap[1].observedRainMm)
         val reset = VerificationHistory.hours(listOf(row("2026-09-10T10:00:00Z", 1.0), row("2026-09-10T11:00:00Z", 0.4)), rome)
