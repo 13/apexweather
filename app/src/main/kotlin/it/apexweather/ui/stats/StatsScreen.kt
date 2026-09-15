@@ -63,7 +63,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
+import kotlin.math.abs
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -371,23 +375,29 @@ internal fun StatsRowView(
         Contender.Consensus -> stringResource(R.string.stats_consensus)
         Contender.SameAsYesterday -> stringResource(R.string.stats_persistence)
     }
-    val labels = columnLabels(quantity)
     val values = columnValues(quantity, row.score, windUnit, f)
-    val summary = labels.zip(values).joinToString(", ") { (l, v) -> "$l $v" }
-    val description = if (model != null && row.rank != null) stringResource(R.string.stats_row_desc_ranked, row.rank, name, summary)
-    else stringResource(R.string.stats_row_desc_other, name, summary)
+    val description = rowDescription(row.copy(rank = row.rank.takeIf { model != null }), name, quantity, windUnit, f)
     val tag = when (row.contender) {
         is Contender.Model -> "stats_row_${row.contender.source.name}"
         Contender.Consensus -> "stats_row_consensus"
         Contender.SameAsYesterday -> "stats_row_yesterday"
     }
+    val click = if (model != null && onClick != null) ({ onClick(model) }) else null
     Row(
         modifier.fillMaxWidth()
             .heightIn(min = 44.dp)
-            .then(if (model != null && onClick != null) Modifier.clickable(role = Role.Button) { onClick(model) } else Modifier)
-            .semantics(mergeDescendants = true) { contentDescription = description }
-            .padding(vertical = 4.dp)
-            .testTag(tag),
+            // One spoken sentence for the whole row. The tag, role and click go inside the block:
+            // it clears everything else on the node, a testTag further along the chain included.
+            .clearAndSetSemantics {
+                contentDescription = description
+                testTag = tag
+                if (click != null) {
+                    role = Role.Button
+                    this.onClick(label = null) { click(); true }
+                }
+            }
+            .then(if (click != null) Modifier.clickable(onClick = click) else Modifier)
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -416,11 +426,56 @@ internal fun StatsRowView(
     }
 }
 
+/**
+ * The row as one sentence for a screen reader, in words rather than symbols: "Platz 1, ICON-CH1,
+ * durchschnittlich 1,1 Kelvin daneben, 78 Prozent Treffer, neigt 0,3 Kelvin zu warm". A row
+ * without a rank (the reference rows, and the detail sheet's own row before it is ranked) says
+ * the same without the place.
+ */
+@Composable
+internal fun rowDescription(row: StatsRow, name: String, quantity: Quantity, windUnit: WindUnit, f: Formats): String {
+    val s = row.score
+    val missing = stringResource(R.string.stats_desc_missing)
+    fun pct(v: Double?) = v?.let { f.whole((it * 100).roundToInt()) } ?: missing
+    val rank = row.rank
+    if (quantity == Quantity.RAIN) {
+        return if (rank != null) stringResource(R.string.stats_desc_rain_ranked, rank, name, pct(s.main), pct(s.hitRate), pct(s.lean))
+        else stringResource(R.string.stats_desc_rain, name, pct(s.main), pct(s.hitRate), pct(s.lean))
+    }
+    val inUnit: (Double) -> Double = if (quantity == Quantity.WIND) windUnit::fromKmh else { v -> v }
+    val error = s.main?.let { f.oneDecimal(inUnit(it)) } ?: missing
+    val leanTenths = s.lean?.let { Math.round(inUnit(it) * 10.0) / 10.0 }
+    val lean = leanTenths?.let { f.oneDecimal(abs(it)) } ?: missing
+    // "zu kalt" / "zu schwach" only for a lean that is negative once rounded; zero reads as warm.
+    val under = (leanTenths ?: 0.0) < 0.0
+    val hits = pct(s.hitRate)
+    return if (quantity == Quantity.TEMPERATURE) {
+        when {
+            rank != null && under -> stringResource(R.string.stats_desc_temp_cold_ranked, rank, name, error, hits, lean)
+            rank != null -> stringResource(R.string.stats_desc_temp_warm_ranked, rank, name, error, hits, lean)
+            under -> stringResource(R.string.stats_desc_temp_cold, name, error, hits, lean)
+            else -> stringResource(R.string.stats_desc_temp_warm, name, error, hits, lean)
+        }
+    } else {
+        val unit = stringResource(if (windUnit == WindUnit.MS) R.string.stats_desc_unit_ms else R.string.stats_desc_unit_kmh)
+        when {
+            rank != null && under -> stringResource(R.string.stats_desc_wind_weak_ranked, rank, name, error, hits, lean, unit)
+            rank != null -> stringResource(R.string.stats_desc_wind_strong_ranked, rank, name, error, hits, lean, unit)
+            under -> stringResource(R.string.stats_desc_wind_weak, name, error, hits, lean, unit)
+            else -> stringResource(R.string.stats_desc_wind_strong, name, error, hits, lean, unit)
+        }
+    }
+}
+
 @Composable
 private fun UnrankedRow(row: StatsRow) {
     val source = (row.contender as? Contender.Model)?.source ?: return
+    val description = pluralStringResource(R.plurals.stats_desc_unranked, row.score.hours, source.shortName, row.score.hours)
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 36.dp).testTag("stats_unranked"),
+        Modifier.fillMaxWidth().heightIn(min = 36.dp).clearAndSetSemantics {
+            contentDescription = description
+            testTag = "stats_unranked"
+        },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Spacer(Modifier.width(RankWidth))

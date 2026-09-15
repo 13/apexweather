@@ -362,8 +362,23 @@
         <item quantity="one">%1$d Stunde wurde als Messfehler ausgeschlossen.</item>
         <item quantity="other">%1$d Stunden wurden als Messfehler ausgeschlossen.</item>
     </plurals>
-    <string name="stats_row_desc_ranked">Platz %1$d, %2$s, %3$s</string>
-    <string name="stats_row_desc_other">%1$s, %2$s</string>
+    <string name="stats_desc_temp_warm_ranked">Platz %1$d, %2$s, durchschnittlich %3$s Kelvin daneben, %4$s Prozent Treffer, neigt %5$s Kelvin zu warm</string>
+    <string name="stats_desc_temp_cold_ranked">Platz %1$d, %2$s, durchschnittlich %3$s Kelvin daneben, %4$s Prozent Treffer, neigt %5$s Kelvin zu kalt</string>
+    <string name="stats_desc_temp_warm">%1$s, durchschnittlich %2$s Kelvin daneben, %3$s Prozent Treffer, neigt %4$s Kelvin zu warm</string>
+    <string name="stats_desc_temp_cold">%1$s, durchschnittlich %2$s Kelvin daneben, %3$s Prozent Treffer, neigt %4$s Kelvin zu kalt</string>
+    <string name="stats_desc_wind_strong_ranked">Platz %1$d, %2$s, durchschnittlich %3$s %6$s daneben, %4$s Prozent Treffer, neigt %5$s %6$s zu stark</string>
+    <string name="stats_desc_wind_weak_ranked">Platz %1$d, %2$s, durchschnittlich %3$s %6$s daneben, %4$s Prozent Treffer, neigt %5$s %6$s zu schwach</string>
+    <string name="stats_desc_wind_strong">%1$s, durchschnittlich %2$s %5$s daneben, %3$s Prozent Treffer, neigt %4$s %5$s zu stark</string>
+    <string name="stats_desc_wind_weak">%1$s, durchschnittlich %2$s %5$s daneben, %3$s Prozent Treffer, neigt %4$s %5$s zu schwach</string>
+    <string name="stats_desc_rain_ranked">Platz %1$d, %2$s, Regen in %3$s Prozent der nassen Stunden richtig, %4$s Prozent erkannt, %5$s Prozent Fehlalarm</string>
+    <string name="stats_desc_rain">%1$s, Regen in %2$s Prozent der nassen Stunden richtig, %3$s Prozent erkannt, %4$s Prozent Fehlalarm</string>
+    <plurals name="stats_desc_unranked">
+        <item quantity="one">%1$s, zu wenig Daten, %2$d Stunde</item>
+        <item quantity="other">%1$s, zu wenig Daten, %2$d Stunden</item>
+    </plurals>
+    <string name="stats_desc_unit_kmh">Kilometer pro Stunde</string>
+    <string name="stats_desc_unit_ms">Meter pro Sekunde</string>
+    <string name="stats_desc_missing">keine Angabe</string>
     <string name="stats_detail_by_part">NACH TAGESZEIT</string>
     <string name="stats_detail_daily">TÄGLICHER Ø FEHLER</string>
     <string name="stats_detail_open_source">Details zur Quelle ›</string>
