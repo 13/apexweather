@@ -298,7 +298,7 @@
     <string name="source_delivery_siag">Abgerufen über die Wetter-API des Landes</string>
     <string name="source_licence">Lizenz: %1$s</string>
     <string name="source_website">Website von %1$s öffnen</string>
-    <string name="source_stale_after">Gilt nach %1$d h ohne neuen Lauf als veraltet und zählt dann nicht mehr zum Konsens.</string>
+    <string name="source_stale_after">Gilt nach %1$d h ohne neue Daten als veraltet und zählt dann nicht mehr zum Konsens.</string>
     <string name="source_last_good">Letzte gute Daten: %1$s</string>
     <string name="source_reach">Reicht bis %1$s</string>
     <string name="source_run_published">Lauf von %1$s, veröffentlicht %2$s</string>
@@ -306,6 +306,8 @@
     <string name="source_update_every">Neuer Lauf alle %1$s</string>
     <string name="source_run_loading">Laufzeit wird abgerufen …</string>
     <string name="source_run_unavailable">Laufzeit nicht abrufbar</string>
+    <!-- The sheet's own status line for a Failed source; the card's row keeps statusText unchanged. -->
+    <string name="source_failed">Abruf fehlgeschlagen</string>
     <!-- Only ever shown for familySize > 1 (see SourceDetailSheet), but a genuine plural: lint's
          PluralsCandidate is right that %d next to "Modell(e)" needs a grammatical singular too. -->
     <plurals name="source_weight_shared">
@@ -316,7 +318,12 @@
     <string name="source_in_consensus">Im Konsens: ja</string>
     <string name="source_not_in_consensus">Im Konsens: nein</string>
     <string name="source_fills_gaps">Als globales Modell zählt es nur in Stunden, die weniger als zwei regionale Modelle erreichen.</string>
-    <string name="source_station">Station %1$s: Fehler 6 Stunden voraus, letzte 7 Tage</string>
+    <!-- The day count follows BiasCorrector.WINDOW, not a hardcoded "7 Tage": PluralsCandidate is
+         right that %d next to "Tag(e)" needs a grammatical singular too. -->
+    <plurals name="source_station">
+        <item quantity="one">Station %1$s: Fehler 6 Stunden voraus, letzter %2$d Tag</item>
+        <item quantity="other">Station %1$s: Fehler 6 Stunden voraus, letzte %2$d Tage</item>
+    </plurals>
     <string name="source_bias_too_few">noch zu wenige Stunden</string>
     <string name="source_part_night">Nachts</string>
     <string name="source_part_morning">Morgens</string>

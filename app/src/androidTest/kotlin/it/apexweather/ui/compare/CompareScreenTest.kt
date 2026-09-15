@@ -206,4 +206,44 @@ class CompareScreenTest {
         rule.onNodeWithTag("source_detail_close").performScrollTo().performClick()
         rule.onNodeWithTag("source_detail_sheet").assertDoesNotExist()
     }
+
+    /**
+     * A global source only fills gaps while it is actually in the consensus with two or more
+     * regional sources reaching the hour. Stale, failed and never-loaded sources are none of that,
+     * so the sentence must not appear for them just because they are not regional.
+     */
+    @Test
+    fun aStaleGlobalSourceDoesNotClaimToFillGaps() {
+        val withEcmwf = snapshot.copy(
+            forecasts = snapshot.forecasts + (Source.ECMWF to fc(Source.ECMWF, 5.0)),
+            status = mapOf(
+                Source.ICON_CH1 to SourceStatus.Ok(t0),
+                Source.ICON_D2 to SourceStatus.Ok(t0),
+                Source.ECMWF to SourceStatus.Stale(t0),
+            ),
+        )
+        val detail = SourceDetailStateBuilder.build(Source.ECMWF, withEcmwf, null, t0)
+        rule.setContent {
+            ApexTheme {
+                CompareContent(state, {}, {}, detail = detail, meta = SourceMetaUi.NotApplicable, onCloseSource = {})
+            }
+        }
+        rule.onNodeWithTag("source_detail_fills_gaps").assertDoesNotExist()
+    }
+
+    /**
+     * A never-loaded source has facts and nothing else: no reach, no share of the consensus and
+     * nothing about the station, because none of that has ever been measured for it.
+     */
+    @Test
+    fun aNeverLoadedSourceHasNoShareOrStationBlock() {
+        val detail = SourceDetailStateBuilder.build(Source.GEM, snapshot, null, t0)
+        rule.setContent {
+            ApexTheme {
+                CompareContent(state, {}, {}, detail = detail, meta = SourceMetaUi.NotApplicable, onCloseSource = {})
+            }
+        }
+        rule.onNodeWithTag("source_detail_share").assertDoesNotExist()
+        rule.onNodeWithTag("source_detail_station").assertDoesNotExist()
+    }
 }

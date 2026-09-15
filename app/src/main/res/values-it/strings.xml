@@ -301,7 +301,7 @@
     <string name="source_delivery_siag">Ottenuto tramite l\'API meteo della Provincia</string>
     <string name="source_licence">Licenza: %1$s</string>
     <string name="source_website">Apri il sito di %1$s</string>
-    <string name="source_stale_after">Senza una nuova corsa per %1$d h è considerato obsoleto e non conta più nel consenso.</string>
+    <string name="source_stale_after">Senza nuovi dati per %1$d h è considerato obsoleto e non conta più nel consenso.</string>
     <string name="source_last_good">Ultimi dati validi: %1$s</string>
     <string name="source_reach">Arriva fino a %1$s</string>
     <string name="source_run_published">Corsa delle %1$s, pubblicata %2$s</string>
@@ -309,6 +309,7 @@
     <string name="source_update_every">Nuova corsa ogni %1$s</string>
     <string name="source_run_loading">Recupero dell\'orario della corsa …</string>
     <string name="source_run_unavailable">Orario della corsa non disponibile</string>
+    <string name="source_failed">Download non riuscito</string>
     <plurals name="source_weight_shared">
         <item quantity="one">Vale %1$s voti – %2$d modello condivide il nucleo %3$s</item>
         <item quantity="many">Vale %1$s voti – %2$d modelli condividono il nucleo %3$s</item>
@@ -318,7 +319,11 @@
     <string name="source_in_consensus">Nel consenso: sì</string>
     <string name="source_not_in_consensus">Nel consenso: no</string>
     <string name="source_fills_gaps">Come modello globale conta solo nelle ore raggiunte da meno di due modelli regionali.</string>
-    <string name="source_station">Stazione %1$s: errore a 6 ore, ultimi 7 giorni</string>
+    <plurals name="source_station">
+        <item quantity="one">Stazione %1$s: errore a 6 ore, ultimo %2$d giorno</item>
+        <item quantity="many">Stazione %1$s: errore a 6 ore, ultimi %2$d giorni</item>
+        <item quantity="other">Stazione %1$s: errore a 6 ore, ultimi %2$d giorni</item>
+    </plurals>
     <string name="source_bias_too_few">ore ancora insufficienti</string>
     <string name="source_part_night">Notte</string>
     <string name="source_part_morning">Mattina</string>
