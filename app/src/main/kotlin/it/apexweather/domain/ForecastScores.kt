@@ -32,7 +32,7 @@ data class Score(
     val lean: Double?,
     /** Rain: hours wet observed or forecast. */
     val wetHours: Int = 0,
-    /** Hours left out as a station fault. */
+    /** Hours left out as a station fault, counted for this contender alone. */
     val excluded: Int = 0,
 )
 
@@ -47,6 +47,11 @@ data class Ranking(
     /** Hours in the period with an observation of [quantity]. */
     val observedHours: Int,
     val firstHour: Instant?,
+    /**
+     * Distinct hours left out because at least one model's miss was a station fault — a bad
+     * thermometer reading with twelve models reporting is one excluded hour, not twelve. Always 0
+     * for rain, which has no fault limit. Compare [Score.excluded], which is per model.
+     */
     val excludedHours: Int,
 )
 
@@ -81,7 +86,7 @@ object ForecastScores {
             quantity = quantity, lead = lead, ranked = ranked, references = references,
             unranked = notYet.sortedBy { (it.contender as Contender.Model).source.ordinal },
             observedHours = period.size, firstHour = period.minOfOrNull { it.time },
-            excludedHours = modelRows.sumOf { it.score.excluded },
+            excludedHours = excludedHourCount(period, quantity, lead),
         )
     }
 
@@ -110,6 +115,19 @@ object ForecastScores {
         return byMain
             .thenByDescending { it.score.hitRate ?: -1.0 }
             .thenBy { (it.contender as? Contender.Model)?.source?.ordinal ?: -1 }
+    }
+
+    /** How many distinct [period] hours have at least one model missing by more than the fault limit. */
+    private fun excludedHourCount(period: List<VerificationHour>, quantity: Quantity, lead: LeadBucket): Int {
+        val fault = when (quantity) {
+            Quantity.TEMPERATURE -> TEMP_FAULT_K
+            Quantity.WIND -> WIND_FAULT_KMH
+            Quantity.RAIN -> return 0
+        }
+        return period.count { hour ->
+            val o = observed(hour, quantity) ?: return@count false
+            MODELS.any { source -> predicted(hour, lead, source, quantity)?.let { abs(it - o) > fault } == true }
+        }
     }
 
     private fun rankable(score: Score, quantity: Quantity): Boolean =
@@ -165,8 +183,10 @@ object ForecastScores {
         var misses = 0
         var falseAlarms = 0
         pairs.forEach { (p, o) ->
-            val forecastWet = p >= WET_MM
-            val observedWet = o >= WET_MM
+            // A small tolerance below WET_MM: model values are floats too, and a value the station or
+            // a model meant as exactly 0.1 can arrive as 0.09999999999999998 (see VerificationHistory).
+            val forecastWet = p >= WET_MM - 1e-9
+            val observedWet = o >= WET_MM - 1e-9
             when {
                 forecastWet && observedWet -> hits++
                 !forecastWet && observedWet -> misses++

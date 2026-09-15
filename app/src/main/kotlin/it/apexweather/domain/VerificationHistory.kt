@@ -61,7 +61,9 @@ object VerificationHistory {
         val day = row.time.atZone(zone).toLocalDate()
         if (row.time.minusSeconds(3600).atZone(zone).toLocalDate() != day) return total
         val before = previous?.precipTodayMm ?: return null
-        val diff = total - before
+        // Rounded to the station's own precision: an unrounded 0.3 - 0.2 is 0.09999999999999998, which
+        // reads as dry against ForecastScores.WET_MM even though the station meant exactly 0.1 mm.
+        val diff = Math.round((total - before) * 100.0) / 100.0
         return if (diff < 0.0) null else diff
     }
 

@@ -33,6 +33,13 @@ class VerificationHistoryTest {
     }
 
     @Test
+    fun `float noise in the daily totals rounds to a clean hundredth`() {
+        // 0.3 - 0.2 is 0.09999999999999998 as a raw Double subtraction, not the 0.1 the station meant.
+        val hours = VerificationHistory.hours(listOf(row("2026-09-10T10:00:00Z", 0.2), row("2026-09-10T11:00:00Z", 0.3)), rome)
+        assertEquals(0.1, hours[1].observedRainMm!!, 0.0)
+    }
+
+    @Test
     fun `a missing hour or a falling total is not scored for rain`() {
         val gap = VerificationHistory.hours(listOf(row("2026-09-10T10:00:00Z", 1.0), row("2026-09-10T12:00:00Z", 1.6)), rome)
         assertNull(gap[1].observedRainMm)
