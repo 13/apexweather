@@ -49,4 +49,14 @@ class SourceInfoTest {
         assertEquals("CC BY-SA 4.0", SourceInfo.of(Source.UKMO).licence)
         assertEquals("CC BY 4.0", SourceInfo.of(Source.ICON_D2).licence)
     }
+
+    /**
+     * `cmc_gem_gdps` stopped updating in May 2026; its `meta.json` last run sat at 2026-05-26 while
+     * the phone read 2026-09-15, and the sheet showed a four-month-old run as current. Measured
+     * 2026-09-15: `cmc_gem_gdps_15km`'s last run was 2026-09-14T12:00Z, published 17:58Z.
+     */
+    @Test
+    fun `GEM reads its metadata from the 15km dataset, not the stale one`() {
+        assertEquals("cmc_gem_gdps_15km", SourceInfo.of(Source.GEM).metaDataset)
+    }
 }

@@ -59,8 +59,11 @@ data class SourceInfo(
             Source.GFS to SourceInfo("NOAA NCEP", 13.0, Delivery.OPEN_METEO, CC_BY, "https://www.ncei.noaa.gov/products/weather-climate-models/global-forecast", "ncep_gfs013"),
             // UKMO docs: Global 0.09° (~10 km), every 6 h; redistributed CC BY-SA 4.0.
             Source.UKMO to SourceInfo("Met Office", 10.0, Delivery.OPEN_METEO, "CC BY-SA 4.0", "https://www.metoffice.gov.uk", "ukmo_global_deterministic_10km"),
-            // GEM docs: GEM Global 0.15° (~15 km), every 12 h.
-            Source.GEM to SourceInfo("ECCC", 15.0, Delivery.OPEN_METEO, CC_BY, "https://weather.gc.ca", "cmc_gem_gdps"),
+            // GEM docs: GEM Global 0.15° (~15 km), every 12 h. `cmc_gem_gdps`'s meta.json stopped
+            // updating in May 2026 — its last run sat at 2026-05-26, published 2026-07-01, while the
+            // phone read September — so the sheet showed a four-month-old run as current. Measured
+            // 2026-09-15: `cmc_gem_gdps_15km`'s last run was 2026-09-14T12:00Z, published 17:58Z.
+            Source.GEM to SourceInfo("ECCC", 15.0, Delivery.OPEN_METEO, CC_BY, "https://weather.gc.ca", "cmc_gem_gdps_15km"),
         )
     }
 }
