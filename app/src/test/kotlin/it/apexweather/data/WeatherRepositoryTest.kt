@@ -21,7 +21,6 @@ import it.apexweather.data.remote.SiagApi
 import it.apexweather.data.remote.SiagStationsResponse
 import it.apexweather.domain.DORF_TIROL
 import it.apexweather.domain.STERZING
-import it.apexweather.domain.VerificationHistory
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.DORF_TIROL
 import it.apexweather.domain.STERZING
@@ -511,6 +510,40 @@ class WeatherRepositoryTest {
         val wind = Fixtures.json.decodeFromString(leadModel, row.modelsWindJson!!)
         assertTrue(wind.getValue("SIX").containsKey("ICON_D2"))
         assertTrue("temperature must still be filed", row.modelsJson.contains("SIX"))
+    }
+
+    /**
+     * A refresh inside an hour must merge rain and wind, never replace them, exactly as temperature
+     * already does — modelled on `refreshing again in the same hour keeps what was written twelve
+     * hours ago`, which only ever checked `modelsJson`.
+     */
+    @Test
+    fun `rain and wind forecasts merge across refreshes like temperature`() = runTest {
+        openMeteo.stationFixture = "openmeteo_station_rain_wind.json"
+        // Twelve hours on is 2026-09-10T02:00Z, where ICON-D2 recorded 3,4 mm.
+        clock.now = Instant.parse("2026-09-09T14:00:00Z")
+        repo.refresh(DORF_TIROL, "de")
+        val target = Instant.parse("2026-09-10T02:00:00Z").epochSecond
+        val afterTwelve = history.stationHistoryDao().history(DORF_TIROL.istat, 0L).first().single { it.hourEpoch == target }
+        val rainTwelve = Fixtures.json.decodeFromString(leadModel, afterTwelve.modelsRainJson!!)
+        val windTwelve = Fixtures.json.decodeFromString(leadModel, afterTwelve.modelsWindJson!!)
+        assertTrue("TWELVE rain missing", rainTwelve.getValue("TWELVE").containsKey("ICON_D2"))
+        assertTrue("TWELVE wind missing", windTwelve.getValue("TWELVE").containsKey("ICON_D2"))
+
+        // Six hours on, the same hour is six hours away and is written again. Both leads must
+        // survive, because the twelve-hour-old forecast can never be fetched a second time.
+        clock.now = clock.now.plus(Duration.ofHours(6))
+        repo.refresh(DORF_TIROL, "de")
+        val row = history.stationHistoryDao().history(DORF_TIROL.istat, 0L).first().single { it.hourEpoch == target }
+        val rain = Fixtures.json.decodeFromString(leadModel, row.modelsRainJson!!)
+        val wind = Fixtures.json.decodeFromString(leadModel, row.modelsWindJson!!)
+        val temps = Fixtures.json.decodeFromString(leadModel, row.modelsJson)
+        assertTrue("the twelve-hour-old rain forecast was overwritten", rain.getValue("TWELVE").containsKey("ICON_D2"))
+        assertTrue("the newer six-hour rain forecast was not added", rain.getValue("SIX").containsKey("ICON_D2"))
+        assertTrue("the twelve-hour-old wind forecast was overwritten", wind.getValue("TWELVE").containsKey("ICON_D2"))
+        assertTrue("the newer six-hour wind forecast was not added", wind.getValue("SIX").containsKey("ICON_D2"))
+        assertTrue("temperature must still hold both leads too", temps.getValue("TWELVE").containsKey("ICON_D2"))
+        assertTrue("temperature must still hold both leads too", temps.getValue("SIX").containsKey("ICON_D2"))
     }
 
     @Test
