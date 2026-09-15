@@ -5,6 +5,7 @@ import it.apexweather.Fixtures
 import it.apexweather.data.local.AppDatabase
 import it.apexweather.data.local.HistoryDatabase
 import it.apexweather.data.local.SourceForecastEntity
+import it.apexweather.data.local.StationHistoryEntity
 import it.apexweather.data.local.WeatherDao
 import it.apexweather.data.remote.GeoSphereApi
 import it.apexweather.data.remote.GeoSphereMapper
@@ -15,10 +16,12 @@ import it.apexweather.data.remote.OdhDistrictResponse
 import it.apexweather.data.remote.OdhWeatherResponse
 import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.OpenMeteoResponse
+import it.apexweather.data.remote.OpenMeteoStationMapper
 import it.apexweather.data.remote.SiagApi
 import it.apexweather.data.remote.SiagStationsResponse
 import it.apexweather.domain.DORF_TIROL
 import it.apexweather.domain.STERZING
+import it.apexweather.domain.VerificationHistory
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.DORF_TIROL
 import it.apexweather.domain.STERZING
@@ -26,6 +29,8 @@ import it.apexweather.domain.model.SourceStatus
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -472,5 +477,66 @@ class WeatherRepositoryTest {
     fun `a place without a station records no history`() = runTest {
         repo.refresh(STERZING, "de")
         assertTrue(history.stationHistoryDao().history(STERZING.istat, 0L).first().isEmpty())
+    }
+
+    private val leadModel = MapSerializer(String.serializer(), MapSerializer(String.serializer(), Double.serializer()))
+
+    /** Both station calls ask for what the statistics need, and the fakes are what prove it. */
+    @Test
+    fun `the station calls ask for temperature, rain and wind`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        assertEquals(OpenMeteoStationMapper.STATION_HOURLY, openMeteo.stationHourly)
+        assertNotNull("AROME was not asked at the station with STATION_PARAMS", geoSphere.askedForStation)
+    }
+
+    @Test
+    fun `a reading writes the station's wind and its rain total`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        val observed = history.stationHistoryDao().history(DORF_TIROL.istat, 0L).first().single { it.observedC != null }
+        // siag_stations.json, Meran: ff 5.0 m/s, n 0.0 mm.
+        assertEquals(18.0, observed.observedWindKmh!!, 1e-9)
+        assertEquals(0.0, observed.observedPrecipTodayMm!!, 1e-9)
+    }
+
+    @Test
+    fun `forecast rain and wind are filed per lead beside the temperature`() = runTest {
+        openMeteo.stationFixture = "openmeteo_station_rain_wind.json"
+        // Six hours on is 2026-09-10T02:00Z, 04:00 local, where ICON-D2 recorded 3,4 mm.
+        clock.now = Instant.parse("2026-09-09T20:00:00Z")
+        repo.refresh(DORF_TIROL, "de")
+        val target = Instant.parse("2026-09-10T02:00:00Z").epochSecond
+        val row = history.stationHistoryDao().history(DORF_TIROL.istat, 0L).first().single { it.hourEpoch == target }
+        val rain = Fixtures.json.decodeFromString(leadModel, row.modelsRainJson!!)
+        assertEquals(3.4, rain.getValue("SIX").getValue("ICON_D2"), 1e-9)
+        val wind = Fixtures.json.decodeFromString(leadModel, row.modelsWindJson!!)
+        assertTrue(wind.getValue("SIX").containsKey("ICON_D2"))
+        assertTrue("temperature must still be filed", row.modelsJson.contains("SIX"))
+    }
+
+    @Test
+    fun `history is kept ninety days`() = runTest {
+        val dao = history.stationHistoryDao()
+        val old = clock.now.minus(java.time.Duration.ofDays(91)).truncatedTo(java.time.temporal.ChronoUnit.HOURS)
+        val recent = clock.now.minus(java.time.Duration.ofDays(30)).truncatedTo(java.time.temporal.ChronoUnit.HOURS)
+        dao.upsert(StationHistoryEntity(DORF_TIROL.istat, old.epochSecond, 10.0, "{}"))
+        dao.upsert(StationHistoryEntity(DORF_TIROL.istat, recent.epochSecond, 11.0, "{}"))
+        repo.refresh(DORF_TIROL, "de")
+        val hours = dao.history(DORF_TIROL.istat, 0L).first().map { it.hourEpoch }
+        assertFalse("91 days old must be pruned", old.epochSecond in hours)
+        assertTrue("30 days old must be kept", recent.epochSecond in hours)
+    }
+
+    @Test
+    fun `the statistics read decodes hours and derives hourly rain`() = runTest {
+        val dao = history.stationHistoryDao()
+        val h0 = clock.now.truncatedTo(java.time.temporal.ChronoUnit.HOURS).minusSeconds(7200)
+        val h1 = h0.plusSeconds(3600)
+        dao.upsert(StationHistoryEntity(DORF_TIROL.istat, h0.epochSecond, 20.0, """{"SIX":{"ICON_D2":19.0}}""", 10.0, 1.0, """{"SIX":{"ICON_D2":0.5}}""", """{"SIX":{"ICON_D2":12.0}}"""))
+        dao.upsert(StationHistoryEntity(DORF_TIROL.istat, h1.epochSecond, 21.0, """{"SIX":{"ICON_D2":20.5}}""", 11.0, 1.6, null, null))
+        val hours = repo.stationHistory(DORF_TIROL).first()
+        assertEquals(listOf(h0, h1), hours.map { it.time })
+        assertEquals(0.6, hours[1].observedRainMm!!, 1e-9)
+        val p0 = hours[0].predicted.getValue(it.apexweather.domain.LeadBucket.SIX).getValue(Source.ICON_D2)
+        assertEquals(it.apexweather.domain.Predicted(19.0, 0.5, 12.0), p0)
     }
 }

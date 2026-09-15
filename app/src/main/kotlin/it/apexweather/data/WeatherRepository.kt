@@ -35,8 +35,11 @@ import it.apexweather.domain.model.WeatherSnapshot
 import it.apexweather.domain.BiasCorrector
 import it.apexweather.domain.Place
 import it.apexweather.domain.LeadBucket
+import it.apexweather.domain.StationHistoryRow
 import it.apexweather.domain.StationSample
 import it.apexweather.domain.SouthTyrol
+import it.apexweather.domain.VerificationHistory
+import it.apexweather.domain.VerificationHour
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -48,6 +51,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
@@ -103,7 +108,9 @@ class WeatherRepository @Inject constructor(
         // keeps the extra query cheap: the bound only changes when the hour does.
         val sidecars = combine(
             dao.warnings(), dao.stationReference(place.istat),
-            historyWindow().flatMapLatest { since -> history.history(place.istat, since) },
+            // The snapshot keeps reading only BiasCorrector.WINDOW; stationHistory below reads the
+            // longer VerificationHistory.KEEP for the statistics screen.
+            historyWindow(BiasCorrector.WINDOW).flatMapLatest { since -> history.history(place.istat, since) },
             dao.ensemble(place.istat), ::Sidecars,
         )
         return combine(
@@ -178,15 +185,42 @@ class WeatherRepository @Inject constructor(
     /**
      * The earliest hour worth reading back, re-evaluated as the clock moves.
      *
-     * Truncated to the hour and de-duplicated, because [BiasCorrector] groups by the hour anyway and
-     * a bound that changed every second would re-query Room every second for the same rows.
+     * Truncated to the hour and de-duplicated, because both readers group by the hour anyway and a
+     * bound that changed every second would re-query Room every second for the same rows.
      */
-    private fun historyWindow(): Flow<Long> = flow {
+    private fun historyWindow(length: Duration): Flow<Long> = flow {
         while (true) {
-            emit(clock.instant().truncatedTo(ChronoUnit.HOURS).minus(BiasCorrector.WINDOW).epochSecond)
+            emit(clock.instant().truncatedTo(ChronoUnit.HOURS).minus(length).epochSecond)
             delay(HISTORY_WINDOW_TICK_MS)
         }
     }.distinctUntilChanged()
+
+    /**
+     * Every recorded hour at [place]'s station within [VerificationHistory.KEEP], decoded and with
+     * hourly rain derived, for the statistics screen. Decoding a season of rows is off the main thread.
+     */
+    fun stationHistory(place: Place): Flow<List<VerificationHour>> =
+        historyWindow(VerificationHistory.KEEP)
+            .flatMapLatest { since -> history.history(place.istat, since) }
+            .map { rows -> VerificationHistory.hours(rows.mapNotNull(::decodeRow), SouthTyrol.ZONE) }
+            .flowOn(Dispatchers.Default)
+
+    private fun decodeRow(row: StationHistoryEntity): StationHistoryRow? {
+        fun leads(text: String?): Map<LeadBucket, Map<Source, Double>> =
+            text?.let { decode("station history", LEAD_MODEL_TEMPS, it) }.orEmpty().mapNotNull { (leadName, models) ->
+                val lead = runCatching { LeadBucket.valueOf(leadName) }.getOrNull() ?: return@mapNotNull null
+                lead to models.mapNotNull { (name, value) -> runCatching { Source.valueOf(name) }.getOrNull()?.let { it to value } }.toMap()
+            }.toMap()
+        return StationHistoryRow(
+            time = Instant.ofEpochSecond(row.hourEpoch),
+            observedC = row.observedC,
+            observedWindKmh = row.observedWindKmh,
+            precipTodayMm = row.observedPrecipTodayMm,
+            temps = leads(row.modelsJson),
+            rain = leads(row.modelsRainJson),
+            wind = leads(row.modelsWindJson),
+        )
+    }
 
     /** Cached JSON can outlive a model change; a row that no longer decodes is reported, never fatal. */
     private fun <T> decode(what: String, serializer: KSerializer<T>, text: String): T? =
@@ -443,7 +477,8 @@ class WeatherRepository @Inject constructor(
     }
 
     /**
-     * Writes down what each model says about the hours ahead, and what the station actually read.
+     * Writes down what each model says about the hours ahead — temperature, rain and wind — and
+     * what the station actually read.
      *
      * Two halves that meet in the same row. The run just fetched is asked what it makes of this
      * hour, of six hours' time and of twelve — those are forecasts at three distances, written into
@@ -468,10 +503,14 @@ class WeatherRepository @Inject constructor(
         if (reference != null) {
             listOf(LeadBucket.SIX, LeadBucket.TWELVE).forEach { lead ->
                 val target = thisHour.plusSeconds(lead.hours * 3600)
-                val models = reference.at(target).mapKeys { it.key.name }
+                val forecasts = HourForecasts(
+                    temps = reference.at(target).mapKeys { it.key.name },
+                    rain = reference.rainAt(target).mapKeys { it.key.name },
+                    wind = reference.windAt(target).mapKeys { it.key.name },
+                )
                 // A model whose run does not reach that far contributes nothing rather than a gap
                 // that later reads as agreement.
-                if (models.isNotEmpty()) mergeStationHour(place, target) { it + (lead.name to models) }
+                if (forecasts.temps.isNotEmpty()) mergeStationHour(place, target, lead = lead, forecasts = forecasts)
             }
         }
 
@@ -480,35 +519,56 @@ class WeatherRepository @Inject constructor(
         // said about 13:00, whatever time the refresh happens to run at.
         val observation = dao.observationOnce(place.istat)?.json
             ?.let { decode("observation", StationObservation.serializer(), it) }
-        val observed = observation?.tempC
-        if (observed != null) {
+        if (observation?.tempC != null) {
             val hour = observation.time.truncatedTo(ChronoUnit.HOURS)
-            val atHour = reference?.at(hour)?.mapKeys { it.key.name }.orEmpty()
-            mergeStationHour(place, hour, observed) {
-                if (atHour.isEmpty()) it else it + (LeadBucket.NOW.name to atHour)
+            val atHour = reference?.let {
+                HourForecasts(
+                    temps = it.at(hour).mapKeys { e -> e.key.name },
+                    rain = it.rainAt(hour).mapKeys { e -> e.key.name },
+                    wind = it.windAt(hour).mapKeys { e -> e.key.name },
+                )
             }
+            mergeStationHour(place, hour, reading = observation, lead = LeadBucket.NOW, forecasts = atHour)
         }
-        history.prune(now.minus(BiasCorrector.WINDOW).epochSecond)
+        history.prune(now.minus(VerificationHistory.KEEP).epochSecond)
     }
 
+    /** What one run says about one hour at the station: source name → value, per quantity. */
+    private data class HourForecasts(
+        val temps: Map<String, Double>,
+        val rain: Map<String, Double>,
+        val wind: Map<String, Double>,
+    )
+
     /**
-     * Read, change, write one history row. [observed] is written where it is given and the stored
-     * reading is kept where it is not, so the two halves above can arrive in either order.
+     * Read, change, write one history row. A reading is written where it is given and the stored one
+     * kept where it is not, and each quantity's forecasts are merged under [lead] — so the halves of
+     * [recordStationHour] can arrive in either order and none overwrites another.
      */
     private suspend fun mergeStationHour(
         place: Place,
         hour: Instant,
-        observed: Double? = null,
-        change: (Map<String, Map<String, Double>>) -> Map<String, Map<String, Double>>,
+        reading: StationObservation? = null,
+        lead: LeadBucket? = null,
+        forecasts: HourForecasts? = null,
     ) {
         val existing = history.at(place.istat, hour.epochSecond)
-        val stored = existing?.modelsJson?.let { decode("station history", LEAD_MODEL_TEMPS, it) }.orEmpty()
+        fun stored(text: String?) = text?.let { decode("station history", LEAD_MODEL_TEMPS, it) }.orEmpty()
+        fun withLead(map: Map<String, Map<String, Double>>, add: Map<String, Double>?) =
+            if (lead == null || add.isNullOrEmpty()) map else map + (lead.name to add)
+        val temps = withLead(stored(existing?.modelsJson), forecasts?.temps)
+        val rain = withLead(stored(existing?.modelsRainJson), forecasts?.rain)
+        val wind = withLead(stored(existing?.modelsWindJson), forecasts?.wind)
         history.upsert(
             StationHistoryEntity(
                 place = place.istat,
                 hourEpoch = hour.epochSecond,
-                observedC = observed ?: existing?.observedC,
-                modelsJson = json.encodeToString(LEAD_MODEL_TEMPS, change(stored)),
+                observedC = reading?.tempC ?: existing?.observedC,
+                modelsJson = json.encodeToString(LEAD_MODEL_TEMPS, temps),
+                observedWindKmh = reading?.windKmh ?: existing?.observedWindKmh,
+                observedPrecipTodayMm = reading?.precipTodayMm ?: existing?.observedPrecipTodayMm,
+                modelsRainJson = rain.takeIf { it.isNotEmpty() }?.let { json.encodeToString(LEAD_MODEL_TEMPS, it) },
+                modelsWindJson = wind.takeIf { it.isNotEmpty() }?.let { json.encodeToString(LEAD_MODEL_TEMPS, it) },
             ),
         )
     }
