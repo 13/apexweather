@@ -12,7 +12,8 @@ import it.apexweather.domain.DailyAggregator
 import it.apexweather.domain.Horizon
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.StationDownscale
-import it.apexweather.domain.StationDry
+import it.apexweather.domain.MeasuredRain
+import it.apexweather.domain.RadarNow
 import it.apexweather.domain.StationFog
 import it.apexweather.domain.StationSun
 import it.apexweather.domain.model.Bulletin
@@ -147,6 +148,8 @@ object HomeStateBuilder {
         consensus: ConsensusForecast,
         now: Instant,
         dismissedWarnings: Set<String> = emptySet(),
+        /** The newest radar frame at the place; the widget and the worker build without one. */
+        radar: RadarNow? = null,
     ): HomeUiState {
         val thisHour = now.truncatedTo(ChronoUnit.HOURS)
         val upcomingRaw = consensus.hourly.filter { !it.time.isBefore(thisHour) }.take(48)
@@ -191,10 +194,16 @@ object HomeStateBuilder {
         // this hour alone — which is why the hour is re-voted here rather than in the blender, where
         // it would colour all forty-eight. It cannot invent fog: something has to have forecast it.
         val current = rawCurrent?.let { wet ->
-            // The rain gauge outranks the models about this minute: a total that has not risen is
-            // no rain now, whatever the hour was forecast to bring. See StationDry.
-            val measuredDry = StationDry.isDry(snapshot.observation, now)
-            val h = if (measuredDry && wet.precipMm > 0.0) wet.copy(precipMm = 0.0) else wet
+            // The instruments outrank the models about this minute, in both directions: a gauge
+            // that has not risen is no rain now, and a rising gauge or a radar echo is rain the
+            // models may have missed. See MeasuredRain for the order they are trusted in.
+            val measured = MeasuredRain.now(snapshot.observation, radar, now)
+            val measuredDry = measured == MeasuredRain.Dry
+            val h = when {
+                measuredDry && wet.precipMm > 0.0 -> wet.copy(precipMm = 0.0)
+                measured is MeasuredRain.Wet && wet.precipMm < measured.mmPerHour -> wet.copy(precipMm = measured.mmPerHour)
+                else -> wet
+            }
             val voted = if (StationFog.impliesFog(snapshot.observation, now, h)) {
                 Condition.FOG
             } else {
@@ -208,7 +217,15 @@ object HomeStateBuilder {
                     stationSaturated = StationFog.saturated(snapshot.observation, now),
                     cloudPct = h.perSource.mapNotNull { (s, p) -> p.cloudPct?.let { s to it } }.toMap(),
                     measuredDry = measuredDry,
-                )
+                ).let { vote ->
+                    // The models' words may all be dry while it is measurably raining; the word then
+                    // comes from what was measured.
+                    when {
+                        measured !is MeasuredRain.Wet || vote.isPrecipitation -> vote
+                        measured.snow -> Condition.SNOW
+                        else -> Condition.rainFor(h.precipMm)
+                    }
+                }
             }
             // And then held to what the sunlight actually arriving allows. This runs last because
             // it outranks the fog above it — a pyranometer reading 834 W/m² is not fog, whatever

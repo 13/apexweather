@@ -4,6 +4,7 @@ import it.apexweather.data.remote.RadarFrame
 import it.apexweather.data.remote.RainViewerApi
 import it.apexweather.data.remote.RainViewerMapper
 import it.apexweather.domain.RadarAtPlace
+import it.apexweather.domain.RadarNow
 import it.apexweather.domain.RadarReading
 import it.apexweather.domain.TilePixel
 import kotlinx.coroutines.CoroutineDispatcher
@@ -21,6 +22,11 @@ import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/** The newest radar reading at a place; [RadarRepository] in the app, a stub in tests. */
+fun interface RadarNowSource {
+    suspend fun latestAt(lat: Double, lon: Double): RadarNow?
+}
 
 /**
  * The radar frames currently on offer, held in memory for as long as they are current, and what
@@ -43,7 +49,7 @@ class RadarRepository internal constructor(
     private val io: CoroutineDispatcher,
     /** Where it is decoded and its pixels read. */
     private val compute: CoroutineDispatcher,
-) {
+) : RadarNowSource {
     @Inject constructor(api: RainViewerApi, decoder: TileDecoder, clock: Clock) :
         this(api, decoder, clock, Dispatchers.IO, Dispatchers.Default)
 
@@ -86,9 +92,24 @@ class RadarRepository internal constructor(
      */
     suspend fun readingsAt(lat: Double, lon: Double): Map<Instant, RadarReading> {
         val current = frames()
-        val pixel = RadarAtPlace.pixelOf(lat, lon)
+        return readingsFor(current, current, RadarAtPlace.pixelOf(lat, lon))
+    }
+
+    /**
+     * The newest frame's reading at ([lat], [lon]), for the home screen's current hour: one tile
+     * rather than the loop's thirteen, and none at all while the frame list is fresh and read.
+     */
+    override suspend fun latestAt(lat: Double, lon: Double): RadarNow? {
+        val current = frames()
+        val newest = current.maxByOrNull { it.time } ?: return null
+        val reading = readingsFor(listOf(newest), current, RadarAtPlace.pixelOf(lat, lon))[newest.time] ?: return null
+        return RadarNow(newest.time, reading)
+    }
+
+    /** Readings for [wanted] at [pixel], keeping the cache to what [current] still names. */
+    private suspend fun readingsFor(wanted: List<RadarFrame>, current: List<RadarFrame>, pixel: TilePixel): Map<Instant, RadarReading> {
         return readingsLock.withLock {
-            val missing = mutex.withLock { current.filter { (it.time to pixel) !in readings } }
+            val missing = mutex.withLock { wanted.filter { (it.time to pixel) !in readings } }
             if (missing.isNotEmpty()) {
                 val semaphore = Semaphore(MAX_PARALLEL_TILES)
                 coroutineScope {
@@ -116,7 +137,7 @@ class RadarRepository internal constructor(
             }
             mutex.withLock {
                 val out = LinkedHashMap<Instant, RadarReading>()
-                for (frame in current) {
+                for (frame in wanted) {
                     readings[frame.time to pixel]?.let { out[frame.time] = it }
                 }
                 readings.keys.retainAll { (time, _) -> current.any { it.time == time } }

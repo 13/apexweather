@@ -73,6 +73,7 @@ object AppModule {
     @Provides @Singleton fun meteoAlarm(c: OkHttpClient, j: Json): MeteoAlarmApi = retrofit(MeteoAlarmApi.BASE_URL, c, j).create(MeteoAlarmApi::class.java)
     @Provides @Singleton fun rainViewer(c: OkHttpClient, j: Json): RainViewerApi = retrofit(RainViewerApi.BASE_URL, c, j).create(RainViewerApi::class.java)
     @Provides @Singleton fun tileDecoder(): it.apexweather.data.TileDecoder = it.apexweather.data.AndroidTileDecoder
+    @Provides fun radarNow(radar: it.apexweather.data.RadarRepository): it.apexweather.data.RadarNowSource = radar
     @Provides @Singleton fun nowcast(c: OkHttpClient, j: Json): NowcastApi = retrofit(NowcastApi.BASE_URL, c, j).create(NowcastApi::class.java)
     // Returns the NetCDF as a raw body, like the Atom feed above; NowcastGrid reads it.
     @Provides @Singleton fun nowcastSource(api: NowcastApi): it.apexweather.data.NowcastSource = it.apexweather.data.GeoSphereNowcastSource(api)

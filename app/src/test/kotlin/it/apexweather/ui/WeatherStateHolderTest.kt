@@ -75,7 +75,7 @@ class WeatherStateHolderTest {
         runBlocking { settings.setPlace(DORF_TIROL.istat) }
         holder = WeatherStateHolder(
             repository, settings, PlaceCatalogue(context), WarningDismissals(context), ConsensusBlender(SouthTyrol.ZONE),
-            MutableClock(Instant.parse("2026-09-08T14:00:00Z")), scope,
+            MutableClock(Instant.parse("2026-09-08T14:00:00Z")), scope, radar = { _, _ -> null },
         )
     }
 

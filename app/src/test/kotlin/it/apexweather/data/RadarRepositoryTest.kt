@@ -153,6 +153,16 @@ class RadarRepositoryTest {
         assertEquals(8, readings.size)
     }
 
+    /** The home screen asks for the newest frame alone: one tile, not the loop's thirteen. */
+    @Test
+    fun `the newest frame at the place costs one tile`() = runTest {
+        val api = MorningApi()
+        val now = RadarRepository(api, decoder, MovableClock(Instant.parse("2026-09-14T05:45:00Z"))).latestAt(lat, lon)!!
+        assertEquals(Instant.parse("2026-09-14T05:40:00Z"), now.time)
+        assertEquals(RadarReading.NO_ECHO, now.reading)
+        assertEquals(1, api.tileCalls)
+    }
+
     @Test
     fun `a tile is fetched once per frame, not once per ask`() = runTest {
         val api = MorningApi()

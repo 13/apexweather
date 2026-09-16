@@ -180,7 +180,7 @@ class MapViewModelTest {
                 FakeMeteoAlarm(), FakeEnsemble(), Fixtures.json, clock,
             ),
             settings, PlaceCatalogue(context), WarningDismissals(context),
-            ConsensusBlender(SouthTyrol.ZONE), clock, scope,
+            ConsensusBlender(SouthTyrol.ZONE), clock, scope, radar = { _, _ -> null },
         )
         val store = ViewModelStore()
         val vm = ViewModelProvider(

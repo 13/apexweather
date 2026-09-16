@@ -36,6 +36,7 @@ class RefreshWorker @AssistedInject constructor(
     private val notifier: WeatherNotifier,
     private val notifyStore: NotifyStore,
     private val clock: Clock,
+    private val radar: it.apexweather.data.RadarNowSource,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -125,7 +126,13 @@ class RefreshWorker @AssistedInject constructor(
         if (!appSettings.anyNotification || !notifier.canPost()) return
         val snapshot = repository.snapshot(place, language).first()
         val now = clock.instant()
-        val home = HomeStateBuilder.build(place, snapshot, appSettings, blender.blend(snapshot.forecastsForBlend, snapshot.modelBias, now, snapshot.ensemble), now)
+        // The radar at the place, so "rain starting" is not announced while it is already raining:
+        // one tile, and a failure is simply no reading.
+        val radarNow = it.apexweather.data.runCatchingCancellable { radar.latestAt(place.lat, place.lon) }.getOrNull()
+        val home = HomeStateBuilder.build(
+            place, snapshot, appSettings, blender.blend(snapshot.forecastsForBlend, snapshot.modelBias, now, snapshot.ensemble), now,
+            radar = radarNow,
+        )
         val memory = notifyStore.read()
         // The worker renders outside a composition, so it resolves the reader's language and clock
         // preference from its own context, exactly as the widget does.

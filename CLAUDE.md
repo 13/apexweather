@@ -865,6 +865,16 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   the grounds that it answers *when* rather than *how much*, and that made the two disagree about
   when: on 2026-09-16 in Meran one or two of six models were wet from 15:15, the strip showed
   millimetres from 16:00, and the median held the hero's "Niederschlag ab" at 19:45.
+- **Measured rain overrules the models about the current hour, in both directions**
+  (`domain/MeasuredRain.kt`), trusted in this order: a gauge that rose within the last hour (rain,
+  at the rate it rose); a gauge that has not moved (`StationDry`, dry); a radar frame under 20 min
+  old with rain at the place (rain, at its Marshall–Palmer rate, snow where RainViewer draws snow).
+  The radar is last because over these mountains it sees precipitation aloft that never reaches
+  the valley, and a false "rain" on a dry afternoon is the more visible mistake. The radar reading
+  is `RadarRepository.latestAt` — the newest frame's one tile — asked by `WeatherStateHolder` every
+  minute (answered from memory until a new frame appears) and by `RefreshWorker` before it decides
+  notifications, so "rain starting" is not sent while it is already raining. The widget builds
+  without it, so its update stays offline.
 - **The word for liquid rain follows the amount** (`Condition.rainFor`, WMO bands: under 2,5 mm/h
   "Leichter Regen", from 7,6 "Starker Regen"). The label used to be the models' plurality while the
   amount is their mean, and on 2026-09-16 the strip read "Leichter Regen" over 3,3 mm beside "Regen"

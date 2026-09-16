@@ -115,7 +115,7 @@ class CompareViewModelTest {
         val holder = WeatherStateHolder(
             weatherRepository,
             settings, PlaceCatalogue(context), WarningDismissals(context),
-            ConsensusBlender(SouthTyrol.ZONE), clock, scope,
+            ConsensusBlender(SouthTyrol.ZONE), clock, scope, radar = { _, _ -> null },
         )
         val metaApi = FakeMetaApi()
         val metaRepository = SourceMetaRepository(metaApi, clock)

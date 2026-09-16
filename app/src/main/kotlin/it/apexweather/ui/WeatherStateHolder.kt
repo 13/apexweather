@@ -2,12 +2,15 @@ package it.apexweather.ui
 
 import it.apexweather.data.AppSettings
 import it.apexweather.data.PlaceCatalogue
+import it.apexweather.data.RadarNowSource
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WarningDismissals
 import it.apexweather.data.WeatherRepository
+import it.apexweather.data.runCatchingCancellable
 import it.apexweather.di.ApplicationScope
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.Place
+import it.apexweather.domain.RadarNow
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.ConsensusForecast
 import it.apexweather.domain.model.WeatherSnapshot
@@ -27,6 +30,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import java.time.Clock
 import java.time.Instant
@@ -65,6 +69,7 @@ class WeatherStateHolder @Inject constructor(
     blender: ConsensusBlender,
     private val clock: Clock,
     @ApplicationScope scope: CoroutineScope,
+    private val radar: RadarNowSource,
 ) {
     /** Identity matters: `awaitCached` tells a real emission from this by reference. */
     private val initial = WeatherState()
@@ -119,9 +124,23 @@ class WeatherStateHolder @Inject constructor(
      */
     suspend fun awaitCached(): WeatherState = weather.first { it !== initial }
 
+    /**
+     * The newest radar frame at the chosen place, asked every minute and answered from memory
+     * except when RainViewer has a new frame — one tile every ten minutes. It feeds the current
+     * hour only; see MeasuredRain. A failure is no reading, never a dry one.
+     */
+    private val radarNow: Flow<RadarNow?> = place
+        .flatMapLatest { p ->
+            minuteTick.map { runCatchingCancellable { radar.latestAt(p.lat, p.lon) }.getOrNull() }
+                .onStart { emit(null) }
+        }
+        .distinctUntilChanged()
+
     /** The home screen's state, built once and shared with the sky behind every tab. */
     val home: StateFlow<HomeUiState> =
-        weather.map { HomeStateBuilder.build(it.place, it.snapshot, it.settings, it.consensus, it.now, it.dismissedWarnings) }
+        combine(weather, radarNow) { it, radarNow ->
+            HomeStateBuilder.build(it.place, it.snapshot, it.settings, it.consensus, it.now, it.dismissedWarnings, radarNow)
+        }
             .flowOn(Dispatchers.Default)
             .stateIn(scope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 }

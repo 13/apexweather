@@ -411,6 +411,37 @@ class HomeStateBuilderTest {
     }
 
     /**
+     * The other direction: every model dry, and the radar has rain over the place. With no gauge
+     * reading to say otherwise, the current hour is rain at the radar's rate, and only that hour.
+     */
+    @Test
+    fun `a radar echo at the place overrules a current hour voted dry`() {
+        val t0 = hour(0)
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 15.0, condition = Condition.CLOUDY), point(1, 15.0, condition = Condition.CLOUDY))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 15.0, condition = Condition.CLOUDY), point(1, 15.0, condition = Condition.CLOUDY))),
+        )
+        val consensus = ConsensusBlender().blend(f)
+        val radar = it.apexweather.domain.RadarNow(t0.minusSeconds(600), it.apexweather.domain.RadarReading(35))
+        val state = HomeStateBuilder.build(DORF_TIROL, WeatherSnapshot.EMPTY.copy(forecasts = f), AppSettings(), consensus, t0, radar = radar)
+        val rate = it.apexweather.domain.RadarAtPlace.rateOf(35)
+        assertEquals(Condition.rainFor(rate), state.heroCondition)
+        assertEquals(rate, state.upcomingHours.first().precipMm, 1e-9)
+        assertEquals(ParticleKind.RAIN, state.palette.particle)
+        assertEquals("only this hour", Condition.CLOUDY, state.upcomingHours[1].condition)
+
+        // A gauge that has not moved all day outranks the echo.
+        val dry = WeatherSnapshot.EMPTY.copy(
+            forecasts = f,
+            observation = StationObservation(
+                stationName = "Meran", time = t0.minusSeconds(600), tempC = 15.0, humidityPct = 60,
+                windKmh = null, windDir = null, gustKmh = null, precipTodayMm = 0.0, pressureHpa = null,
+            ),
+        )
+        assertEquals(Condition.CLOUDY, HomeStateBuilder.build(DORF_TIROL, dry, AppSettings(), consensus, t0, radar = radar).heroCondition)
+    }
+
+    /**
      * A dry station leaves the vote exactly as the models cast it — and a lone voice inside one
      * family is still a lone voice.
      *
