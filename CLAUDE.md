@@ -818,8 +818,10 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   the chance is shown separately, and that is where an unlikely shower belongs. The chance itself is
   the mean for the same reason, and because averaging is what a probability across equally good models
   *means*: it used to be the **maximum**, which let the single most alarmist of ten models set the
-  figure on the screen on its own. The quarter-hourly series still uses the median, because it answers
-  *when* rather than *how much*.
+  figure on the screen on its own. The quarter-hourly series is the mean too. It was the median, on
+  the grounds that it answers *when* rather than *how much*, and that made the two disagree about
+  when: on 2026-09-16 in Meran one or two of six models were wet from 15:15, the strip showed
+  millimetres from 16:00, and the median held the hero's "Niederschlag ab" at 19:45.
 - **The station measures the sky, not only the air, and `StationSun` is where that is used.** On
   2026-09-11 at 13:00 the app led with "Bedeckt" over Dorf Tirol while the sun was out of a nearly
   clear sky — and it was not wrong about its sources: ICON-CH1, ICON-D2 and DMI HARMONIE all called

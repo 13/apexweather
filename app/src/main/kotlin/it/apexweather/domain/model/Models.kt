@@ -520,7 +520,7 @@ data class ConsensusDay(
     val sunset: Instant?,
 )
 
-/** Quarter-hourly precipitation, blended the same way as everything else: the median of the models. */
+/** Quarter-hourly precipitation: the weighted mean of the models, as the hourly amount is. */
 data class ConsensusMinute(val time: Instant, val precipMm: Double, val sourceCount: Int)
 
 data class ConsensusForecast(

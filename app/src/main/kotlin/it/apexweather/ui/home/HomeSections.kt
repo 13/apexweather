@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,7 +45,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -119,7 +119,27 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
                 )
             },
         )
-        Text(state.heroCondition.label(), style = MaterialTheme.typography.headlineMedium, color = Color.White)
+        // The rain line is weather rather than provenance and the one worth reading first, so it
+        // shares the condition's line, on the right under the icon, sitting on the word's baseline.
+        // Where the two do not fit side by side — a long condition, a large text size — the rain
+        // line wraps to a line of its own rather than squeezing the condition.
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                state.heroCondition.label(),
+                style = MaterialTheme.typography.headlineMedium, color = Color.White,
+                modifier = Modifier.alignByBaseline(),
+            )
+            state.minutelyStart?.let {
+                Text(
+                    stringResource(R.string.rain_starts_at, Format.time(it, SouthTyrol.ZONE, formats)),
+                    style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.alignByBaseline().padding(start = 12.dp).testTag("rain_starts_at"),
+                )
+            }
+        }
         Spacer(Modifier.height(6.dp))
         val sourceCount = state.currentHour?.sourceCount ?: 0
         // A moved reading has to say it was moved, and by how much: it is still a measurement, but
@@ -136,19 +156,8 @@ fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces:
                 ?: stringResource(R.string.now_from_station, obs.stationName, at)
         } ?: pluralStringResource(R.plurals.now_from_consensus, sourceCount, sourceCount)
 
-        // The rain line is weather rather than provenance and the one worth reading first, so it
-        // keeps the right edge under the icon. Where the number came from and when it was fetched
-        // sit on the left as two plain lines: the hero carries no feels-like reading and no spread
-        // badge, so nothing competes with them for the width.
-        state.minutelyStart?.let {
-            Text(
-                stringResource(R.string.rain_starts_at, Format.time(it, SouthTyrol.ZONE, formats)),
-                style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f),
-                textAlign = TextAlign.End,
-                modifier = Modifier.fillMaxWidth().testTag("rain_starts_at"),
-            )
-            Spacer(Modifier.height(4.dp))
-        }
+        // Where the number came from and when it was fetched sit on the left as two plain lines: the
+        // hero carries no feels-like reading and no spread badge, so nothing competes with them.
         HeroQuiet(state, formats, source)
     }
 }

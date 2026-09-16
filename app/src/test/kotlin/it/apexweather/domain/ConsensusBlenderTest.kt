@@ -288,16 +288,30 @@ class ConsensusBlenderTest {
     }
 
     @Test
-    fun `the quarter-hourly series is the median of the models that publish one`() {
+    fun `the quarter-hourly series is the weighted mean of the models that publish one`() {
         val f = mapOf(
             Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.0, 1.0)),
-            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.4, 2.0)),
-            Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.2, 3.0)),
+            Source.KNMI_HARMONIE to forecast(Source.KNMI_HARMONIE, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.4, 2.0)),
+            Source.ECMWF_AIFS to forecast(Source.ECMWF_AIFS, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.2, 3.0)),
         )
         val minutely = blender.blend(f).minutely
         assertEquals(3, minutely.size)
         assertEquals(0.2, minutely[1].precipMm, 1e-9)
         assertEquals(3, minutely[1].sourceCount)
+    }
+
+    /**
+     * Meran, 2026-09-16: from 15:15 one or two of six regional models were wet and the rest dry, so
+     * the median stayed at zero until 19:45 and the hero said "ab 19:45" over a strip already
+     * showing millimetres at 16:00. The start is read off the same kind of average as the strip.
+     */
+    @Test
+    fun `one wet model among dry ones starts the precipitation as the hourly amount does`() {
+        val dry = minutes(0.0, 0.0, 0.0, 0.0)
+        val f = listOf(Source.ICON_CH1, Source.ICON_CH2, Source.ICON_2I, Source.ICON_D2, Source.KNMI_HARMONIE)
+            .associateWith { forecast(it, listOf(point(0, 10.0))).copy(minutely = dry) } +
+            (Source.DMI_HARMONIE to forecast(Source.DMI_HARMONIE, listOf(point(0, 10.0))).copy(minutely = minutes(0.0, 0.7, 0.7, 0.7)))
+        assertEquals(T0.plusSeconds(900L), blender.blend(f).precipitationStartsAt(T0))
     }
 
     /** A model with no quarter-hourly series simply does not vote; it must not count as a dry zero. */

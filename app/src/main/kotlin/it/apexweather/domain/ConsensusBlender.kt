@@ -117,16 +117,21 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
     }
 
     /**
-     * The quarter-hourly series, median across whichever models published one. Only the regional
-     * models do, so this is a smaller consensus than the hourly one — and an honest one, rather than
-     * a wide one padded with globals interpolating their own hourly values.
+     * The quarter-hourly series, the weighted mean across whichever models published one. Only the
+     * regional models do, so this is a smaller consensus than the hourly one — and an honest one,
+     * rather than a wide one padded with globals interpolating their own hourly values.
+     *
+     * The mean, like the hourly amount, and for the same reason: precipitation is zero-inflated, so
+     * a median stays at zero until half the models are wet. It was the median, and on 2026-09-16 in
+     * Meran that put "Niederschlag ab 19:45" over a strip showing millimetres from 16:00 — one or
+     * two of six models had showers from 15:15 and the median threw them away.
      */
     private fun blendMinutely(forecasts: Map<Source, SourceForecast>): List<ConsensusMinute> {
-        val byTime = sortedMapOf<Instant, MutableList<Double>>()
-        forecasts.values.forEach { f ->
-            f.minutely.forEach { p -> byTime.getOrPut(p.time) { mutableListOf() }.add(p.precipMm) }
+        val byTime = sortedMapOf<Instant, MutableMap<Source, Double>>()
+        forecasts.forEach { (source, f) ->
+            f.minutely.forEach { p -> byTime.getOrPut(p.time) { mutableMapOf() }[source] = p.precipMm }
         }
-        return byTime.map { (time, values) -> ConsensusMinute(time, median(values), values.size) }
+        return byTime.map { (time, values) -> ConsensusMinute(time, weightedMean(values), values.size) }
     }
 
     /**
