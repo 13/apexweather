@@ -135,12 +135,22 @@ object EnsembleMapper {
     private const val PRECIP_PREFIX = "precipitation_member"
 
     /** The millimetres in an hour at which a member counts as wet; the app's own threshold. */
-    private const val MEMBER_WET_MM = 0.1
+    const val MEMBER_WET_MM = 0.1
+
+    /**
+     * ECMWF's, higher, because Open-Meteo serves that model three-hourly and spreads each total
+     * evenly over its hours: a member with a short shower paints three hours wet. Scored against a
+     * year of Meran's gauge (Open Data Hub, 2025-09-01 to 2026-09-16, 9 124 hours, deterministic
+     * runs of both models a day ahead, since no ensemble archive exists): ICON-D2 alone Brier 0,063,
+     * the 50/50 mean at 0,1 mm 0,071, the mean with ECMWF at 0,5 mm 0,050 — better in each half of
+     * the year. Tuned on the same data, so a judgement with evidence, not a calibration.
+     */
+    const val ECMWF_MEMBER_WET_MM = 0.5
 
     /** Fewer members than this reaching an hour and it is not an ensemble, it is a couple of runs. */
     private const val MIN_MEMBERS = 5
 
-    fun map(resp: EnsembleResponse, fetchedAt: Instant): EnsembleSpread {
+    fun map(resp: EnsembleResponse, fetchedAt: Instant, memberWetMm: Double = MEMBER_WET_MM): EnsembleSpread {
         val times = resp.hourly.strings("time").map { parseLocal(it!!, SouthTyrol.ZONE) }
         fun members(prefix: String) =
             resp.hourly.keys.filter { it.startsWith(prefix) }.sorted().map { resp.hourly.doubles(it) }
@@ -162,7 +172,7 @@ object EnsembleMapper {
         val wet = times.indices.mapNotNull { i ->
             val values = precip.mapNotNull { it.getOrNull(i) }
             if (values.size < MIN_MEMBERS) return@mapNotNull null
-            times[i].epochSecond to values.count { it >= MEMBER_WET_MM }.toDouble() / values.size
+            times[i].epochSecond to values.count { it >= memberWetMm }.toDouble() / values.size
         }.toMap()
 
         return EnsembleSpread(fetchedAt, temps.size, byHour, wet)

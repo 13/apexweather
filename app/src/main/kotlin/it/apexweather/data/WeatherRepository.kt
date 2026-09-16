@@ -444,6 +444,7 @@ class WeatherRepository @Inject constructor(
                                 models = EnsembleApi.ECMWF_ENS, forecastDays = EnsembleApi.ECMWF_ENS_DAYS,
                             ),
                             now,
+                            memberWetMm = EnsembleMapper.ECMWF_MEMBER_WET_MM,
                         )
                     }
                     val sp = EnsembleSpread.combine(near, far)

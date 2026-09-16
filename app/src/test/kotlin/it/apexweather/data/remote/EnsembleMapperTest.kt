@@ -132,6 +132,26 @@ class EnsembleMapperTest {
         }
     }
 
+    /**
+     * ECMWF's members count as wet only from half a millimetre an hour.
+     *
+     * Open-Meteo serves ECMWF three-hourly and spreads each total over its three hours, so a
+     * member drizzling for twenty minutes paints three whole hours wet. Scored against a year of
+     * Meran's gauge (2025-09 to 2026-09, deterministic runs of the same two models at a day ahead):
+     * the plain 50/50 mean had a Brier score of 0,071 against ICON-D2 alone at 0,063; with ECMWF
+     * wet only from 0,5 mm/h the mean scored 0,050, and did so in each half of the year.
+     */
+    @Test
+    fun `a heavier threshold counts fewer members wet`() {
+        val resp = Fixtures.json.decodeFromString(EnsembleResponse.serializer(), Fixtures.read("openmeteo_ensemble_ecmwf.json"))
+        val light = EnsembleMapper.map(resp, fetchedAt)
+        val heavy = EnsembleMapper.map(resp, fetchedAt, memberWetMm = EnsembleMapper.ECMWF_MEMBER_WET_MM)
+        assertEquals(light.wetShareByEpochSecond.keys, heavy.wetShareByEpochSecond.keys)
+        heavy.wetShareByEpochSecond.forEach { (t, share) -> assertTrue(share <= light.wetShareByEpochSecond.getValue(t)) }
+        assertTrue("the recorded run has members between the two thresholds",
+            heavy.wetShareByEpochSecond.values.sum() < light.wetShareByEpochSecond.values.sum())
+    }
+
     /** An hour the ensemble does not reach has no share at all, rather than a share of zero. */
     @Test
     fun `an hour beyond the run is absent rather than dry`() {

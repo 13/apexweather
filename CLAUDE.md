@@ -195,6 +195,14 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   wrong: on 2026-09-16 over Dorf Tirol 15 % of ICON-D2's members were wet at 19:00 against 100 % of
   ECMWF's, ten of eleven deterministic models were raining and the province's KMOS said 65 %, and
   the strip printed 16 % under 2,3 mm. Pooled it read 61 %, and 67 % at 21:00 against KMOS's 65 %.
+  **ECMWF's members count as wet only from 0,5 mm/h** (`EnsembleMapper.ECMWF_MEMBER_WET_MM`):
+  Open-Meteo serves ECMWF three-hourly and spreads each total over its hours, so a short shower
+  paints three hours wet. Scored over a year of Meran's gauge with deterministic runs of both
+  models a day ahead (no ensemble archive exists): ICON-D2 alone Brier 0,063, the plain mean 0,071
+  — worse — and the mean with ECMWF at 0,5 mm 0,050, better in each half of the year. Tuned on the
+  data it was scored on. Scripts: the session's `score_a_proxy.py`, not kept in the repo.
+  `StationDry` was replayed over the same year: 0,3–1 % of its dry calls were wrong, mostly rain
+  starting later in the hour, which no humidity threshold fixes.
   `NotificationDecider.RAIN_MIN_PROB` was **re-examined rather than inherited** — it stays at 30,
   which now reads literally as three atmospheres in ten and is better founded than the average of
   opinions it used to bound.
@@ -355,11 +363,16 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   calibration without the axes needs about a month to get ~25 samples a bin across five bins, for a
   recalibration of a number that is already the mean of eleven models. Not built; the arithmetic is
   here so the next person does not have to redo it.
-- **The station archive that would make that cheap does not exist.** The SIAG station endpoint
-  serves current readings only (`/api/v2/station/<code>` is 404), and Open Data Hub's `MeteoStation`
-  dataset is daily totals from HISTALP and Trentino with timestamps in 2009 and 2015 — not a live
-  South Tyrolean hourly series. Same shape as the temperature case, which is why `station_history`
-  exists at all: the app has to write down what it saw, because nobody else publishes it.
+- **A station archive does exist, and this bullet said otherwise until 2026-09-16.** Open Data
+  Hub's *mobility* API serves the province's stations at five minutes:
+  `https://mobility.api.opendatahub.com/v2/flat/MeteoStation/precipitation/<from>/<to>?where=scode.eq."23200MS"`
+  (also `air-humidity`, and the other sensors), in real UTC, 0,1 mm resolution, anonymous requests
+  limited to five days each. A year for Meran (2025-09-01 to 2026-09-16) has 44 missing slots of
+  109 645 and 630 mm. What does *not* exist is the other half — what each model said beforehand —
+  so `station_history` is still the only place the app's own forecasts are kept; but a rule about
+  the station alone (like `StationDry`) can be replayed over a year, and was. That year's gauge is
+  wet in **6,0 %** of hours at 0,1 mm, not the 17,4 % above, which came from a different series
+  and has not been reconciled.
 - `notify/` is the notification feature and is self-contained the way `update/` is.
   `NotificationDecider` is pure and holds every rule (morning summary once a day within four hours of
   its hour, rain starting within three hours and not already falling, each warning once);
