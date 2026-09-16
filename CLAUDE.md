@@ -874,6 +874,16 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   twilight) and the earlier of (terrain sunset, astronomical − twilight) — and with no ridge it is
   *exactly* the old rule, which `SunPhaseTest` pins, because a change that moved the colours of an
   open plain would be a bug rather than this feature. A profile of the wrong length is ignored
+- **The rain gauge outranks the models about the current hour** (`domain/StationDry.kt`). On
+  2026-09-16 at 18:56 Meran's screen said "Gewitter" with rain falling across the sky while the
+  station read 0,0 mm since midnight at 49 %. The gauge publishes a total since midnight, so dry
+  means nothing fallen today, or the total not risen since the reading before —
+  `StationObservation.previousPrecipTodayMm`/`previousTime`, carried across refreshes by
+  `StationDry.withPrevious` in the repository. Only a reading under 30 min old and under 90 %
+  humidity counts (drizzle can fall without tipping the bucket). `HomeStateBuilder` then zeroes
+  that hour's amount and re-votes it with `measuredDry`, which takes the dry branch even when every
+  label is wet: the cloud median, else overcast. The current hour only; the chance is left as the
+  models gave it.
   (`Horizon.usable`), so a catalogue written before this falls back to the flat horizon everywhere.
   `Place.horizon` and `NearbyStation.horizon` are separate because a thermometer 264 m down on the
   valley floor has a different skyline from the village reading it.

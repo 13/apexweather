@@ -453,6 +453,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             precipMm = precipMm,
             stationSaturated = stationSaturated,
             cloudPct = cloudPct.mapIndexed { i, c -> i to c }.toMap(),
+            measuredDry = false,
         )
 
         /**
@@ -468,12 +469,14 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             precipMm: Double,
             stationSaturated: Boolean = false,
             cloudPct: Map<Source, Int> = emptyMap(),
+            measuredDry: Boolean = false,
         ): Condition = voteCondition(
             conditions = conditions,
             weightOf = weights(conditions.keys)::getValue,
             precipMm = precipMm,
             stationSaturated = stationSaturated,
             cloudPct = cloudPct,
+            measuredDry = measuredDry,
         )
 
         private fun <K> voteCondition(
@@ -482,6 +485,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             precipMm: Double,
             stationSaturated: Boolean,
             cloudPct: Map<K, Int>,
+            measuredDry: Boolean,
         ): Condition {
             if (conditions.isEmpty()) return Condition.CLOUDY
             fun weight(of: Map<K, Condition>) = of.keys.sumOf(weightOf)
@@ -495,7 +499,10 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             val fogWins = fog > 0 && precipMm <= FOG_LOSES_ABOVE_MM &&
                 (stationSaturated || fog * WET_SHARE_DENOMINATOR >= total)
             if (fogWins) return Condition.FOG
-            if (precipMm < WET_MIN_MM && dry.isNotEmpty()) {
+            // A rain gauge that has not moved is a dry hour even when every label is wet — see
+            // StationDry — so the sky is then read off the cloud, or failing that called overcast:
+            // a sky every model filled with rain is not a clear one.
+            if (precipMm < WET_MIN_MM && (dry.isNotEmpty() || measuredDry)) {
                 // The **median of the cloud the models publish**, not a plurality over the words
                 // they put on it. Four ordered labels voted on as if they were four unrelated
                 // categories throws away how cloudy each model actually said, and the tie-break
@@ -510,7 +517,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
                 if (cloudPct.size >= MIN_CLOUD_SOURCES) {
                     return fromCloudCover(weightedMedianBy(cloudPct.mapValues { it.value.toDouble() }, weightOf))
                 }
-                return plurality(dry, weightOf)
+                return if (dry.isEmpty()) Condition.CLOUDY else plurality(dry, weightOf)
             }
             // The mildest wet answer the models actually gave, not the worst: a third of them
             // saying so is reason to call it drizzle, not reason to promise heavy rain.

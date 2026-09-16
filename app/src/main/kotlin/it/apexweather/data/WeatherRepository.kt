@@ -3,6 +3,7 @@ package it.apexweather.data
 import android.util.Log
 import it.apexweather.data.local.BulletinEntity
 import it.apexweather.data.local.ObservationEntity
+import it.apexweather.domain.StationDry
 import it.apexweather.data.local.RefreshMetaEntity
 import it.apexweather.data.local.SourceForecastEntity
 import it.apexweather.data.local.EnsembleEntity
@@ -368,8 +369,12 @@ class WeatherRepository @Inject constructor(
                             SiagMappers.mapObservation(siag.stations(), station) ?: error("station ${station.code} not in response")
                         }
                         val prev = dao.observationOnce(place.istat)
+                        val carried = o?.let {
+                            val cached = prev?.json?.let { j -> runCatching { json.decodeFromString(StationObservation.serializer(), j) }.getOrNull() }
+                            StationDry.withPrevious(it, cached)
+                        }
                         dao.upsertObservation(
-                            if (o != null) ObservationEntity(place.istat, json.encodeToString(StationObservation.serializer(), o), now.toEpochMilli(), null, null)
+                            if (carried != null) ObservationEntity(place.istat, json.encodeToString(StationObservation.serializer(), carried), now.toEpochMilli(), null, null)
                             else ObservationEntity(place.istat, prev?.json, prev?.fetchedAtMs, failed["SIAG_STATION"], now.toEpochMilli())
                         )
                     }

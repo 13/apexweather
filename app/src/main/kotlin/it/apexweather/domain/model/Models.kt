@@ -342,6 +342,13 @@ data class StationObservation(
      * answers "has it actually been a nice day" better than any hourly icon can.
      */
     val sunshineTodayMinutes: Int? = null,
+    /**
+     * [precipTodayMm] as the reading before this one had it, and when that was — carried across
+     * refreshes by the repository so [it.apexweather.domain.StationDry] can tell whether the total
+     * rose. Null on a first fetch.
+     */
+    val previousPrecipTodayMm: Double? = null,
+    @Serializable(with = InstantSerializer::class) val previousTime: Instant? = null,
 )
 
 sealed interface SourceStatus {

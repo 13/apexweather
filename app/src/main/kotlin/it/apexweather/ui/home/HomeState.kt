@@ -12,6 +12,7 @@ import it.apexweather.domain.DailyAggregator
 import it.apexweather.domain.Horizon
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.StationDownscale
+import it.apexweather.domain.StationDry
 import it.apexweather.domain.StationFog
 import it.apexweather.domain.StationSun
 import it.apexweather.domain.model.Bulletin
@@ -189,7 +190,11 @@ object HomeStateBuilder {
         // A saturated station is the only ground truth this app has about the sky, and it applies to
         // this hour alone — which is why the hour is re-voted here rather than in the blender, where
         // it would colour all forty-eight. It cannot invent fog: something has to have forecast it.
-        val current = rawCurrent?.let { h ->
+        val current = rawCurrent?.let { wet ->
+            // The rain gauge outranks the models about this minute: a total that has not risen is
+            // no rain now, whatever the hour was forecast to bring. See StationDry.
+            val measuredDry = StationDry.isDry(snapshot.observation, now)
+            val h = if (measuredDry && wet.precipMm > 0.0) wet.copy(precipMm = 0.0) else wet
             val voted = if (StationFog.impliesFog(snapshot.observation, now, h)) {
                 Condition.FOG
             } else {
@@ -202,6 +207,7 @@ object HomeStateBuilder {
                     h.precipMm,
                     stationSaturated = StationFog.saturated(snapshot.observation, now),
                     cloudPct = h.perSource.mapNotNull { (s, p) -> p.cloudPct?.let { s to it } }.toMap(),
+                    measuredDry = measuredDry,
                 )
             }
             // And then held to what the sunlight actually arriving allows. This runs last because
@@ -213,7 +219,7 @@ object HomeStateBuilder {
                 // is asked, and in this province it is usually much lower and much more hemmed in.
                 place?.station?.let { st -> StationSun.corrected(voted, obs, st.lat, st.lon, now, h, st.horizon) }
             } ?: voted
-            if (revoted == h.condition) h else h.copy(condition = revoted)
+            if (revoted == h.condition && h === wet) wet else h.copy(condition = revoted)
         }
         // The hero and the strip's first column both answer to the word "Jetzt", so they have to be
         // the same weather. The re-vote above gave that hour its condition; this gives it its

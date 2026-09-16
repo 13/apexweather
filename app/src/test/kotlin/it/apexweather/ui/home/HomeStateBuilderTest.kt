@@ -46,7 +46,9 @@ class HomeStateBuilderTest {
 
     private fun observation(temp: Double) = StationObservation(
         "Meran", hour(3), tempC = temp, humidityPct = 40, windKmh = 5.0, windDir = "W",
-        gustKmh = null, precipTodayMm = 0.0, pressureHpa = 1010.0,
+        // No gauge reading: these tests are about temperature, and a dry gauge would re-vote the
+        // fixture's rain hours (see StationDry).
+        gustKmh = null, precipTodayMm = null, pressureHpa = 1010.0,
     )
 
     /** The models' view from down at the station, warmer than the village by [warmerBy]. */
@@ -371,6 +373,41 @@ class HomeStateBuilderTest {
         assertEquals(Condition.PARTLY_CLOUDY, HomeStateBuilder.build(DORF_TIROL, shaded, AppSettings(), consensus, t0).heroCondition)
         val blind = sunny.copy(observation = sunny.observation!!.copy(radiationWm2 = null))
         assertEquals(Condition.PARTLY_CLOUDY, HomeStateBuilder.build(DORF_TIROL, blind, AppSettings(), consensus, t0).heroCondition)
+    }
+
+    /**
+     * Meran, 2026-09-16 at 18:56: "Gewitter" on the screen and rain falling across the sky, while
+     * the station read 0,0 mm since midnight at 49 %. The gauge outranks the models about this
+     * minute, and the strip's first column is the same hour.
+     */
+    @Test
+    fun `a dry rain gauge overrules a current hour voted wet`() {
+        val t0 = hour(0)
+        fun storm(cloud: Int) = point(0, 25.0, precip = 1.2, prob = 50, condition = Condition.THUNDERSTORM).copy(cloudPct = cloud)
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(storm(60), point(1, 23.0, precip = 1.3, condition = Condition.RAIN))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(storm(70), point(1, 23.0, precip = 1.3, condition = Condition.RAIN))),
+            Source.KNMI_HARMONIE to forecast(Source.KNMI_HARMONIE, listOf(storm(80), point(1, 23.0, precip = 1.3, condition = Condition.RAIN))),
+        )
+        val consensus = ConsensusBlender().blend(f)
+        assertEquals(Condition.THUNDERSTORM, consensus.hourly.first().condition)
+        val dry = WeatherSnapshot.EMPTY.copy(
+            forecasts = f,
+            observation = StationObservation(
+                stationName = "Meran", time = t0.minusSeconds(16 * 60), tempC = 25.9, humidityPct = 49,
+                windKmh = 20.9, windDir = "SW", gustKmh = 49.3, precipTodayMm = 0.0, pressureHpa = 1009.6,
+            ),
+        )
+        val state = HomeStateBuilder.build(DORF_TIROL, dry, AppSettings(), consensus, t0)
+        assertFalse(state.heroCondition.isPrecipitation)
+        assertEquals(state.heroCondition, state.upcomingHours.first().condition)
+        assertEquals(0.0, state.upcomingHours.first().precipMm, 0.0)
+        assertTrue(state.palette.particle != ParticleKind.RAIN)
+        assertEquals("only this hour", Condition.RAIN, state.upcomingHours[1].condition)
+
+        // A gauge that has been rising is no evidence of a dry minute.
+        val wet = dry.copy(observation = dry.observation!!.copy(precipTodayMm = 3.0))
+        assertEquals(Condition.THUNDERSTORM, HomeStateBuilder.build(DORF_TIROL, wet, AppSettings(), consensus, t0).heroCondition)
     }
 
     /**
