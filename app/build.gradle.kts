@@ -196,6 +196,13 @@ dependencies {
     // The map tab. Same library Apex Maps uses, and the only one that draws OpenStreetMap tiles
     // without an API key. Its cache and user agent are configured in MapScreen.
     implementation(libs.osmdroid)
+    // Reads GeoSphere's region-wide rain forecast, which is NetCDF 4 (HDF5): 162 kB where the same
+    // grid as GeoJSON is 4,4 MB. Pure Java. lz4-java is left out: it ships native libraries, and
+    // GeoSphere's files are deflate only (see proguard-rules.pro). compress-lzf stays, because
+    // jhdf's filter registry cannot even load without its exception class.
+    implementation(libs.jhdf) {
+        exclude(group = "at.yawk.lz4", module = "lz4-java")
+    }
     implementation(libs.coil.compose)
     implementation(libs.coil.okhttp)
 

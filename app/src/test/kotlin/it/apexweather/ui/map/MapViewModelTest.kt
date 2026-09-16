@@ -20,7 +20,8 @@ import it.apexweather.data.WarningDismissals
 import it.apexweather.data.WeatherRepository
 import it.apexweather.data.local.AppDatabase
 import it.apexweather.data.local.HistoryDatabase
-import it.apexweather.data.remote.NowcastApi
+import it.apexweather.data.NowcastSource
+import it.apexweather.data.remote.PrecipNowcast
 import it.apexweather.data.remote.NowcastResponse
 import it.apexweather.data.remote.RainViewerApi
 import it.apexweather.data.remote.RainViewerFrame
@@ -108,18 +109,18 @@ class MapViewModelTest {
     }
 
     /** No forecast: this is a test about the loop, and one source of frames is enough to drive it. */
-    private class NoNowcast : NowcastApi {
+    private class NoNowcast : NowcastSource {
         /** Set to model GeoSphere's slow INCA answer: 383 kB uncompressed, 4,4 s on the phone. */
         var delayMs: Long = 0
         var calls = 0
-        override suspend fun precipitation(bbox: String, parameters: String, outputFormat: String): NowcastResponse {
+        override suspend fun nowcast(): PrecipNowcast {
             calls++
             if (delayMs > 0) delay(delayMs)
-            return NowcastResponse()
+            return PrecipNowcast.EMPTY
         }
-        override suspend fun outlook(bbox: String, end: String, parameters: String, outputFormat: String): NowcastResponse {
+        override suspend fun outlook(end: String): PrecipNowcast {
             if (delayMs > 0) delay(delayMs)
-            return NowcastResponse()
+            return PrecipNowcast.EMPTY
         }
     }
 

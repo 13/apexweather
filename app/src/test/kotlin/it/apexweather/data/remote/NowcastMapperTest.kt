@@ -64,6 +64,24 @@ class NowcastMapperTest {
         }
     }
 
+    /**
+     * The grid's own extent, dry points included, so the overlay can fade the forecast out at the
+     * edge of what was asked for rather than stop it at a straight line — and never fade a real
+     * edge of the rain, which is what the extent of the wet cells alone would do.
+     */
+    @Test
+    fun `each step carries the extent of the whole grid, dry points included`() {
+        val points = Fixtures.json.decodeFromString(NowcastResponse.serializer(), Fixtures.read("geosphere_nowcast.json"))
+            .features.map { it.geometry.coordinates }
+        val expected = NowcastExtent(
+            south = points.minOf { it[1] }, west = points.minOf { it[0] },
+            north = points.maxOf { it[1] }, east = points.maxOf { it[0] },
+        )
+        nowcast.steps.forEach { assertEquals(expected, it.extent) }
+        val wet = nowcast.steps.flatMap { it.cells }
+        assertTrue("the wet cells alone span less", wet.minOf { it.lat } > expected.south || wet.maxOf { it.lat } < expected.north)
+    }
+
     private val outlook = NowcastMapper.mapOutlook(
         Fixtures.json.decodeFromString(NowcastResponse.serializer(), Fixtures.read("geosphere_outlook.json")),
         after = null,
@@ -120,15 +138,17 @@ class NowcastMapperTest {
         assertEquals(PrecipNowcast.EMPTY, NowcastMapper.map(NowcastResponse()))
     }
 
-    /** The box is drawn around the place, which is what makes this affordable at all. */
+    /** The forecast is asked for the province and a margin, as the radar shows it. */
     @Test
-    fun `the box is centred on the place`() {
-        val box = NowcastApi.boxAround(it.apexweather.domain.DORF_TIROL)
-        val (south, west, north, east) = box.split(",").map { part -> part.toDouble() }
-        assertEquals(it.apexweather.domain.DORF_TIROL.lat, (south + north) / 2, 1e-3)
-        assertEquals(it.apexweather.domain.DORF_TIROL.lon, (west + east) / 2, 1e-3)
-        assertTrue("the box must be south,west,north,east", south < north && west < east)
+    fun `the box is the province and a margin`() {
+        val (south, west, north, east) = NowcastApi.PROVINCE_BOX.split(",").map { part -> part.toDouble() }
+        val m = NowcastApi.MARGIN_DEG
+        assertEquals(it.apexweather.domain.SouthTyrol.SOUTH - m, south, 1e-9)
+        assertEquals(it.apexweather.domain.SouthTyrol.WEST - m, west, 1e-9)
+        assertEquals(it.apexweather.domain.SouthTyrol.NORTH + m, north, 1e-9)
+        assertEquals(it.apexweather.domain.SouthTyrol.EAST + m, east, 1e-9)
     }
+
     /**
      * The two halves are drawn at different sizes on the map, so a step has to say which it is —
      * INCA's grid is a kilometre and AROME's two and a half, and cells drawn at the wrong width

@@ -1,12 +1,11 @@
 package it.apexweather.data
 
-import it.apexweather.data.remote.NowcastApi
+import it.apexweather.data.remote.NowcastMapper
 import it.apexweather.data.remote.NowcastFeature
 import it.apexweather.data.remote.NowcastGeometry
 import it.apexweather.data.remote.NowcastParameter
 import it.apexweather.data.remote.NowcastProperties
 import it.apexweather.data.remote.NowcastResponse
-import it.apexweather.domain.DORF_TIROL
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -20,7 +19,7 @@ import java.time.Instant
  */
 class NowcastRepositoryTest {
 
-    private class FakeApi : NowcastApi {
+    private class FakeApi : NowcastSource {
         var reference: String = "2026-09-14T05:00+00:00"
         var calls = 0
         var fail = false
@@ -30,24 +29,24 @@ class NowcastRepositoryTest {
 
         /** How long each of the two requests takes to answer. */
         var delayMs: Long = 0
-        override suspend fun precipitation(bbox: String, parameters: String, outputFormat: String): NowcastResponse {
+        override suspend fun nowcast() = run {
             calls++
             if (delayMs > 0) delay(delayMs)
             if (fail) throw IOException("no network")
-            return NowcastResponse(
+            NowcastMapper.map(NowcastResponse(
                 referenceTime = reference,
                 timestamps = listOf(reference.replace(":00+", ":15+")),
                 features = listOf(NowcastFeature(NowcastGeometry(listOf(11.16, 46.69)), NowcastProperties(mapOf("rr" to NowcastParameter("kg m-2", listOf(0.1)))))),
-            )
+            ))
         }
-        override suspend fun outlook(bbox: String, end: String, parameters: String, outputFormat: String): NowcastResponse {
+        override suspend fun outlook(end: String) = run {
             if (delayMs > 0) delay(delayMs)
-            if (!withOutlook) return NowcastResponse()
-            return NowcastResponse(
+            if (!withOutlook) return@run NowcastMapper.map(NowcastResponse())
+            NowcastMapper.mapOutlook(NowcastResponse(
                 referenceTime = "2026-09-14T00:00+00:00",
                 timestamps = listOf("2026-09-14T01:00+00:00"),
                 features = listOf(NowcastFeature(NowcastGeometry(listOf(11.16, 46.69)), NowcastProperties(mapOf("rain_p50" to NowcastParameter("kg m-2", listOf(1.0)))))),
-            )
+            ), after = null)
         }
     }
 
@@ -58,7 +57,7 @@ class NowcastRepositoryTest {
     fun `the nowcast and the outlook are fetched side by side`() = runTest {
         val api = FakeApi().apply { withOutlook = true; delayMs = 1_000 }
         val repo = NowcastRepository(api, MutableClock(t("05:36")))
-        val held = repo.forPlace(DORF_TIROL)
+        val held = repo.current()
         assertEquals("one request waited for the other", 1_000L, testScheduler.currentTime)
         assertEquals(1, held.outlook.size)
     }
@@ -68,15 +67,15 @@ class NowcastRepositoryTest {
         val api = FakeApi()
         val clock = MutableClock(t("05:36"))
         val repo = NowcastRepository(api, clock)
-        repo.forPlace(DORF_TIROL)
+        repo.current()
         assertEquals(1, api.calls)
         // 05:00 + 15 min + 35 min lag = 05:50.
         clock.now = t("05:45")
-        repo.forPlace(DORF_TIROL)
+        repo.current()
         assertEquals("not due yet", 1, api.calls)
         clock.now = t("05:51")
         api.reference = "2026-09-14T05:15+00:00"
-        repo.forPlace(DORF_TIROL)
+        repo.current()
         assertEquals("due", 2, api.calls)
     }
 
@@ -86,14 +85,14 @@ class NowcastRepositoryTest {
         val api = FakeApi()
         val clock = MutableClock(t("05:36"))
         val repo = NowcastRepository(api, clock)
-        repo.forPlace(DORF_TIROL)
+        repo.current()
         clock.now = t("05:52")
-        repo.forPlace(DORF_TIROL) // due, but the service still has 05:00
+        repo.current() // due, but the service still has 05:00
         clock.now = t("05:53")
-        repo.forPlace(DORF_TIROL)
+        repo.current()
         assertEquals(2, api.calls)
         clock.now = t("05:55")
-        repo.forPlace(DORF_TIROL)
+        repo.current()
         assertEquals(3, api.calls)
     }
 
@@ -103,20 +102,20 @@ class NowcastRepositoryTest {
         val api = FakeApi()
         val clock = MutableClock(t("05:20")) // 05:00 run seen after 20 min
         val repo = NowcastRepository(api, clock)
-        repo.forPlace(DORF_TIROL)
+        repo.current()
         clock.now = t("05:36") // 05:00 + 15 + 20 = 05:35, due
-        repo.forPlace(DORF_TIROL)
+        repo.current()
         assertEquals(2, api.calls)
     }
 
+    /** The run covers the province, so there is nothing to ask again when the reader moves. */
     @Test
-    fun `a new place is asked for at once`() = runTest {
+    fun `one run serves every place`() = runTest {
         val api = FakeApi()
-        val clock = MutableClock(t("05:36"))
-        val repo = NowcastRepository(api, clock)
-        repo.forPlace(DORF_TIROL)
-        repo.forPlace(DORF_TIROL.copy(istat = "021008", lat = 46.5, lon = 11.3))
-        assertEquals(2, api.calls)
+        val repo = NowcastRepository(api, MutableClock(t("05:36")))
+        repo.current()
+        repo.current()
+        assertEquals(1, api.calls)
     }
 
     @Test
@@ -124,10 +123,10 @@ class NowcastRepositoryTest {
         val api = FakeApi()
         val clock = MutableClock(t("05:36"))
         val repo = NowcastRepository(api, clock)
-        val held = repo.forPlace(DORF_TIROL)
+        val held = repo.current()
         api.fail = true
         clock.now = t("05:51")
-        assertEquals(held, repo.forPlace(DORF_TIROL))
+        assertEquals(held, repo.current())
     }
 
     /**
@@ -141,12 +140,12 @@ class NowcastRepositoryTest {
         api.reference = "2026-09-14T05:15+00:00"
         val clock = MutableClock(t("05:10"))
         val repo = NowcastRepository(api, clock)
-        repo.forPlace(DORF_TIROL)
+        repo.current()
         assertEquals(1, api.calls)
         // With a floor of 0 the next run is due at 05:15 + 15 + 0 = 05:30. The old code learns
         // -5 min, is due at 05:25, and asks.
         clock.now = t("05:27")
-        repo.forPlace(DORF_TIROL)
+        repo.current()
         assertEquals(1, api.calls)
     }
 
@@ -157,49 +156,49 @@ class NowcastRepositoryTest {
         api.withOutlook = true
         val clock = MutableClock(t("05:36"))
         val repo = NowcastRepository(api, clock)
-        repo.forPlace(DORF_TIROL)
+        repo.current()
         assertEquals(1, api.calls)
 
         clock.now = t("05:51")
         api.fail = true
-        repo.forPlace(DORF_TIROL) // INCA fails, AROME alone still answers: due.
+        repo.current() // INCA fails, AROME alone still answers: due.
         assertEquals(2, api.calls)
 
         clock.now = t("05:53")
-        repo.forPlace(DORF_TIROL) // three-minute floor
+        repo.current() // three-minute floor
         assertEquals(2, api.calls)
 
         clock.now = t("05:54")
         api.fail = false
         api.reference = "2026-09-14T05:15+00:00"
-        repo.forPlace(DORF_TIROL) // due: the held INCA run is still 05:00
+        repo.current() // due: the held INCA run is still 05:00
         assertEquals(3, api.calls)
 
         clock.now = t("06:04")
-        repo.forPlace(DORF_TIROL) // 05:15 + 15 + 35 = 06:05, not due yet
+        repo.current() // 05:15 + 15 + 35 = 06:05, not due yet
         assertEquals(3, api.calls)
 
         clock.now = t("06:06")
-        repo.forPlace(DORF_TIROL)
+        repo.current()
         assertEquals(4, api.calls)
     }
 
     /** Heute needs every AROME hour, including the ones INCA's finer steps already cover in Jetzt. */
     @Test
     fun `the outlook keeps every hour`() = runTest {
-        val api = object : NowcastApi {
-            override suspend fun precipitation(bbox: String, parameters: String, outputFormat: String) = NowcastResponse(
+        val api = object : NowcastSource {
+            override suspend fun nowcast() = NowcastMapper.map(NowcastResponse(
                 referenceTime = "2026-09-14T05:00+00:00",
                 timestamps = listOf("2026-09-14T06:00+00:00"),
                 features = listOf(NowcastFeature(NowcastGeometry(listOf(11.16, 46.69)), NowcastProperties(mapOf("rr" to NowcastParameter("", listOf(0.1)))))),
-            )
-            override suspend fun outlook(bbox: String, end: String, parameters: String, outputFormat: String) = NowcastResponse(
+            ))
+            override suspend fun outlook(end: String) = NowcastMapper.mapOutlook(NowcastResponse(
                 referenceTime = "2026-09-14T00:00+00:00",
                 timestamps = listOf("2026-09-14T06:00+00:00", "2026-09-14T07:00+00:00"),
                 features = listOf(NowcastFeature(NowcastGeometry(listOf(11.16, 46.69)), NowcastProperties(mapOf("rain_p50" to NowcastParameter("", listOf(1.0, 1.0)))))),
-            )
+            ), after = null)
         }
-        val result = NowcastRepository(api, MutableClock(t("05:36"))).forPlace(DORF_TIROL)
+        val result = NowcastRepository(api, MutableClock(t("05:36"))).current()
         assertEquals(2, result.outlook.size)
         assertEquals(2, result.steps.size) // INCA 06:00, then AROME 07:00 only
     }

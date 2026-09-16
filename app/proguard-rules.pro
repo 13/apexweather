@@ -11,3 +11,10 @@
 -keep,allowobfuscation,allowshrinking interface retrofit2.Call
 -keep,allowobfuscation,allowshrinking class retrofit2.Response
 -keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
+# jhdf: its LZ4 filter names a library excluded in build.gradle.kts, reached only for a file
+# compressed with it, which GeoSphere's are not. slf4j has no binding and logs nothing.
+-dontwarn net.jpountz.**
+# JhdfInfo reads its own package's version in a static initialiser; repackaged by R8 it has no
+# package, the initialiser throws, and every file fails to open — silently, as a map with no forecast.
+-keep class io.jhdf.JhdfInfo { *; }
+-dontwarn org.slf4j.**

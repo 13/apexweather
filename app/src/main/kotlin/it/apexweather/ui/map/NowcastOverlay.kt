@@ -1,9 +1,15 @@
 package it.apexweather.ui.map
 
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Shader
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.set
+import it.apexweather.data.remote.NowcastExtent
 import it.apexweather.data.remote.NowcastKind
 import it.apexweather.data.remote.NowcastStep
 import org.osmdroid.util.PointL
@@ -38,6 +44,9 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
      */
     private val cellKm = if (step.kind == NowcastKind.OUTLOOK) OUTLOOK_CELL_KM else NOWCAST_CELL_KM
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val extent = step.extent
+    private val maskPaint = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
+    private val layer = android.graphics.RectF()
 
     /**
      * Reused across draws rather than allocated fresh each time: a frame redraws many times a
@@ -59,7 +68,54 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
 
     override fun draw(canvas: Canvas, map: MapView, shadow: Boolean) {
         if (shadow || cells.isEmpty()) return
+        val strength = (255 * fade).toInt().coerceIn(0, 255)
+        if (strength == 0) return
         val projection = map.projection
+        // Region-wide that is some 18 000 cells a step, and the map redraws many times a second
+        // while playing and on every frame of a crossfade. Placing them is only worth redoing when
+        // the map has moved; the fade is the paint's alpha, not baked into the pixels.
+        val view = ViewKey(projection.zoomLevel, projection.offsetX, projection.offsetY, map.width, map.height)
+        if (view != renderedFor) {
+            render(map, projection)
+            renderedFor = view
+        }
+        val bitmap = buffer?.takeIf { hasContent } ?: return
+        bitmapPaint.alpha = strength
+        val edge = edgeRect
+        if (edge == null) {
+            canvas.drawBitmap(bitmap, null, target, bitmapPaint)
+            return
+        }
+        // Faded out at the edge of the grid over the radar's own width, so the two layers end the
+        // same way. The forecast used to be asked for a box round the place, and on a wet day the
+        // rain filled it: drawn to the edge, that was a hard-edged square over the valley
+        // (2026-09-16, Meran).
+        val feather = RadarOverlay.FEATHER_DP * map.context.resources.displayMetrics.density
+        layer.set(
+            maxOf(target.left, 0f), maxOf(target.top, 0f),
+            minOf(target.right, map.width.toFloat()), minOf(target.bottom, map.height.toFloat()),
+        )
+        if (layer.isEmpty) return
+        val saved = canvas.saveLayer(layer, null)
+        canvas.drawBitmap(bitmap, null, target, bitmapPaint)
+        fadeEdge(canvas, edge.left, 0f, edge.left + feather, 0f)
+        fadeEdge(canvas, edge.right, 0f, edge.right - feather, 0f)
+        fadeEdge(canvas, 0f, edge.top, 0f, edge.top + feather)
+        fadeEdge(canvas, 0f, edge.bottom, 0f, edge.bottom - feather)
+        canvas.restoreToCount(saved)
+    }
+
+    private data class ViewKey(val zoom: Double, val offsetX: Long, val offsetY: Long, val width: Int, val height: Int)
+
+    /** The map position [buffer] was last painted for. */
+    private var renderedFor: ViewKey? = null
+    private var hasContent = false
+    private val target = android.graphics.RectF()
+    private var edgeRect: android.graphics.RectF? = null
+
+    /** Paints the cells on screen into [buffer] and works out where it and the grid's edge go. */
+    private fun render(map: MapView, projection: Projection) {
+        hasContent = false
         val side = cellSidePx(projection, cells.first().lat, cellKm)
         val bounds = map.boundingBox
         val projected = PointL()
@@ -73,7 +129,7 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
             val colour = solid ?: possible ?: return@mapNotNull null
             val (x, y) = projectPrecise(projection, cell.lat, cell.lon, projected)
             val strength = if (solid != null) alpha else alpha * POSSIBLE_ALPHA_NUMERATOR / 10
-            Triple(x, y, colour.toArgb((strength * colour.alpha * fade).toInt()))
+            Triple(x, y, colour.toArgb((strength * colour.alpha).toInt()))
         }
         if (placed.isEmpty()) return
         // One bitmap pixel per grid cell, drawn scaled with filtering: the edges soften and the grid
@@ -107,12 +163,22 @@ class NowcastOverlay(step: NowcastStep, private val alpha: Int) : Overlay() {
         bitmap.getPixels(pixelBuffer, 0, layout.cols, 0, 0, layout.cols, layout.rows)
         fillHoles(pixelBuffer, layout.cols, layout.rows)
         bitmap.setPixels(pixelBuffer, 0, layout.cols, 0, 0, layout.cols, layout.rows)
-        canvas.drawBitmap(
-            bitmap,
-            null,
-            android.graphics.RectF(layout.left, layout.top, layout.left + layout.cols * side, layout.top + layout.rows * side),
-            bitmapPaint,
-        )
+        target.set(layout.left, layout.top, layout.left + layout.cols * side, layout.top + layout.rows * side)
+        edgeRect = extent?.let { gridRect(projection, it, side) }
+        hasContent = true
+    }
+
+    /** The grid's outer edge on screen: its extreme points plus half a cell, since they are centres. */
+    private fun gridRect(projection: Projection, e: NowcastExtent, side: Float): android.graphics.RectF {
+        val reuse = PointL()
+        val (left, top) = projectPrecise(projection, e.north, e.west, reuse)
+        val (right, bottom) = projectPrecise(projection, e.south, e.east, reuse)
+        return android.graphics.RectF(left - side / 2f, top - side / 2f, right + side / 2f, bottom + side / 2f)
+    }
+
+    private fun fadeEdge(canvas: Canvas, x0: Float, y0: Float, x1: Float, y1: Float) {
+        maskPaint.shader = LinearGradient(x0, y0, x1, y1, Color.TRANSPARENT, Color.BLACK, Shader.TileMode.CLAMP)
+        canvas.drawRect(layer, maskPaint)
     }
 
     /**

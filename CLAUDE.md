@@ -453,7 +453,7 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   ever, and this was nearly shipped that way. `rain_*` is per-step and wants no differencing, unlike
   the deterministic run's `rr_acc` it replaced. `MapUiState.timeline` then drops forecast steps
   the radar has already watched, because INCA reaches back to its own reference time.
-  The 2,5 km run rather than the 1 km one for the far hours is a measurement: over a place box a day
+  The 2,5 km run rather than the 1 km one for the far hours is a measurement: over a box round a place a day
   of the kilometre grid is 488 kB and this is 117 kB, for a resolution still finer than the radar's
   at any zoom anyone uses. The kilometre is spent where it buys something, on the next two hours.
   **Nothing better than RainViewer is available for the radar half**, and it was looked for: the
@@ -471,10 +471,25 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   and dashed for the future with a tick at the present, and the forecast is drawn a shade lighter
   than the radar. **Confusing "this happened" with "this is expected" is the one mistake this map
   can make that matters**, which is why that distinction is in the model rather than in the styling.
-  **The nowcast is asked for a box around the place, not the province**, and that is what makes it
-  affordable: a South Tyrol box is 4,7 MB of uncompressed GeoJSON (the service does not gzip, and
-  its 46 kB NetCDF alternative is HDF5, which nothing on Android reads without a library bigger than
-  this app), against about 300 kB for `Place.NOWCAST_BOX_DEG_*`. Its grid is a projected 1 km one,
+  **The forecast covers the whole province, read as NetCDF** (`NowcastGrid`, via jhdf). It used to
+  be a box forty kilometres round the place as GeoJSON, because the province as GeoJSON is 4,4 MB
+  the service will not gzip; on a wet evening (2026-09-16) the map then drew the forecast as a
+  square in the middle of the radar's region-wide picture, and the box was replaced on request.
+  The same grid as NetCDF 4 is 162 kB (INCA) and 270 kB (AROME, both percentiles) — deflated
+  inside the file — and 726 kB together with `NowcastApi.MARGIN_DEG` (0,2°) round the province,
+  because at the widest zoom the screen shows past it and the radar draws there. Values were
+  checked point by point against the GeoJSON of the same run. jhdf is pure Java; `lz4-java` is
+  excluded (native libraries, and these files are deflate only) but `compress-lzf` has to stay,
+  because jhdf's filter registry cannot load without its exception class. **R8 broke it silently
+  once**: `JhdfInfo` reads its package's version in a static initialiser, R8 repackaged it, every
+  file failed to open and the map simply had no forecast — `proguard-rules.pro` keeps it, and
+  `GeoSphereNowcastSource` now logs a failed read. Only the release build shows this; check the
+  map there after touching the dependency. One run serves every place, so switching place asks
+  nothing new. The GeoJSON DTOs and `NowcastMapper` remain for the recorded fixtures.
+  **Drawing ~18 000 cells a step** is cached per map position in `NowcastOverlay` (the fade is the
+  paint's alpha, not baked into pixels). Measured on the phone over 20 s of playback: p90 20 ms,
+  p95 38 ms, against 24 / 36 ms for the old place-box build, and 48 / 81 ms before the cache.
+  INCA's grid is a projected 1 km one,
   so no two points share a latitude and `NowcastOverlay` draws them as a bitmap of one pixel per grid
   cell, scaled up with filtering: the edges soften, but the grid still reads as coarser than the
   radar, which is honest about it being a model and not a measurement (see the overlay notes below).
@@ -529,6 +544,9 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   was still false, and an `update` then built `Marker(map)` against a null repository (the NPE seen
   once at 14:09 on 2026-09-14). `update` also returns while the view is not attached; Compose
   re-runs it on attach, so nothing is skipped.
+  **The forecast fades out at the edge of its grid over the radar's 20 dp** (`NowcastOverlay`), so
+  the two layers end the same way. The edge is `NowcastStep.extent`, taken from every grid point
+  the service returned, dry ones included, so a real edge of the rain is never faded.
   **The forecast overlay places cells at sub-pixel precision** (`Projection.toProjectedPixels` /
   `getProjectedPowerDifference` / offsets), not `toPixels`, which truncates to int. Truncation put
   61 of 801 cells of this morning's INCA run into already-used pixels at zoom 9. The exact placement
@@ -682,6 +700,9 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   ovals across the sky; they read as smudges behind the text rather than as weather, and the icon and
   the word beside the temperature already say it is cloudy or foggy. Fog keeps its own grey palette
   and nothing moves on it. `ParticleKind` has no CLOUDS or FOG member — do not add one.
+  **No lightning either** (removed 2026-09-16 on request): a thunderstorm sky flashed white over the
+  whole screen every few seconds. It keeps its dark palette and draws rain; `ParticleKind` has no
+  LIGHTNING member.
 - Source colours are in `ui/common/SourceColors.kt`; SIAG letter codes in `domain/SiagCodes.kt`.
   **A column is headed by `Source.shortName`, which is spelled out and not derived.** It used to be
   `displayName.substringAfter(' ')` — a rule that works until a name does not fit it, and two did
@@ -700,9 +721,6 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
 - **Tapping a source in Quellenstatus opens its sheet** (`SourceDetailSheet`, built by the pure
   `SourceDetailStateBuilder`). Four blocks: what it is (`domain/SourceInfo.kt`, every value checked
   against the provider's documentation on 2026-09-15 — change one only with a source for it),
-  **No lightning either** (removed 2026-09-16 on request): a thunderstorm sky flashed white over the
-  whole screen every few seconds. It keeps its dark palette and draws rain; `ParticleKind` has no
-  LIGHTNING member.
   whether it is working (the **full** error text, which the card cuts at 40 characters), its share of
   the consensus (worked out as the blender does: among the regional runs when two report, otherwise
   among everything in the blend), and its six-hour error per part of the day at the station
@@ -856,6 +874,16 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   by the ephemeris, and set, in fact. The index computed there was the ratio of diffuse shade to
   full sun. It was always harmless, because the rule can only lighten and a low index lightens
   nothing, but it was never an answer either, and it is absent now.
+- **The rain gauge outranks the models about the current hour** (`domain/StationDry.kt`). On
+  2026-09-16 at 18:56 Meran's screen said "Gewitter" with rain falling across the sky while the
+  station read 0,0 mm since midnight at 49 %. The gauge publishes a total since midnight, so dry
+  means nothing fallen today, or the total not risen since the reading before —
+  `StationObservation.previousPrecipTodayMm`/`previousTime`, carried across refreshes by
+  `StationDry.withPrevious` in the repository. Only a reading under 30 min old and under 90 %
+  humidity counts (drizzle can fall without tipping the bucket). `HomeStateBuilder` then zeroes
+  that hour's amount and re-votes it with `measuredDry`, which takes the dry branch even when every
+  label is wet: the cloud median, else overcast. The current hour only; the chance is left as the
+  models gave it.
 - **The horizon is made of mountains, and it is measured** (`domain/Horizon.kt`,
   `tools/horizons.py`). Every place and every station carries a skyline: tenths of a degree, one
   every five degrees of bearing, from 30 m SRTM tiles cached under `tools/.dem-cache`. Measured for
@@ -877,16 +905,6 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   twilight) and the earlier of (terrain sunset, astronomical − twilight) — and with no ridge it is
   *exactly* the old rule, which `SunPhaseTest` pins, because a change that moved the colours of an
   open plain would be a bug rather than this feature. A profile of the wrong length is ignored
-- **The rain gauge outranks the models about the current hour** (`domain/StationDry.kt`). On
-  2026-09-16 at 18:56 Meran's screen said "Gewitter" with rain falling across the sky while the
-  station read 0,0 mm since midnight at 49 %. The gauge publishes a total since midnight, so dry
-  means nothing fallen today, or the total not risen since the reading before —
-  `StationObservation.previousPrecipTodayMm`/`previousTime`, carried across refreshes by
-  `StationDry.withPrevious` in the repository. Only a reading under 30 min old and under 90 %
-  humidity counts (drizzle can fall without tipping the bucket). `HomeStateBuilder` then zeroes
-  that hour's amount and re-votes it with `measuredDry`, which takes the dry branch even when every
-  label is wet: the cloud median, else overcast. The current hour only; the chance is left as the
-  models gave it.
   (`Horizon.usable`), so a catalogue written before this falls back to the flat horizon everywhere.
   `Place.horizon` and `NearbyStation.horizon` are separate because a thermometer 264 m down on the
   valley floor has a different skyline from the village reading it.

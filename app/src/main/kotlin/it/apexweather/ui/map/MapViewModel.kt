@@ -67,10 +67,13 @@ class MapViewModel internal constructor(
     private var fetching: Job? = null
     private var fetchingFor: String? = null
 
-    /** The last forecast put on screen, and whose it was, so the radar can go up beside it at once. */
+    /**
+     * The last forecast put on screen, so the radar can go up beside it at once. It covers the
+     * province, so it serves whichever place is chosen next.
+     */
     private var shown: ShownForecast? = null
 
-    private data class ShownForecast(val istat: String, val steps: List<NowcastStep>, val outlook: List<NowcastStep>)
+    private data class ShownForecast(val steps: List<NowcastStep>, val outlook: List<NowcastStep>)
 
     /** Every radar frame's tiles, kept here so a return to the tab does not download the loop again. */
     val radarTiles = RadarTileStore()
@@ -103,18 +106,18 @@ class MapViewModel internal constructor(
             // A held check from the same place is reused — its readings are keyed by frame time, so
             // they are still good — rather than left blank until the last phase below replaces it.
             val heldCheck = _state.value.check?.takeIf { place != null && it.lat == place.lat && it.lon == place.lon }
-            // The radar goes on screen the moment its list is in, beside whatever forecast this place
-            // already has. It used to wait for both forecasts, and INCA alone took 4,4 s on the phone:
+            // The radar goes on screen the moment its list is in, beside whatever forecast is already
+            // held. It used to wait for both forecasts, and INCA alone took 4,4 s on the phone:
             // six seconds of bare basemap on a first open (measured 2026-09-14).
-            val kept = shown?.takeIf { it.istat == place?.istat }
+            val kept = shown
             publish(past, kept?.steps.orEmpty(), kept?.outlook.orEmpty(), heldCheck, place, doneLoading = past.isNotEmpty())
-            // The forecast is only asked for once a place is known, because the box it covers is
-            // drawn around the place. A failure here leaves the radar loop intact: the map was worth
-            // looking at without a forecast until now, and still is.
-            val held = place?.let { nowcast.forPlace(it) }
+            // The forecast is only asked for once a place is known, because the timeline is read at
+            // the place. A failure here leaves the radar loop intact: the map was worth looking at
+            // without a forecast until now, and still is.
+            val held = place?.let { nowcast.current() }
             val ahead = held?.steps.orEmpty()
             val outlook = held?.outlook.orEmpty()
-            shown = place?.let { ShownForecast(it.istat, ahead, outlook) }
+            shown = place?.let { ShownForecast(ahead, outlook) }
             publish(past, ahead, outlook, heldCheck, place, doneLoading = true)
             if (fetching == coroutineContext.job) fetching = null
             if (place != null) {

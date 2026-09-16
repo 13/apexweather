@@ -1,6 +1,7 @@
 package it.apexweather.data.remote
 
-import it.apexweather.domain.Place
+import it.apexweather.domain.SouthTyrol
+import okhttp3.ResponseBody
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import retrofit2.http.GET
@@ -20,40 +21,35 @@ import java.time.temporal.ChronoField
  * province: 1 km, quarter-hourly, two and a half hours ahead, built by blending radar and station
  * observations into the ALARO model rather than by extrapolating the last two radar frames.
  *
- * **It is asked for a box around the reader's place, not for the province**, and that is the whole
- * reason it is affordable. A South Tyrol bounding box is 4.7 MB of uncompressed GeoJSON — the
- * service does not gzip, and its 46 kB NetCDF alternative is HDF5, which nothing on Android reads
- * without a library larger than this app. A box [Place.nowcastBox] wide is about 300 kB, fetched at
- * most once every ten minutes, which is the same order as the fourteen-day forecast the app already
- * pulls on every refresh.
- *
- * The grid is a projected 1 km one, so no two points share a latitude and the lat/lon lattice is
- * not rectangular. Cells are therefore drawn one at a time rather than as rows.
+ * **Both calls ask for the whole province, as NetCDF** — see [NowcastGrid] for the reader and the
+ * measurements. They used to ask for a box forty kilometres round the place as GeoJSON, because the
+ * province as GeoJSON is 4,4 MB the service will not gzip; the map then showed the forecast as a
+ * square of weather in the middle of the radar's region-wide picture (2026-09-16). The NetCDF of
+ * the whole province is 162 kB. The GeoJSON DTOs below remain for the recorded fixtures.
  */
 interface NowcastApi {
     @GET("v1/grid/forecast/nowcast-v1-15min-1km")
     suspend fun precipitation(
-        @Query("bbox") bbox: String,
+        @Query("bbox") bbox: String = PROVINCE_BOX,
         @Query("parameters") parameters: String = "rr",
-        @Query("output_format") outputFormat: String = "geojson",
-    ): NowcastResponse
+        @Query("output_format") outputFormat: String = "netcdf",
+    ): ResponseBody
 
     /**
      * The rest of the day, from AROME's **ensemble** on the same grid service.
      *
      * INCA stops two and a half hours out, and "will it rain this evening" is a map question too.
-     * This is the 2,5 km run rather than the 1 km one: over a box around the place the kilometre
-     * grid is 488 kB for a day and this is 117 kB, for a resolution still finer than the radar's own
-     * at the zooms anyone looks at. The near hours keep INCA's kilometre and its quarter hours,
-     * which is where resolution actually buys something.
+     * This is the 2,5 km run rather than the 1 km one: the kilometre grid is four times the data for
+     * a resolution the radar behind it does not have either. The near hours keep INCA's kilometre
+     * and its quarter hours, which is where resolution actually buys something. 270 kB for the
+     * province and a day, both percentiles, measured 2026-09-16.
      *
      * The **median of the ensemble** rather than the single deterministic run it replaced, at
-     * exactly the same payload — 117 kB either way, which is the only reason this was a free choice.
-     * Measured against that run over a box of the eastern Dolomites on 2026-09-11: the median calls
-     * *more* cell-hours wet than the single run does (1137 against 730), so it is not the drier
-     * answer one might fear from a median; where the two disagree, the ensemble's ninetieth
-     * percentile sides with the single run nine times out of ten, which is what one realisation of a
-     * model is — a member, and not usually the middle one.
+     * exactly the same payload. Measured against that run over a box of the eastern Dolomites on
+     * 2026-09-11: the median calls *more* cell-hours wet than the single run does (1137 against
+     * 730), so it is not the drier answer one might fear from a median; where the two disagree, the
+     * ensemble's ninetieth percentile sides with the single run nine times out of ten, which is what
+     * one realisation of a model is — a member, and not usually the middle one.
      *
      * **`rain_*` is the precipitation here, not `rr_*`.** They both claim `kg m-2` and `rr_p50`
      * tops out at 0,008 over a box a day long, against 7,9 for `rain_p50`; a map drawn from `rr`
@@ -62,12 +58,12 @@ interface NowcastApi {
      */
     @GET("v1/grid/forecast/ensemble-v1-1h-2500m")
     suspend fun outlook(
-        @Query("bbox") bbox: String,
         @Query("end") end: String,
+        @Query("bbox") bbox: String = PROVINCE_BOX,
         @Query("parameters") parameters: String =
             "${NowcastMapper.OUTLOOK_PARAMETER},${NowcastMapper.OUTLOOK_UPPER_PARAMETER}",
-        @Query("output_format") outputFormat: String = "geojson",
-    ): NowcastResponse
+        @Query("output_format") outputFormat: String = "netcdf",
+    ): ResponseBody
 
     companion object {
         const val BASE_URL = "https://dataset.api.hub.geosphere.at/"
@@ -75,20 +71,25 @@ interface NowcastApi {
         /** How far the map's forecast reaches. */
         const val OUTLOOK_HOURS = 24L
 
+        /**
+         * How far past the province the forecast is asked for. The map's limits hold its *centre*
+         * inside the province, but at the widest zoom the screen shows well beyond, and the radar
+         * draws there. Measured 2026-09-16: 472 kB for both files without it, 726 kB with it — about
+         * what the old forty-kilometre box cost as GeoJSON.
+         */
+        const val MARGIN_DEG = 0.2
+
+        /** `bbox` wants south,west,north,east: the province's limits and [MARGIN_DEG]. */
+        val PROVINCE_BOX: String = "%.2f,%.2f,%.2f,%.2f".format(
+            java.util.Locale.ROOT,
+            SouthTyrol.SOUTH - MARGIN_DEG, SouthTyrol.WEST - MARGIN_DEG,
+            SouthTyrol.NORTH + MARGIN_DEG, SouthTyrol.EAST + MARGIN_DEG,
+        )
+
         /** The `end` this service wants: local-ish ISO minutes, no offset and no seconds. */
         fun endOf(now: Instant): String = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
             .withZone(java.time.ZoneOffset.UTC)
             .format(now.plusSeconds(OUTLOOK_HOURS * 3600))
-
-        /** `bbox` wants south,west,north,east. */
-        fun boxAround(place: Place): String {
-            val dLat = Place.NOWCAST_BOX_DEG_LAT
-            val dLon = Place.NOWCAST_BOX_DEG_LON
-            return "%.4f,%.4f,%.4f,%.4f".format(
-                java.util.Locale.ROOT,
-                place.lat - dLat, place.lon - dLon, place.lat + dLat, place.lon + dLon,
-            )
-        }
     }
 }
 
@@ -151,7 +152,12 @@ data class NowcastStep(
     val time: Instant,
     val cells: List<NowcastCell>,
     val kind: NowcastKind = NowcastKind.NOWCAST,
+    /** The whole grid that was asked for, dry points included; where the forecast ends. */
+    val extent: NowcastExtent? = null,
 )
+
+/** A box of grid points, in degrees. */
+data class NowcastExtent(val south: Double, val west: Double, val north: Double, val east: Double)
 
 /**
  * A nowcast for one place: a handful of quarter-hourly frames, each a grid of rates.
@@ -227,6 +233,14 @@ object NowcastMapper {
         // rate a colour scale and a reader can use.
         val perHour = if (parameter == NOWCAST_PARAMETER) QUARTER_HOURS_PER_HOUR else 1
         val times = resp.timestamps.map(::parse)
+        val coordinates = resp.features.mapNotNull { f ->
+            val c = f.geometry.coordinates
+            if (c.size < 2) null else c[1] to c[0]
+        }
+        val extent = if (coordinates.isEmpty()) null else NowcastExtent(
+            south = coordinates.minOf { it.first }, west = coordinates.minOf { it.second },
+            north = coordinates.maxOf { it.first }, east = coordinates.maxOf { it.second },
+        )
         val steps = times.mapIndexedNotNull { i, time ->
             if (time == null) return@mapIndexedNotNull null
             if (after != null && !time.isAfter(after)) return@mapIndexedNotNull null
@@ -243,7 +257,7 @@ object NowcastMapper {
                 val worthDrawing = rate >= MIN_MM_PER_HOUR || (upper ?: 0.0) >= MIN_MM_PER_HOUR
                 if (!worthDrawing) null else NowcastCell(lat, lon, rate, upper)
             }
-            NowcastStep(time, cells, kind)
+            NowcastStep(time, cells, kind, extent)
         }
         return PrecipNowcast(issuedAt, steps)
     }

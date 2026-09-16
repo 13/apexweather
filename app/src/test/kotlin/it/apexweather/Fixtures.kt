@@ -8,4 +8,8 @@ object Fixtures {
     fun read(name: String): String =
         checkNotNull(Fixtures::class.java.getResourceAsStream("/fixtures/$name")) { "missing fixture $name" }
             .bufferedReader().readText()
+
+    fun bytes(name: String): ByteArray =
+        checkNotNull(Fixtures::class.java.getResourceAsStream("/fixtures/$name")) { "missing fixture $name" }
+            .use { it.readBytes() }
 }

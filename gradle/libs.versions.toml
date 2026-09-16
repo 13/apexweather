@@ -32,6 +32,7 @@ benchmark = "1.5.0-rc02"
 uiautomator = "2.4.0"
 profileinstaller = "1.4.1"
 osmdroid = "6.1.20"
+jhdf = "0.13.0"
 
 [libraries]
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -83,6 +84,7 @@ benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro
 uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
 profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 osmdroid = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
+jhdf = { group = "io.jhdf", name = "jhdf", version.ref = "jhdf" }
 roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
 roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
 roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "roborazzi-junit-rule", version.ref = "roborazzi" }

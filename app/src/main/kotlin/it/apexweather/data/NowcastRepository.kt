@@ -1,39 +1,75 @@
 package it.apexweather.data
 
+import android.util.Log
 import it.apexweather.data.remote.NowcastApi
-import it.apexweather.data.remote.NowcastMapper
+import it.apexweather.data.remote.NowcastGrid
+import it.apexweather.data.remote.NowcastKind
 import it.apexweather.data.remote.PrecipNowcast
-import it.apexweather.domain.Place
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import okhttp3.ResponseBody
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** Where the forecast comes from: GeoSphere in the app, a fake in tests. */
+interface NowcastSource {
+    /** INCA, the next two and a half hours; [PrecipNowcast.EMPTY] when the answer holds nothing. */
+    suspend fun nowcast(): PrecipNowcast
+
+    /** AROME's ensemble, up to [end] (see [NowcastApi.endOf]). */
+    suspend fun outlook(end: String): PrecipNowcast
+}
+
+/** The province's NetCDF, read off the main thread: a download on IO, the decoding on Default. */
+class GeoSphereNowcastSource @Inject constructor(private val api: NowcastApi) : NowcastSource {
+    override suspend fun nowcast() = decode(logged(NowcastKind.NOWCAST) { api.precipitation() }, NowcastKind.NOWCAST)
+    override suspend fun outlook(end: String) = decode(logged(NowcastKind.OUTLOOK) { api.outlook(end) }, NowcastKind.OUTLOOK)
+
+    private suspend fun logged(kind: NowcastKind, fetch: suspend () -> ResponseBody): ResponseBody = try {
+        fetch()
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.w("NowcastSource", "cannot fetch the $kind grid", e)
+        throw e
+    }
+
+    private suspend fun decode(body: ResponseBody, kind: NowcastKind): PrecipNowcast {
+        val bytes = withContext(Dispatchers.IO) { body.use { it.bytes() } }
+        // Logged, because a reader that fails quietly looks exactly like a dry province: that is how
+        // the first minified build shipped no forecast at all (see proguard-rules.pro).
+        return withContext(Dispatchers.Default) {
+            NowcastGrid.map(bytes, kind) { Log.w("NowcastSource", "cannot read the $kind grid", it) }
+        }
+    }
+}
+
 /**
- * The rain forecast for the place the reader is looking at, held in memory the way the radar is.
+ * The rain forecast for the province, held in memory the way the radar is.
  *
  * A day of it, in two resolutions: GeoSphere's INCA for the two and a half hours it runs, at a
  * kilometre and a quarter hour, then AROME hourly at 2,5 km to twenty-four. The join is where INCA
  * stops.
  *
  * Nothing here goes into Room, for the same reason [RadarRepository] stores nothing: this is a
- * picture of the next two hours, and a stale one is worse than none. It is keyed by place, because
- * the box it covers is drawn around the place — switching village asks again.
+ * picture of the next two hours, and a stale one is worse than none. It covers the whole province,
+ * as the radar does, so one run serves every place and switching village asks nothing new.
  *
  * A failed fetch keeps whatever was held; the next ask after [MIN_GAP] tries again.
  */
 @Singleton
 class NowcastRepository @Inject constructor(
-    private val api: NowcastApi,
+    private val source: NowcastSource,
     private val clock: Clock,
 ) {
     private val mutex = Mutex()
-    private var istat: String? = null
     private var nowcast: PrecipNowcast = PrecipNowcast.EMPTY
     private var askedAt: Instant? = null
 
@@ -47,41 +83,28 @@ class NowcastRepository @Inject constructor(
      */
     private var incaIssuedAt: Instant? = null
 
-    suspend fun forPlace(place: Place): PrecipNowcast = mutex.withLock {
+    suspend fun current(): PrecipNowcast = mutex.withLock {
         val now = clock.instant()
-        if (istat == place.istat && !due(now)) return@withLock nowcast
+        if (!due(now)) return@withLock nowcast
         askedAt = now
-        val box = NowcastApi.boxAround(place)
         // The two halves are fetched independently and either is worth having on its own: INCA
         // carries the next two and a half hours at a kilometre and a quarter hour, AROME the rest of
         // the day at 2,5 km and an hour. A failure in one leaves the other's stretch of the timeline
-        // standing.
-        // An answer with no steps is no answer: the mappers return EMPTY for a response without a
-        // reference time, and treating that as a fetch would overwrite a good held run with nothing.
-        // Side by side, not one after the other: INCA's box is 383 kB the service will not gzip and
-        // took 4,4 s on the phone (2026-09-14), and AROME waited all of that out before it started.
+        // standing. An answer with no steps is no answer: treating it as a fetch would overwrite a
+        // good held run with nothing. Side by side, because neither should wait out the other.
         val (near, far) = coroutineScope {
             val nearAsync = async {
-                runCatchingCancellable { NowcastMapper.map(api.precipitation(box)) }.getOrNull()?.takeIf { it.steps.isNotEmpty() }
+                runCatchingCancellable { source.nowcast() }.getOrNull()?.takeIf { it.steps.isNotEmpty() }
             }
-            // The outlook is fetched whole, with nothing trimmed at INCA's end: Heute needs every AROME
+            // The outlook is kept whole, with nothing trimmed at INCA's end: Heute needs every AROME
             // hour, including the ones Jetzt's [steps] drops as already covered by INCA's finer run.
             val farAsync = async {
-                runCatchingCancellable { NowcastMapper.mapOutlook(api.outlook(box, NowcastApi.endOf(now)), after = null) }.getOrNull()
-                    ?.takeIf { it.steps.isNotEmpty() }
+                runCatchingCancellable { source.outlook(NowcastApi.endOf(now)) }.getOrNull()?.takeIf { it.steps.isNotEmpty() }
             }
             nearAsync.await() to farAsync.await()
         }
         val nearEnd = near?.steps?.lastOrNull()?.time
-        val fetched = when {
-            near == null && far == null -> null
-            else -> PrecipNowcast(
-                issuedAt = near?.issuedAt ?: far!!.issuedAt,
-                steps = near?.steps.orEmpty() + far?.steps.orEmpty().filter { nearEnd == null || it.time.isAfter(nearEnd) },
-                outlook = far?.steps.orEmpty(),
-            )
-        }
-        if (fetched != null) {
+        if (near != null || far != null) {
             // A fetch can land long after a run appeared but never before it, so only a shorter
             // delay than the one held is evidence — floored at zero, because a run can be stamped
             // ahead of the clock (GeoSphere's clock and the reader's are not perfectly synced) and a
@@ -91,17 +114,11 @@ class NowcastRepository @Inject constructor(
                 if (seen < lag) lag = seen
                 incaIssuedAt = near.issuedAt
             }
-            if (near == null && istat != place.istat) {
-                // AROME alone answered for a place INCA has not; there is no known INCA schedule here.
-                incaIssuedAt = null
-            }
-            nowcast = fetched
-            istat = place.istat
-        } else if (istat != place.istat) {
-            // The held forecast is about somewhere else, and somewhere else's rain is worse than none.
-            nowcast = PrecipNowcast.EMPTY
-            istat = null
-            incaIssuedAt = null
+            nowcast = PrecipNowcast(
+                issuedAt = near?.issuedAt ?: far!!.issuedAt,
+                steps = near?.steps.orEmpty() + far?.steps.orEmpty().filter { nearEnd == null || it.time.isAfter(nearEnd) },
+                outlook = far?.steps.orEmpty(),
+            )
         }
         nowcast
     }
