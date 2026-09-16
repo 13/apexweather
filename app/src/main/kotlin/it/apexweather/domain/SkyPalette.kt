@@ -7,8 +7,12 @@ import it.apexweather.domain.model.Condition
  * handful of pale ovals sliding across the gradient, and they read as smudges on the screen rather
  * than as weather — distracting behind the text, and never informative, since the icon and the word
  * beside the temperature already say it is cloudy.
+ *
+ * There is no LIGHTNING either: a thunderstorm sky flashed white across the whole screen every few
+ * seconds, and it was asked to be switched off on 2026-09-16. The storm keeps its dark palette and
+ * its rain.
  */
-enum class ParticleKind { NONE, STARS, RAIN, SNOW, LIGHTNING }
+enum class ParticleKind { NONE, STARS, RAIN, SNOW }
 
 /** Colors are ARGB longs so this stays free of Android/Compose dependencies. */
 data class SkyPalette(
@@ -128,7 +132,7 @@ object SkyPaletteSelector {
                 else -> p(0xFF5B6B85, 0xFF8FA0BA, 0xFFD9E2EF, 0xFFFFFFFF, 0xFF4B5A73, ParticleKind.SNOW, precipDensity)
             }
             Condition.HEAVY_SNOW -> p(0xFF3D4A62, 0xFF6C7B95, 0xFFC5D0E0, 0xFFFFFFFF, 0xFF33405A, ParticleKind.SNOW, precipDensity.coerceAtLeast(0.7f))
-            Condition.THUNDERSTORM -> p(0xFF0B0A1A, 0xFF1E1A3A, 0xFF2E2B52, 0xFFFFE28A, 0xFF0C0B1A, ParticleKind.LIGHTNING, precipDensity.coerceAtLeast(0.6f))
+            Condition.THUNDERSTORM -> p(0xFF0B0A1A, 0xFF1E1A3A, 0xFF2E2B52, 0xFFFFE28A, 0xFF0C0B1A, ParticleKind.RAIN, precipDensity.coerceAtLeast(0.6f))
         }
     }
 }

@@ -700,6 +700,9 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
 - **Tapping a source in Quellenstatus opens its sheet** (`SourceDetailSheet`, built by the pure
   `SourceDetailStateBuilder`). Four blocks: what it is (`domain/SourceInfo.kt`, every value checked
   against the provider's documentation on 2026-09-15 — change one only with a source for it),
+  **No lightning either** (removed 2026-09-16 on request): a thunderstorm sky flashed white over the
+  whole screen every few seconds. It keeps its dark palette and draws rain; `ParticleKind` has no
+  LIGHTNING member.
   whether it is working (the **full** error text, which the card cuts at 40 characters), its share of
   the consensus (worked out as the blender does: among the regional runs when two report, otherwise
   among everything in the blend), and its six-hour error per part of the day at the station
