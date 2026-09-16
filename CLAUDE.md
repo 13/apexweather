@@ -502,6 +502,15 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   `GeoSphereNowcastSource` now logs a failed read. Only the release build shows this; check the
   map there after touching the dependency. One run serves every place, so switching place asks
   nothing new. The GeoJSON DTOs and `NowcastMapper` remain for the recorded fixtures.
+  **Each half goes on screen as it lands** (`NowcastRepository.current(onPartial)`): on
+  2026-09-16 INCA took 17 s and AROME half a second. The two halves are held apart, so one failing
+  keeps the other's last run. **On a metered connection the forecast is asked every 30 min at
+  most** (`MeteredNetwork`, `METERED_GAP`). **Drawn unfiltered, as the radar is, it looked worse**
+  — tried on the phone the same evening: AROME's 2,5 km cells become a mottled checkerboard at
+  zoom 10, not a radar picture. Note `Paint()` already filters bitmaps on Android; turning it off
+  needs `isFilterBitmap = false`. Memory with the province's forecast held: Java heap 53 MB,
+  PSS 286 MB on the phone, against 32 / 294 earlier that evening; the cells were not packed into
+  arrays, since nothing measured called for it.
   **Drawing ~18 000 cells a step** is cached per map position in `NowcastOverlay` (the fade is the
   paint's alpha, not baked into pixels). Measured on the phone over 20 s of playback: p90 20 ms,
   p95 38 ms, against 24 / 36 ms for the old place-box build, and 48 / 81 ms before the cache.

@@ -6,6 +6,7 @@ import it.apexweather.data.remote.NowcastGeometry
 import it.apexweather.data.remote.NowcastParameter
 import it.apexweather.data.remote.NowcastProperties
 import it.apexweather.data.remote.NowcastResponse
+import it.apexweather.data.remote.PrecipNowcast
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -29,9 +30,12 @@ class NowcastRepositoryTest {
 
         /** How long each of the two requests takes to answer. */
         var delayMs: Long = 0
+
+        /** How long INCA alone takes, on top of [delayMs]. */
+        var nowcastExtraDelayMs: Long = 0
         override suspend fun nowcast() = run {
             calls++
-            if (delayMs > 0) delay(delayMs)
+            if (delayMs + nowcastExtraDelayMs > 0) delay(delayMs + nowcastExtraDelayMs)
             if (fail) throw IOException("no network")
             NowcastMapper.map(NowcastResponse(
                 referenceTime = reference,
@@ -60,6 +64,50 @@ class NowcastRepositoryTest {
         val held = repo.current()
         assertEquals("one request waited for the other", 1_000L, testScheduler.currentTime)
         assertEquals(1, held.outlook.size)
+    }
+
+    /** On 2026-09-16 INCA took 17 s and AROME half a second; the map waited for both. */
+    @Test
+    fun `the half that lands first is handed over at once`() = runTest {
+        val api = FakeApi().apply { withOutlook = true; nowcastExtraDelayMs = 17_000 }
+        val partials = mutableListOf<Pair<Long, PrecipNowcast>>()
+        val held = NowcastRepository(api, MutableClock(t("05:36"))).current { partials += testScheduler.currentTime to it }
+        assertEquals(1, partials.size)
+        assertEquals("AROME, before INCA", 0L, partials.single().first)
+        assertEquals(1, partials.single().second.outlook.size)
+        assertEquals(17_000L, testScheduler.currentTime)
+        // Then both: INCA's step, and AROME whole for Heute.
+        assertEquals(Instant.parse("2026-09-14T05:15:00Z"), held.steps.single().time)
+        assertEquals(1, held.outlook.size)
+    }
+
+    /** A failed half keeps what that half held before. */
+    @Test
+    fun `a failed nowcast keeps the held one beside a fresh outlook`() = runTest {
+        val api = FakeApi().apply { withOutlook = true }
+        val clock = MutableClock(t("05:36"))
+        val repo = NowcastRepository(api, clock)
+        val first = repo.current()
+        api.fail = true
+        clock.now = t("05:51")
+        val second = repo.current()
+        assertEquals(first.steps.first(), second.steps.first())
+    }
+
+    /** About 730 kB a fetch: on a metered connection the map asks every half hour at most. */
+    @Test
+    fun `a metered connection is asked every half hour at most`() = runTest {
+        val api = FakeApi()
+        val clock = MutableClock(t("05:36"))
+        val repo = NowcastRepository(api, clock, MeteredNetwork { true })
+        repo.current()
+        clock.now = t("05:51") // due by the run schedule
+        repo.current()
+        assertEquals(1, api.calls)
+        clock.now = t("06:06")
+        api.reference = "2026-09-14T05:30+00:00"
+        repo.current()
+        assertEquals(2, api.calls)
     }
 
     @Test

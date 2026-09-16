@@ -88,7 +88,7 @@ class MapViewModel internal constructor(
                     // would describe the place just left, so the ribbon goes empty instead.
                     if (changed) next.copy(nowBars = emptyList(), todayBars = emptyList()) else next
                 }
-                // The forecast covers a box around the place, so a new place needs a new one.
+                // The forecast covers the province, but the ribbon and the check are the place's own.
                 if (changed && home.place != null) refresh()
             }
         }
@@ -114,7 +114,10 @@ class MapViewModel internal constructor(
             // The forecast is only asked for once a place is known, because the timeline is read at
             // the place. A failure here leaves the radar loop intact: the map was worth looking at
             // without a forecast until now, and still is.
-            val held = place?.let { nowcast.current() }
+            // Each half goes on screen as it lands: INCA has taken 17 s where AROME took half a second.
+            val held = place?.let {
+                nowcast.current { partial -> publish(past, partial.steps, partial.outlook, heldCheck, place, doneLoading = true) }
+            }
             val ahead = held?.steps.orEmpty()
             val outlook = held?.outlook.orEmpty()
             shown = place?.let { ShownForecast(ahead, outlook) }
