@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Build/install: `./gradlew :app:assembleDebug` then `adb -s RZCXA1ZEXJE install -r app/build/outputs/apk/debug/ApexWeather-debug.apk`
 - JVM tests: `./gradlew :app:testDebugUnitTest` (single class: `--tests 'it.apexweather.domain.ConsensusBlenderTest'`)
-- Device tests: `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest` (single class: `-Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.home.HomeScreenTest`). The serial is required, and it should be an emulator's: the run uninstalls the app, and on the phone (RZCXA1ZEXJE) that deletes `station_history`. Boot one headless with `~/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -no-window`.
+- Device tests: `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest` (single class: `-Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.home.HomeScreenTest`). The serial is required, and it should be an emulator's: the run uninstalls the app, and on the phone (RZCXA1ZEXJE) that deletes `station_history`. Boot one headless with `~/Android/Sdk/emulator/emulator -avd r8verify34 -no-window` (API 34). **Not `Medium_Phone_API_36.1`**: on API 36 every Compose UI test fails with `NoSuchMethodException: android.hardware.input.InputManager…` from the test framework, not the app (93 of 102 on 2026-09-16; all 102 pass on API 34).
 - Release build: `./gradlew :app:assembleRelease` (R8 on, unsigned APK; keep rules in `app/proguard-rules.pro`).
 - Release on a device: `./tools/release-smoke.sh [serial]` after `assembleRelease`, **on an
   emulator**: it uninstalls first, which deletes `station_history`, and it refuses a real device
