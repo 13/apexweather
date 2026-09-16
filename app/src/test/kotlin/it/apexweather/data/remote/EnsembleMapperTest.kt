@@ -144,15 +144,20 @@ class EnsembleMapperTest {
     }
 
     /**
-     * ICON-D2 wins wherever it reaches, for precipitation as for temperature: twenty members at
-     * 2 km say more about an Alpine valley tomorrow than fifty at 25 km do.
+     * For the chance of rain the two ensembles pool, one vote each, where both reach. On
+     * 2026-09-16 over Dorf Tirol ICON-D2's run was late: 15 % of its members were wet at 19:00
+     * where 100 % of ECMWF's were, ten of eleven deterministic models were raining and the
+     * province said 65 %. Letting one model family's members stand for the whole chance put 16 %
+     * under 2,3 mm on the strip.
      */
     @Test
-    fun `combining prefers the near ensemble's wet share where it reaches`() {
-        val near = EnsembleSpread(fetchedAt, 20, mapOf(1L to 1.0), mapOf(1L to 0.2))
+    fun `combining pools the two ensembles' wet shares where both reach`() {
+        val near = EnsembleSpread(fetchedAt, 20, mapOf(1L to 1.0, 3L to 1.0), mapOf(1L to 0.2, 3L to 0.4))
         val far = EnsembleSpread(fetchedAt, 50, mapOf(1L to 5.0, 2L to 5.0), mapOf(1L to 0.9, 2L to 0.6))
         val combined = EnsembleSpread.combine(near, far)!!
-        assertEquals(0.2, combined.wetShareByEpochSecond.getValue(1L), 1e-9)
-        assertEquals("and the far one carries the rest", 0.6, combined.wetShareByEpochSecond.getValue(2L), 1e-9)
+        assertEquals(0.55, combined.wetShareByEpochSecond.getValue(1L), 1e-9)
+        assertEquals("the far one alone past the near one's reach", 0.6, combined.wetShareByEpochSecond.getValue(2L), 1e-9)
+        assertEquals("the near one alone where the far one is missing", 0.4, combined.wetShareByEpochSecond.getValue(3L), 1e-9)
+        assertEquals("the spread still prefers the near ensemble", 1.0, combined.halfWidthByEpochSecond.getValue(1L), 1e-9)
     }
 }

@@ -101,19 +101,30 @@ data class EnsembleSpread(
 
     companion object {
         /**
-         * [near] wherever it reaches, [far] beyond it.
+         * [near] wherever it reaches, [far] beyond it — for the spread. The chance of rain pools.
          *
-         * ICON-D2 at 2 km says more about an Alpine valley tomorrow than ECMWF at 25 km does, so it
-         * wins every hour both cover; ECMWF's fifty members carry the rest of the fortnight. The
-         * member count reported is the one whose numbers are used at the near end, because that is
-         * the ensemble a reader is looking at when they open the app.
+         * ICON-D2 at 2 km says more about an Alpine valley tomorrow than ECMWF at 25 km does, so its
+         * spread wins every hour both cover; ECMWF's fifty members carry the rest of the fortnight.
+         * The member count reported is the one whose numbers are used at the near end, because that
+         * is the ensemble a reader is looking at when they open the app.
+         *
+         * **The wet share is the mean of the two where both reach, one vote per ensemble.** Twenty
+         * members of one model measure how that model's rain moves when its start is nudged, not
+         * whether the model has the timing of a front wrong — and when it has, all twenty have it
+         * wrong together. On 2026-09-16 over Dorf Tirol ICON-D2 had the evening's rain late: 15 %
+         * of its members wet at 19:00 against 100 % of ECMWF's, ten of eleven deterministic models
+         * raining and the province's own KMOS at 65 %, and the strip printed 16 % under 2,3 mm.
+         * Per ensemble rather than per member, or ECMWF's fifty would outvote the finer run.
          */
         fun combine(near: EnsembleSpread?, far: EnsembleSpread?): EnsembleSpread? = when {
             near == null || near.halfWidthByEpochSecond.isEmpty() -> far
             far == null -> near
             else -> near.copy(
                 halfWidthByEpochSecond = far.halfWidthByEpochSecond + near.halfWidthByEpochSecond,
-                wetShareByEpochSecond = far.wetShareByEpochSecond + near.wetShareByEpochSecond,
+                wetShareByEpochSecond = far.wetShareByEpochSecond +
+                    near.wetShareByEpochSecond.mapValues { (t, share) ->
+                        far.wetShareByEpochSecond[t]?.let { (share + it) / 2.0 } ?: share
+                    },
             )
         }
     }

@@ -186,6 +186,12 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   Measured: precipitation costs **225 B gzipped on ICON-D2's two days and 3 238 B on ECMWF's
   fifteen**. The ladder below it is unchanged and still needed past day fifteen or where an ensemble
   fails: the weighted mean of the models' own figures, then the weighted share of wet ones.
+  **Where both ensembles reach an hour their wet shares are averaged, one vote each**
+  (`EnsembleSpread.combine`); ICON-D2 still wins the temperature spread. It used to win the chance
+  too, and twenty members of one model are wrong together when that model has a front's timing
+  wrong: on 2026-09-16 over Dorf Tirol 15 % of ICON-D2's members were wet at 19:00 against 100 % of
+  ECMWF's, ten of eleven deterministic models were raining and the province's KMOS said 65 %, and
+  the strip printed 16 % under 2,3 mm. Pooled it read 61 %, and 67 % at 21:00 against KMOS's 65 %.
   `NotificationDecider.RAIN_MIN_PROB` was **re-examined rather than inherited** — it stays at 30,
   which now reads literally as three atmospheres in ten and is better founded than the average of
   opinions it used to bound.
