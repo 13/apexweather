@@ -127,10 +127,10 @@ class ConsensusBlenderTest {
     @Test
     fun `condition majority vote with severity tie-break`() {
         val f = mapOf(
-            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, precip = 1.0, condition = Condition.RAIN))),
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, precip = 6.0, condition = Condition.RAIN))),
             Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0, condition = Condition.CLOUDY))),
             Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 10.0, condition = Condition.CLOUDY))),
-            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(point(0, 10.0, precip = 1.0, condition = Condition.RAIN))),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(point(0, 10.0, precip = 6.0, condition = Condition.RAIN))),
         )
         assertEquals(Condition.RAIN, blender.blend(f).hourly.single().condition)
     }
@@ -486,7 +486,7 @@ class ConsensusBlenderTest {
             Condition.RAIN,
             ConsensusBlender.voteCondition(
                 listOf(Condition.RAIN, Condition.RAIN, Condition.CLOUDY),
-                precipMm = 2.0, cloudPct = listOf(0, 0, 0),
+                precipMm = 3.0, cloudPct = listOf(0, 0, 0),
             ),
         )
     }
@@ -610,7 +610,27 @@ class ConsensusBlenderTest {
     @Test
     fun `a clear majority of wet models still decides on its own`() {
         val soaked = listOf(Condition.RAIN, Condition.RAIN, Condition.RAIN, Condition.CLOUDY)
-        assertEquals(Condition.RAIN, ConsensusBlender.voteCondition(soaked, precipMm = 2.0))
+        assertEquals(Condition.RAIN, ConsensusBlender.voteCondition(soaked, precipMm = 3.0))
+    }
+
+    /**
+     * 2026-09-16 over Dorf Tirol: the strip read "Leichter Regen" over 3,3 mm beside "Regen" over
+     * 1,8 mm, because the word was the models' plurality and the amount their mean. Where the vote
+     * is liquid rain the word now follows the amount, on the WMO's own bands for rain intensity.
+     */
+    @Test
+    fun `the word for liquid rain follows the amount`() {
+        val drizzly = listOf(Condition.DRIZZLE, Condition.DRIZZLE, Condition.RAIN)
+        assertEquals(Condition.DRIZZLE, ConsensusBlender.voteCondition(drizzly, precipMm = 1.8))
+        assertEquals(Condition.RAIN, ConsensusBlender.voteCondition(drizzly, precipMm = 3.3))
+        assertEquals(Condition.HEAVY_RAIN, ConsensusBlender.voteCondition(drizzly, precipMm = 8.0))
+        val heavy = listOf(Condition.HEAVY_RAIN, Condition.HEAVY_RAIN)
+        assertEquals(Condition.DRIZZLE, ConsensusBlender.voteCondition(heavy, precipMm = 1.8))
+        // Snow, sleet and thunder are what they are whatever the amount.
+        assertEquals(Condition.THUNDERSTORM, ConsensusBlender.voteCondition(List(3) { Condition.THUNDERSTORM }, precipMm = 0.4))
+        assertEquals(Condition.SNOW, ConsensusBlender.voteCondition(List(3) { Condition.SNOW }, precipMm = 9.0))
+        assertEquals(Condition.RAIN, Condition.rainFor(2.5))
+        assertEquals(Condition.HEAVY_RAIN, Condition.rainFor(7.6))
     }
 
     @Test

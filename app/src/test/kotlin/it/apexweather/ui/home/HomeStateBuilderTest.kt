@@ -385,9 +385,9 @@ class HomeStateBuilderTest {
         val t0 = hour(0)
         fun storm(cloud: Int) = point(0, 25.0, precip = 1.2, prob = 50, condition = Condition.THUNDERSTORM).copy(cloudPct = cloud)
         val f = mapOf(
-            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(storm(60), point(1, 23.0, precip = 1.3, condition = Condition.RAIN))),
-            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(storm(70), point(1, 23.0, precip = 1.3, condition = Condition.RAIN))),
-            Source.KNMI_HARMONIE to forecast(Source.KNMI_HARMONIE, listOf(storm(80), point(1, 23.0, precip = 1.3, condition = Condition.RAIN))),
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(storm(60), point(1, 23.0, precip = 3.0, condition = Condition.RAIN))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(storm(70), point(1, 23.0, precip = 3.0, condition = Condition.RAIN))),
+            Source.KNMI_HARMONIE to forecast(Source.KNMI_HARMONIE, listOf(storm(80), point(1, 23.0, precip = 3.0, condition = Condition.RAIN))),
         )
         val consensus = ConsensusBlender().blend(f)
         assertEquals(Condition.THUNDERSTORM, consensus.hourly.first().condition)

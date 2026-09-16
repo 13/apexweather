@@ -522,7 +522,11 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             // The mildest wet answer the models actually gave, not the worst: a third of them
             // saying so is reason to call it drizzle, not reason to promise heavy rain.
             val pool = if (wet.isNotEmpty() && weight(wet) * WET_SHARE_DENOMINATOR >= total) wet else conditions
-            return plurality(pool, weightOf)
+            val voted = plurality(pool, weightOf)
+            // Which of drizzle, rain and heavy rain is a question about how much, and the amount is
+            // decided above as the mean: the plurality of the labels put "Leichter Regen" over
+            // 3,3 mm beside "Regen" over 1,8 on 2026-09-16. Below WET_MIN_MM the labels stand.
+            return if (voted.isLiquidRain && precipMm >= WET_MIN_MM) Condition.rainFor(precipMm) else voted
         }
 
         /** [weightedMedian] over anything that can be weighed, not only over sources. */

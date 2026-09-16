@@ -151,6 +151,22 @@ enum class Condition {
      * the models that call it sleet publish centimetres for it.
      */
     val isFrozen: Boolean get() = this == SLEET || this == SNOW || this == HEAVY_SNOW
+
+    /** Drizzle, rain or heavy rain: the three whose difference is only how much falls. */
+    val isLiquidRain: Boolean get() = this == DRIZZLE || this == RAIN || this == HEAVY_RAIN
+
+    companion object {
+        /** The WMO's bands for rain intensity: slight under 2,5 mm/h, heavy from 7,6. */
+        const val RAIN_FROM_MM = 2.5
+        const val HEAVY_RAIN_FROM_MM = 7.6
+
+        /** The word for liquid rain at [mmPerHour]. DRIZZLE is the "Leichter Regen" label. */
+        fun rainFor(mmPerHour: Double): Condition = when {
+            mmPerHour >= HEAVY_RAIN_FROM_MM -> HEAVY_RAIN
+            mmPerHour >= RAIN_FROM_MM -> RAIN
+            else -> DRIZZLE
+        }
+    }
 }
 
 @Serializable

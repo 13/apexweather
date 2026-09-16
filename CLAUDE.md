@@ -865,6 +865,11 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   the grounds that it answers *when* rather than *how much*, and that made the two disagree about
   when: on 2026-09-16 in Meran one or two of six models were wet from 15:15, the strip showed
   millimetres from 16:00, and the median held the hero's "Niederschlag ab" at 19:45.
+- **The word for liquid rain follows the amount** (`Condition.rainFor`, WMO bands: under 2,5 mm/h
+  "Leichter Regen", from 7,6 "Starker Regen"). The label used to be the models' plurality while the
+  amount is their mean, and on 2026-09-16 the strip read "Leichter Regen" over 3,3 mm beside "Regen"
+  over 1,8. Only where the vote is drizzle, rain or heavy rain and the hour has 0,1 mm or more;
+  snow, sleet and thunder keep their word.
 - **The station measures the sky, not only the air, and `StationSun` is where that is used.** On
   2026-09-11 at 13:00 the app led with "Bedeckt" over Dorf Tirol while the sun was out of a nearly
   clear sky — and it was not wrong about its sources: ICON-CH1, ICON-D2 and DMI HARMONIE all called
