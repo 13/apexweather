@@ -108,8 +108,7 @@ object StationDownscale {
         // is likely to be shared 270 m up the hill. At full trust this is exactly observed + offset,
         // which is what it always was.
         val moved = (observed + offset) - (anomaly ?: 0.0) * (1 - transferred(anomaly ?: 0.0))
-        val forecast = consensus.hourly.firstOrNull { it.time == observation.time.truncatedTo(ChronoUnit.HOURS) }?.tempC
-            ?: return moved
+        val forecast = consensusAt(consensus, observation.time) ?: return moved
         // Never outside what its own two sources say. The app has exactly two views of the village:
         // the thermometer 270 m below it, and the models' own value for it. A result colder than
         // both, or warmer than both, is an assertion neither of them supports.
@@ -139,7 +138,43 @@ object StationDownscale {
         // reference at all — the raw reading is the last resort, never the fallback. Returning null
         // rather than the forecast keeps that decision in one place, and stops the hero calling
         // itself a measurement it no longer is.
-        return moved.takeIf { it in minOf(observed, forecast)..maxOf(observed, forecast) }
+        //
+        // Except by a hair, where the thermometer stands at the place's own height. There the
+        // models' offset hovers round zero and a station running warm is carried up whole, so the
+        // result lands a tenth of a degree past the thermometer — inside anything anyone could
+        // measure, and it cost Meran (5 m below its station) the reading on 2026-09-16 at 19:00:
+        // 24,1 against [23,3; 24,0]. Held at the edge, the edge is a thermometer standing where the
+        // village is. Where it stands a few hundred metres lower, the edge is the valley floor, and
+        // that is the case above: no tolerance.
+        val low = minOf(observed, forecast)
+        val high = maxOf(observed, forecast)
+        val tolerance = if (abs(heightDifferenceM) <= LEVEL_STATION_M) BRACKET_TOLERANCE_C else 0.0
+        return when {
+            moved in low..high -> moved
+            moved < low && low - moved < tolerance -> low
+            moved > high && moved - high < tolerance -> high
+            else -> null
+        }
+    }
+
+    /** How far past its bracket a carried reading may land and still be quoted, at the edge. */
+    const val BRACKET_TOLERANCE_C = 0.5
+
+    /** A station within this many metres of the place's height stands, for this purpose, where it is. */
+    const val LEVEL_STATION_M = 100
+
+    /**
+     * The consensus at the minute of the reading, straight-lined between the hours either side as
+     * [StationReference.interpolatedAt] does for the station. A reading at :40 held against the
+     * top of the hour is up to an hour out on a morning warming three degrees an hour.
+     */
+    private fun consensusAt(consensus: ConsensusForecast, time: Instant): Double? {
+        val hour = time.truncatedTo(ChronoUnit.HOURS)
+        val start = consensus.hourly.firstOrNull { it.time == hour }?.tempC ?: return null
+        val fraction = (time.epochSecond - hour.epochSecond) / 3600.0
+        if (fraction == 0.0) return start
+        val end = consensus.hourly.firstOrNull { it.time == hour.plusSeconds(3600) }?.tempC ?: return start
+        return start + (end - start) * fraction
     }
 
     /**

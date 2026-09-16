@@ -1007,6 +1007,12 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   35 W/m² — while Dorf Tirol 264 m above it was in the clear at about 13. The carried reading came
   out under both, the clamp handed the screen 10,9, and the strip one line below read 13 with
   nothing accounting for the gap. The raw reading is the last resort, never the fallback.
+  **Two refinements (2026-09-16):** the bracket's forecast end is the consensus interpolated to the
+  minute of the reading, not the top of the hour; and where the station stands within
+  `LEVEL_STATION_M` (100 m) of the place, a result less than `BRACKET_TOLERANCE_C` (0,5 K) outside
+  is held at the edge instead of dropped. Meran (5 m below its station) lost its reading at 19:00
+  that day over 0,1 K: 24,1 against [23,3; 24,0]. A station hundreds of metres down gets no
+  tolerance, because there the edge is the valley floor — the 2026-09-12 case.
   The line under the hero quotes the move that was applied, and says nothing where that move rounds
   to zero.
 - **The hero and the strip's first column are the same hour and must be the same weather.**

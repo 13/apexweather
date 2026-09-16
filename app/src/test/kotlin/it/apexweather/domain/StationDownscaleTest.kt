@@ -99,6 +99,56 @@ class StationDownscaleTest {
     }
 
     /**
+     * Meran, 2026-09-16 at 19:00: a place at its station's own height (-5 m), the station 0,8 K
+     * warmer than the models said, and the models putting the village 0,1 K above the station. The
+     * carried reading came out at 24,1 against a thermometer reading 24,0 and a consensus of 23,3 —
+     * a tenth of a degree outside the bracket, and the hero dropped the measurement altogether.
+     * Where the station stands at the place's height, a reading that misses by less than
+     * [StationDownscale.BRACKET_TOLERANCE_C] is held at the bracket's edge instead.
+     */
+    @Test
+    fun `a reading a hair outside the bracket is held at its edge, not dropped`() {
+        // models: village 10,0, station 9,9; thermometer 11,0. Carried up: 11,1, against [10,0; 11,0].
+        val t = StationDownscale.villageTemperature(
+            observation(hour(2), 11.0), reference(offsetFromVillage = -0.1), forecasts, consensus, now = hour(2), heightDifferenceM = -5,
+        )
+        assertEquals(11.0, t!!, 1e-9)
+        // A thermometer a few hundred metres down is the valley floor, not the village: no slack.
+        assertNull(
+            StationDownscale.villageTemperature(
+                observation(hour(2), 11.0), reference(offsetFromVillage = -0.1), forecasts, consensus, now = hour(2), heightDifferenceM = dz,
+            ),
+        )
+    }
+
+    /**
+     * The bracket's forecast end is read at the minute of the reading, like the anomaly is. On a
+     * warming morning the top-of-the-hour consensus is up to an hour behind a reading taken at :40,
+     * and held against it a perfectly good carried reading looks like it has left the bracket.
+     */
+    @Test
+    fun `the bracket's forecast end is read at the minute of the reading`() {
+        val ramp = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 24).map { point(it, 10.0 + 2.0 * (it - 2)) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 24).map { point(it, 10.0 + 2.0 * (it - 2)) }),
+        )
+        val rampConsensus = blender.blend(ramp)
+        val colder = StationReference(
+            fetchedAt = hour(0), elevationM = 330.0,
+            bySource = listOf(Source.ICON_CH1, Source.ICON_D2).associate { s ->
+                s.name to rampConsensus.hourly.associate { it.time.epochSecond to it.tempC - 0.3 }
+            },
+        )
+        // At 02:30 the models put the station at 10,7 and the village at 11,0; the thermometer
+        // agrees with them exactly, so the answer is 11,0. Held against 02:00's 10,0 it was 0,3 K
+        // outside [10,0; 10,7].
+        val t = StationDownscale.villageTemperature(
+            observation(hour(2).plusSeconds(1800), 10.7), colder, ramp, rampConsensus, now = hour(3), heightDifferenceM = dz,
+        )
+        assertEquals(11.0, t!!, 1e-9)
+    }
+
+    /**
      * The thermometer does not report on the hour, and the models only exist on it.
      *
      * Meran publishes every twenty minutes, so a reading is up to fifty minutes away from the model
