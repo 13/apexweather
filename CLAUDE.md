@@ -6,9 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Build/install: `./gradlew :app:assembleDebug` then `adb -s RZCXA1ZEXJE install -r app/build/outputs/apk/debug/ApexWeather-debug.apk`
 - JVM tests: `./gradlew :app:testDebugUnitTest` (single class: `--tests 'it.apexweather.domain.ConsensusBlenderTest'`)
-- Device tests: `ANDROID_SERIAL=RZCXA1ZEXJE ./gradlew :app:connectedDebugAndroidTest` (single class: `-Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.home.HomeScreenTest`). The serial is required: an emulator is usually attached as well.
+- Device tests: `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest` (single class: `-Pandroid.testInstrumentationRunnerArguments.class=it.apexweather.ui.home.HomeScreenTest`). The serial is required, and it should be an emulator's: the run uninstalls the app, and on the phone (RZCXA1ZEXJE) that deletes `station_history`. Boot one headless with `~/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -no-window`.
 - Release build: `./gradlew :app:assembleRelease` (R8 on, unsigned APK; keep rules in `app/proguard-rules.pro`).
-- Release on a device: `./tools/release-smoke.sh [serial]` after `assembleRelease`. Installs the
+- Release on a device: `./tools/release-smoke.sh [serial]` after `assembleRelease`, **on an
+  emulator**: it uninstalls first, which deletes `station_history`, and it refuses a real device
+  unless `APEX_SMOKE_WIPE_OK=1` (three runs on the phone lost its history on 2026-09-16). It also
+  opens the map and requires a forecast grid to have been read. Installs the
   minified APK, launches it, reads the screen back with `uiautomator dump` and fails on any crash,
   `ClassNotFoundException` or `SerializationException` in the log. The instrumented suite runs
   against the debug build, so this is the only thing that exercises Glance's runtime layout lookup,

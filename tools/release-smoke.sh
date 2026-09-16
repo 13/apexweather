@@ -13,7 +13,7 @@
 # covered here only as far as "the provider survived R8 and is registered". Placing one and looking
 # at it stays a manual check.
 #
-# Usage: tools/release-smoke.sh [serial]
+# Usage: tools/release-smoke.sh [serial]   (an emulator; see the guard below for a real device)
 set -euo pipefail
 
 SERIAL="${1:-${ANDROID_SERIAL:-}}"
@@ -22,6 +22,16 @@ if [ -z "$SERIAL" ]; then
 fi
 [ -n "$SERIAL" ] || { echo "no device attached"; exit 1; }
 ADB=(adb -s "$SERIAL")
+
+# The install below starts with an uninstall, which deletes the app's data — including
+# station_history, which is not a cache and cannot be fetched again. On 2026-09-16 three runs
+# against the phone took its whole history with them. An emulator is the default target; a real
+# device needs APEX_SMOKE_WIPE_OK=1 to say that loss is understood.
+if [[ "$SERIAL" != emulator-* ]] && [ "${APEX_SMOKE_WIPE_OK:-}" != 1 ]; then
+    echo "$SERIAL is not an emulator: this uninstalls the app and deletes its station history."
+    echo "Run it on an emulator, or set APEX_SMOKE_WIPE_OK=1 if that is acceptable."
+    exit 1
+fi
 
 APK="app/build/outputs/apk/release/ApexWeather-release.apk"
 [ -f "$APK" ] || { echo "missing $APK — run ./gradlew :app:assembleRelease first"; exit 1; }
@@ -70,6 +80,44 @@ if grep -qE '°' "$OUT/ui.xml" 2>/dev/null; then
 else
     echo "FAIL: nothing on screen looks like a temperature; the forecast never arrived"
     FAILED=1
+fi
+
+echo "== opening the map"
+# The rain forecast is read by jhdf, which R8 once broke without a single crash: every file failed
+# to open and the map simply had no forecast. The tab is found by its label in any of the app's
+# three languages, and the reader logs one line per grid it read.
+MAP_TAB=$(python3 - "$OUT/ui.xml" <<'PY' || true
+import re, sys
+xml = open(sys.argv[1]).read()
+for m in re.finditer(r'text="(Karte|Mappa|Map)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml):
+    x1, y1, x2, y2 = map(int, m.groups()[1:])
+    print((x1 + x2) // 2, (y1 + y2) // 2)
+    break
+PY
+)
+if [ -z "$MAP_TAB" ]; then
+    echo "FAIL: no map tab on screen; see $OUT/ui.xml"
+    FAILED=1
+else
+    # shellcheck disable=SC2086
+    "${ADB[@]}" shell input tap $MAP_TAB
+    # GeoSphere has taken 17 s for the nowcast on a slow evening.
+    for _ in $(seq 1 30); do
+        "${ADB[@]}" logcat -d -s NowcastSource:I 2>/dev/null | grep -q "read the NOWCAST grid" && break
+        sleep 2
+    done
+    GRID=$("${ADB[@]}" logcat -d -s NowcastSource:V 2>/dev/null || true)
+    if echo "$GRID" | grep -q "cannot read"; then
+        echo "FAIL: the forecast grid could not be read"
+        echo "$GRID" | head -20
+        FAILED=1
+    elif echo "$GRID" | grep -q "read the NOWCAST grid"; then
+        echo "  the map read the forecast"
+    else
+        echo "FAIL: the map never read a forecast grid (offline, or GeoSphere slower than a minute)"
+        echo "$GRID" | head -20
+        FAILED=1
+    fi
 fi
 
 echo "== checking the widget provider survived"

@@ -37,16 +37,22 @@ class GeoSphereNowcastSource @Inject constructor(private val api: NowcastApi) : 
     } catch (e: kotlinx.coroutines.CancellationException) {
         throw e
     } catch (e: Exception) {
-        Log.w("NowcastSource", "cannot fetch the $kind grid", e)
+        Log.w(TAG, "cannot fetch the $kind grid", e)
         throw e
+    }
+
+    private companion object {
+        const val TAG = "NowcastSource"
     }
 
     private suspend fun decode(body: ResponseBody, kind: NowcastKind): PrecipNowcast {
         val bytes = withContext(Dispatchers.IO) { body.use { it.bytes() } }
         // Logged, because a reader that fails quietly looks exactly like a dry province: that is how
         // the first minified build shipped no forecast at all (see proguard-rules.pro).
+        // A successful read is logged too, once per fetch: tools/release-smoke.sh looks for it.
         return withContext(Dispatchers.Default) {
-            NowcastGrid.map(bytes, kind) { Log.w("NowcastSource", "cannot read the $kind grid", it) }
+            NowcastGrid.map(bytes, kind) { Log.w(TAG, "cannot read the $kind grid", it) }
+                .also { if (it.steps.isNotEmpty()) Log.i(TAG, "read the $kind grid: ${it.steps.size} steps") }
         }
     }
 }
