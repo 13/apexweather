@@ -69,24 +69,29 @@ object RefreshDue {
     val OFFLINE_WAIT: Duration = Duration.ofMinutes(5)
 
     /**
+     * What is due now, and — **only when nothing is** — how long to sleep before asking again.
+     *
+     * The wait beside a [RefreshKind] is a floor and not a schedule: after acting, the caller asks
+     * again rather than sleeping on it. Sleeping on the wait returned with a `FULL` was the bug
+     * this shape prevents — a full refresh is due every thirty minutes, so the loop performed one
+     * and then slept for thirty, and the station was never polled at ten and twenty at all.
+     *
+     * Failures are deliberately **not** an input. A rule that returned "nothing due" while a phone
+     * was failing could never come back, because the count that suppresses it only clears on a
+     * success it is refusing to attempt. The backoff belongs to the caller, which knows whether its
+     * last attempt worked; [backoff] is the ladder it uses.
+     *
      * @param lastStation when the station last answered, or null if it never has
      * @param lastFull when a full refresh last succeeded, or null
-     * @param consecutiveFailures how many attempts have failed in a row, of either kind — the phone
-     *   is either reaching the internet or it is not, so one counter covers both
      */
     fun next(
         now: Instant,
         lastStation: Instant?,
         lastFull: Instant?,
-        consecutiveFailures: Int = 0,
         metered: Boolean = false,
         online: Boolean = true,
     ): RefreshDecision {
         if (!online) return RefreshDecision(null, OFFLINE_WAIT)
-
-        // A failed attempt delays the *next* attempt and never the cadence itself: one bad minute
-        // on a pass must not leave a working app refreshing every half hour for the rest of the day.
-        if (consecutiveFailures > 0) return RefreshDecision(null, backoff(consecutiveFailures))
 
         val fullAge = age(lastFull, now)
         if (fullAge == null || fullAge >= StaleRefresher.STALE_ON_OPEN) {

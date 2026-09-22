@@ -1,6 +1,10 @@
 package it.apexweather.ui
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import androidx.glance.appwidget.updateAll
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.apexweather.data.PlaceCatalogue
@@ -97,6 +101,105 @@ class StaleRefresher @Inject constructor(
         val settings = settingsRepository.settings.first()
         val keep = settings.keptPlaces
         repository.evictAllBut(keep, keep.mapNotNull { catalogue.byIstat(it)?.district }.distinct())
+    }
+
+    // ---- the loop that runs while the app is in front of somebody ----
+
+    /**
+     * The timing lives in [ForegroundRefreshLoop] and the wiring lives here.
+     *
+     * The loop takes functions rather than these objects so that a test of a `delay` does not have
+     * to stand up a DataStore, a Room database, an asset read and three `WhileSubscribed` flows to
+     * observe one.
+     */
+    private val loop = ForegroundRefreshLoop(
+        clock = clock,
+        scope = scope,
+        seed = {
+            val cached = holder.awaitCached().snapshot
+            ForegroundRefreshLoop.Seed(cached.lastSuccessfulRefresh, cached.lastObservationFetch)
+        },
+        place = { holder.weather.value.place },
+        fullRefresh = {
+            val before = holder.weather.value.snapshot.lastSuccessfulRefresh
+            run()
+            val after = holder.weather.value.snapshot.lastSuccessfulRefresh
+            after != null && after != before
+        },
+        stationRefresh = { repository.refreshObservation(it) },
+        metered = { isMetered() },
+        online = { isOnline() },
+    )
+
+    private var callback: ConnectivityManager.NetworkCallback? = null
+
+    /**
+     * Starts refreshing while the app is open.
+     *
+     * Called by [it.apexweather.ApexApplication] from its count of started activities rather than
+     * by a screen: being open is not a property of any one screen, which is the same argument that
+     * put [refreshIfStale] above the tabs.
+     */
+    @Synchronized
+    fun start() {
+        registerNetworkCallback()
+        loop.start()
+    }
+
+    @Synchronized
+    fun stop() {
+        loop.stop()
+        unregisterNetworkCallback()
+    }
+
+    private fun connectivity(): ConnectivityManager? =
+        context.getSystemService(ConnectivityManager::class.java)
+
+    /** Unknown counts as metered, as `RefreshWorker` already has it: the cautious direction. */
+    private fun isMetered(): Boolean = connectivity()?.isActiveNetworkMetered ?: true
+
+    /**
+     * Whether there is a network to try at all.
+     *
+     * Deliberately **not** `NET_CAPABILITY_VALIDATED`. Validation is the platform's opinion about
+     * whether a network reaches the internet, it is reported differently across OEMs, and a captive
+     * portal that answers wrongly is a fetch that fails — which the backoff already handles, and
+     * handles more honestly than a prediction would. What this rules out is the case worth ruling
+     * out: no network at all, where trying every ten minutes on a mountain is the battery bug this
+     * feature would be accused of.
+     */
+    private fun isOnline(): Boolean {
+        val cm = connectivity() ?: return false
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    /**
+     * Wakes the loop the moment signal returns.
+     *
+     * This is the mountain case and the only reason the registration earns its keep: without it a
+     * reader walking back into coverage waits out whatever backoff the dead half hour built up, and
+     * the app they have just pulled out of a pocket shows them the weather from before the tunnel.
+     */
+    private fun registerNetworkCallback() {
+        if (callback != null) return
+        val cm = connectivity() ?: return
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) = loop.wake()
+        }
+        runCatching {
+            cm.registerNetworkCallback(
+                NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),
+                cb,
+            )
+            callback = cb
+        }
+    }
+
+    private fun unregisterNetworkCallback() {
+        val cb = callback ?: return
+        callback = null
+        runCatching { connectivity()?.unregisterNetworkCallback(cb) }
     }
 
     companion object {

@@ -86,22 +86,16 @@ class RefreshDueTest {
         assertEquals(listOf(1L, 2L, 4L, 8L, 16L, 30L, 30L, 30L), ladder)
     }
 
-    @Test
-    fun `a failure delays the next attempt and decides nothing meanwhile`() {
-        val d = RefreshDue.next(at(40), lastStation = t0, lastFull = t0, consecutiveFailures = 3)
-        assertNull(d.kind)
-        assertEquals(Duration.ofMinutes(4), d.wait)
-    }
-
     /**
-     * One bad minute on a pass must not leave a working app refreshing half as often for the rest
-     * of the day. The counter is reset by the caller on any success; this pins that the rule then
-     * returns to the ordinary cadence in one step rather than easing back into it.
+     * The backoff is the caller's to apply, and the rule deliberately knows nothing about it.
+     *
+     * A rule that suppressed itself while a phone was failing could never come back: the count that
+     * suppresses it only clears on a success it is refusing to attempt. So the ladder is exposed and
+     * `ForegroundRefreshLoop` sleeps on it, while what is *due* stays a question about the clock.
      */
     @Test
-    fun `a success after failures returns to the ordinary cadence at once`() {
-        val d = RefreshDue.next(at(40), lastStation = t0, lastFull = t0, consecutiveFailures = 0)
-        assertEquals(RefreshKind.FULL, d.kind)
+    fun `the rule says what is due regardless of how badly things are going`() {
+        assertEquals(RefreshKind.FULL, RefreshDue.next(at(40), lastStation = t0, lastFull = t0).kind)
     }
 
     /**
@@ -113,15 +107,13 @@ class RefreshDueTest {
         val instants = listOf<Instant?>(null, t0, at(5), at(10), at(29), at(30), at(31), at(600))
         for (station in instants) {
             for (full in instants) {
-                for (failures in listOf(0, 1, 5, 40)) {
-                    for (metered in listOf(false, true)) {
-                        for (online in listOf(false, true)) {
-                            val d = RefreshDue.next(at(30), station, full, failures, metered, online)
-                            assertTrue(
-                                "wait was ${d.wait} for station=$station full=$full failures=$failures",
-                                !d.wait.isZero && !d.wait.isNegative,
-                            )
-                        }
+                for (metered in listOf(false, true)) {
+                    for (online in listOf(false, true)) {
+                        val d = RefreshDue.next(at(30), station, full, metered, online)
+                        assertTrue(
+                            "wait was ${d.wait} for station=$station full=$full",
+                            !d.wait.isZero && !d.wait.isNegative,
+                        )
                     }
                 }
             }
