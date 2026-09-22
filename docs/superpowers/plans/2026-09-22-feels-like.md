@@ -630,7 +630,9 @@ Append to `app/src/androidTest/kotlin/it/apexweather/ui/home/HomeScreenTest.kt`,
     }
 ```
 
-`Condition.labelRes()` is the non-composable form of the condition's label. If it is named differently in `ui/common/WarningVisuals.kt`'s neighbourhood or on `Condition` itself, use whatever the widget uses — `widget/ApexWidget.kt` renders outside a composition and must already resolve a condition's label from resources.
+`Condition.labelRes()` is the non-composable form of the condition's label and lives in
+`app/src/main/kotlin/it/apexweather/ui/common/WeatherIcons.kt:60`; `WidgetState.kt:76` already uses
+it the same way. Add `import it.apexweather.ui.common.labelRes` to the test file.
 
 - [ ] **Step 3: Boot the emulator and run the tests to verify they fail**
 
@@ -675,7 +677,10 @@ with:
             )
 ```
 
-Check the imports at the top of the file: `androidx.compose.ui.platform.testTag` is not the right one — it is `androidx.compose.ui.platform.testTag`'s sibling `androidx.compose.ui.platform.testTag`. Use whatever import the other `testTag(` calls in this same file already rely on; `Format` and `formats` are already in scope in this composable, since the rain line beside it uses both.
+No new imports are needed: `androidx.compose.ui.platform.testTag` (line 42),
+`androidx.compose.ui.res.stringResource` (line 45) and `it.apexweather.ui.common.Format` (line 65)
+are already imported in this file, and `formats` is already in scope in this composable because the
+rain line beside it uses it.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
