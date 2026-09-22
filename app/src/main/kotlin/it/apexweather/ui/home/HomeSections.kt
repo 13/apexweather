@@ -167,10 +167,23 @@ fun HeroSection(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
+            // The apparent temperature is a clause of the condition, not a third child of this
+            // row. This FlowRow is SpaceBetween with two children — the condition on the left, the
+            // rain line on the right under the icon — and a third child would take the middle and
+            // push the rain line's right edge around at every font scale. Inside the condition's
+            // own string the row's layout is untouched.
+            //
+            // Whether there is a clause at all was decided in HomeStateBuilder; see FeelsLike. The
+            // hero carries one only where the hour is cold and feels colder, or hot and feels
+            // hotter — in the mild middle an apparent temperature is arithmetic rather than a
+            // sensation, and a second number to reconcile for nothing.
+            val condition = state.heroCondition.label()
             Text(
-                state.heroCondition.label(),
+                state.heroFeelsLikeC
+                    ?.let { stringResource(R.string.hero_condition_feels, condition, Format.temp(it, formats)) }
+                    ?: condition,
                 style = MaterialTheme.typography.headlineMedium, color = Color.White,
-                modifier = Modifier.alignByBaseline(),
+                modifier = Modifier.alignByBaseline().testTag("hero_feels"),
             )
             state.minutelyStart?.let {
                 Text(

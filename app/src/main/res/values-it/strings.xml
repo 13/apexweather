@@ -285,6 +285,7 @@
 
     <!-- The quarter-hour the rain starts, where a regional model published one. -->
     <string name="rain_starts_at">Precipitazioni dalle %1$s</string>
+    <string name="hero_condition_feels">%1$s · percepita %2$s</string>
 
     <string name="source_detail_open">%1$s, %2$s, apri dettagli</string>
     <string name="source_block_what">COS\'È</string>
