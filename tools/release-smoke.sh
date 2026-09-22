@@ -52,7 +52,18 @@ echo "== launching"
 "${ADB[@]}" shell am start -W -n "$PKG/.MainActivity" >/dev/null
 # Captured now, while the app is certainly up: every check below that reads the log has to be able
 # to tell this app's output from the rest of the device's.
-PID=$("${ADB[@]}" shell pidof "$PKG" | tr -d '\r' | awk '{print $1}')
+#
+# An app that died on launch used to end the script here and print nothing: `set -e` plus a `pidof`
+# that finds no process is an exit, and the log that would have said *why* was never read. That is
+# the one failure this script exists to catch, and it was the one it reported least about — on a CI
+# emulator, with no way to re-run it by hand, "exit code 1" was the whole diagnosis.
+PID=$("${ADB[@]}" shell pidof "$PKG" | tr -d '\r' | awk '{print $1}' || true)
+if [ -z "$PID" ]; then
+    echo "  the app did not survive launch; what the device said:"
+    "${ADB[@]}" logcat -d -t 400 2>/dev/null | grep -iE "androidruntime|fatal|$PKG|e/|exception" | tail -60 || true
+    "${ADB[@]}" logcat -d -b crash -t 200 2>/dev/null | tail -40 || true
+    exit 1
+fi
 # Long enough for the launch refresh to reach all five upstreams and come back through every mapper.
 sleep 20
 

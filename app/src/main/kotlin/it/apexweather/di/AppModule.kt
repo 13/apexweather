@@ -126,5 +126,8 @@ object AppModule {
  * thing being injected is a credential: naming it makes every injection site say so.
  */
 @javax.inject.Qualifier
-@Retention(AnnotationRetention.BINARY)
+// RUNTIME, which is what javax.inject.Qualifier itself is declared with and what JSR-330 requires.
+// BINARY compiles and injects correctly in a debug build — the graph is generated at compile time —
+// and is a different proposition once R8 has been over it.
+@Retention(AnnotationRetention.RUNTIME)
 annotation class WuApiKey
