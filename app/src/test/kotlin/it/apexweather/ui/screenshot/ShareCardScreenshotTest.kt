@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -24,7 +23,6 @@ import it.apexweather.ui.share.ShareDay
 import it.apexweather.ui.share.ShareRange
 import it.apexweather.ui.share.ShareHour
 import it.apexweather.ui.theme.ApexTheme
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -190,26 +188,4 @@ class ShareCardScreenshotTest {
         dayCard(ShareRange.SEVEN_DAYS, days(7, thinFrom = 5)),
     )
 
-    /**
-     * Chat clients crop previews, and the half that survives a crop is the top. A card much taller
-     * than about 1:1.8 loses its rows in the thumbnail — so the constraint is a measurement rather
-     * than a hope.
-     */
-    @Test
-    fun `the seven-day card stays inside a preview's crop`() {
-        val state = dayCard(ShareRange.SEVEN_DAYS, days(7, thinFrom = 5))
-        var ratio = 0f
-        captureRoboImage("build/tmp/share_card_ratio.png") {
-            ApexTheme {
-                CompositionLocalProvider(LocalFormats provides Formats(Locale.GERMANY, true)) {
-                    Box(
-                        Modifier.onGloballyPositioned { ratio = it.size.height.toFloat() / it.size.width },
-                    ) {
-                        ShareCard(state)
-                    }
-                }
-            }
-        }
-        assertTrue("the card is $ratio tall for its width; a preview would crop its rows", ratio < 1.8f)
-    }
 }

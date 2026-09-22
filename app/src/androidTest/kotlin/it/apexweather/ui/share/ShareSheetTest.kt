@@ -37,6 +37,7 @@ import it.apexweather.ui.home.HomeUiState
 import it.apexweather.ui.theme.ApexTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
@@ -250,5 +251,32 @@ class ShareSheetTest {
             assertEquals("$range width", (one.right - one.left).value, (two.right - two.left).value, 0.5f)
             assertEquals("$range height", (one.bottom - one.top).value, (two.bottom - two.top).value, 0.5f)
         }
+    }
+
+    /**
+     * Chat clients crop previews, and the half that survives a crop is the top — so a card much
+     * taller than about 1:1.8 loses its rows in the thumbnail.
+     *
+     * This lives here rather than in `ShareCardScreenshotTest` because it is a layout assertion and
+     * not a golden. It was written there first, using `captureRoboImage` purely to force a layout
+     * pass and writing to `build/tmp`; in **verify** mode Roborazzi treats any capture as a real
+     * golden and compares it against a file that does not exist on a clean checkout. It passed
+     * locally only because the record run had left the file behind, and CI caught it.
+     */
+    @Test
+    fun theWeekCardStaysInsideAPreviewsCrop() {
+        val card = ShareCardStateBuilder.today(state, Locale.US, ShareRange.SEVEN_DAYS)!!
+        rule.setContent {
+            ApexTheme {
+                CompositionLocalProvider(LocalFormats provides Formats(Locale.US, true)) {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        Box(Modifier.testTag("week_card")) { ShareCard(card) }
+                    }
+                }
+            }
+        }
+        val b = rule.onNodeWithTag("week_card").getUnclippedBoundsInRoot()
+        val ratio = (b.bottom - b.top).value / (b.right - b.left).value
+        assertTrue("the card is $ratio tall for its width; a preview would crop its rows", ratio < 1.8f)
     }
 }
