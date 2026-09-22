@@ -25,9 +25,11 @@ Weather Underground's contributor network has stations the province does not. Me
  1,92 km  IMERAN10    —              T 19,0
 ```
 
-Dorf Tirol stands at 594 m. **ITIROL16 stands at 586 m, 490 m away.** For this place that is not a
-better input to the height correction, it is the correction becoming unnecessary — the hero stops
-being a converted number and becomes a reading taken at the reader's own altitude.
+Dorf Tirol stands at 594 m. **ITIROL16 claims 586 m, 490 m away**, and the DEM under its
+coordinates reads 634 — so it is somewhere within a few tens of metres of the village's own height
+either way, against the 264 m the app corrects for today. For this place that is not a better input
+to the height correction, it is the correction becoming nearly unnecessary — the hero stops being a
+converted number and becomes a reading taken at roughly the reader's own altitude.
 
 The same table is the argument for everything defensive in this design. Four of the seven report an
 altitude that cannot be true, and one still evening spreads six degrees over two kilometres.
@@ -95,9 +97,12 @@ reads the station's, not the village's.
 
 `places.json` gains a field beside `station`, and **never replaces it**:
 
+The altitude is the DEM's and the stability is whatever `pick_by_stability` measures; both are
+written by the generator, neither is invented here.
+
 ```json
 "pws": { "network": "wu", "id": "ITIROL16", "lat": 46.6932, "lon": 11.1552,
-         "altitudeM": 634, "distanceKm": 0.49, "stabilityK": 0.11, "horizon": [ … ] }
+         "altitudeM": 634, "distanceKm": 0.49, "stabilityK": <measured>, "horizon": [ … ] }
 ```
 
 The official station stays in the record for every place that has one. It is the fallback, and the
