@@ -179,6 +179,7 @@ class WeatherRepository @Inject constructor(
                 },
                 lastSuccessfulRefresh = meta?.lastSuccessMs?.let(Instant::ofEpochMilli),
                 lastRefreshFailed = meta?.lastAttemptFailed ?: false,
+                lastObservationFetch = obsRow?.fetchedAtMs?.let(Instant::ofEpochMilli),
             )
         }
     }
@@ -368,15 +369,7 @@ class WeatherRepository @Inject constructor(
                         val o = attempt("SIAG_STATION") {
                             SiagMappers.mapObservation(siag.stations(), station) ?: error("station ${station.code} not in response")
                         }
-                        val prev = dao.observationOnce(place.istat)
-                        val carried = o?.let {
-                            val cached = prev?.json?.let { j -> runCatching { json.decodeFromString(StationObservation.serializer(), j) }.getOrNull() }
-                            StationDry.withPrevious(it, cached)
-                        }
-                        dao.upsertObservation(
-                            if (carried != null) ObservationEntity(place.istat, json.encodeToString(StationObservation.serializer(), carried), now.toEpochMilli(), null, null)
-                            else ObservationEntity(place.istat, prev?.json, prev?.fetchedAtMs, failed["SIAG_STATION"], now.toEpochMilli())
-                        )
+                        storeObservation(place, o, failed["SIAG_STATION"], now)
                     }
                 }
             }
@@ -500,7 +493,7 @@ class WeatherRepository @Inject constructor(
      * record. Rows are merged rather than replaced: a refresh inside an hour must not wipe the
      * twelve-hour-old forecast that is the whole point of the row.
      */
-    private suspend fun recordStationHour(place: Place, now: Instant) {
+    private suspend fun recordStationHour(place: Place, now: Instant, prune: Boolean = true) {
         val reference = dao.stationReferenceOnce(place.istat)?.json
             ?.let { decode("station reference", StationReference.serializer(), it) }
         val thisHour = now.truncatedTo(ChronoUnit.HOURS)
@@ -526,7 +519,67 @@ class WeatherRepository @Inject constructor(
             val atHour = reference?.let { HourForecasts.at(it, hour) }
             mergeStationHour(place, hour, reading = observation, lead = LeadBucket.NOW, forecasts = atHour)
         }
-        history.prune(now.minus(VerificationHistory.KEEP).epochSecond)
+        if (prune) history.prune(now.minus(VerificationHistory.KEEP).epochSecond)
+    }
+
+    /**
+     * The station alone, for the loop that runs while the app is open.
+     *
+     * Returns whether a reading landed, which is what the loop's failure counter needs.
+     *
+     * **It takes the same mutex as [refresh]**, and that is deliberate rather than lazy. The station
+     * write is a read-modify-write — the cached reading is decoded, [StationDry.withPrevious]
+     * carries its predecessor forward, and the result is written back — so letting this slip past a
+     * full refresh would race exactly the row that carries the gauge's two points. A ten-minute poll
+     * waiting the few seconds a full refresh takes costs nothing, and the poll is then serialised
+     * with the one thing it could corrupt.
+     *
+     * It does **not** go through [refresh]'s coalescing memo, which is keyed by place and language
+     * and describes a full fetch; being handed a full refresh's result would not be what this asked
+     * for. And it does not retry on [IOException] the way [fetchEverything] does: a dropped
+     * connection there costs a source for a whole hour, where here the next attempt is ten minutes
+     * away and the loop's own backoff already covers a connection that has gone.
+     *
+     * It records the hour so a reading the hourly worker was too late for is still filed — that is
+     * most of why this exists — but it does not prune, because pruning is the worker's job and a
+     * ten-minute poll doing it would be 144 sweeps a day for nothing.
+     */
+    suspend fun refreshObservation(place: Place): Boolean = refreshMutex.withLock {
+        val station = place.station ?: return@withLock false
+        val now = clock.instant()
+        val attempt = runCatchingCancellable {
+            SiagMappers.mapObservation(siag.stations(), station) ?: error("station ${station.code} not in response")
+        }
+        val observation = attempt.getOrNull()
+        val error = attempt.exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName }
+        storeObservation(place, observation, error, now)
+        if (observation != null) recordStationHour(place, now, prune = false)
+        observation != null
+    }
+
+    /**
+     * Read, carry forward, write: the one place an observation reaches the cache.
+     *
+     * Both the full refresh and [refreshObservation] come through here rather than each writing the
+     * row their own way. Two code paths writing one row differently is how [StationDry]'s carried
+     * previous reading would quietly stop being carried — and the symptom of that is not a crash,
+     * it is the gauge silently losing the ability to call an hour dry.
+     */
+    private suspend fun storeObservation(
+        place: Place,
+        observation: StationObservation?,
+        error: String?,
+        now: Instant,
+    ) {
+        val prev = dao.observationOnce(place.istat)
+        val carried = observation?.let {
+            val cached = prev?.json?.let { j -> runCatching { json.decodeFromString(StationObservation.serializer(), j) }.getOrNull() }
+            StationDry.withPrevious(it, cached)
+        }
+        dao.upsertObservation(
+            if (carried != null) ObservationEntity(place.istat, json.encodeToString(StationObservation.serializer(), carried), now.toEpochMilli(), null, null)
+            else ObservationEntity(place.istat, prev?.json, prev?.fetchedAtMs, error, now.toEpochMilli())
+        )
     }
 
     /** What one run says about one hour at the station: source name → value, per quantity. */

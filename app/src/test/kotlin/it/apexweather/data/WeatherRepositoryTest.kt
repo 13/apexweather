@@ -605,4 +605,128 @@ class WeatherRepositoryTest {
         val p0 = hours[0].predicted.getValue(it.apexweather.domain.LeadBucket.SIX).getValue(Source.ICON_D2)
         assertEquals(it.apexweather.domain.Predicted(19.0, 0.5, 12.0), p0)
     }
+
+    // ---- the station on its own, for the loop that runs while the app is open ----
+
+    /**
+     * The whole point of the station-only path: one small call, and nothing else touched.
+     *
+     * Asserted through what landed in the cache rather than only through a call counter, because a
+     * path that fetched the models and failed to store them would pass a counter check and still be
+     * wrong.
+     */
+    @Test
+    fun `a station refresh fetches the station and nothing else`() = runTest {
+        assertTrue(repo.refreshObservation(DORF_TIROL))
+
+        assertEquals(1, siag.stationCalls)
+        assertEquals(0, openMeteo.forecastCalls)
+        val s = repo.snapshot(DORF_TIROL, "de").first()
+        assertNotNull(s.observation)
+        assertTrue("a station refresh must not fetch forecasts", s.forecasts.isEmpty())
+        assertNull("nor the bulletin", s.bulletin)
+        assertTrue("nor the warnings", s.warnings.isEmpty())
+    }
+
+    /**
+     * `StationDry` needs two readings to tell a gauge that has not moved from one that has, and it
+     * gets the second by the repository carrying the first forward. Both write paths go through
+     * `storeObservation` so that this cannot hold on one of them and not the other.
+     *
+     * The cache is seeded by hand rather than by refreshing twice: `FakeSiag` returns one recorded
+     * fixture, so two refreshes are two copies of one reading at one time — and `withPrevious` is
+     * right to carry nothing forward from a reading to itself. An older point is what the rule is
+     * actually for.
+     */
+    @Test
+    fun `a station refresh carries the previous reading forward`() = runTest {
+        val earlier = Instant.parse("2026-09-08T13:00:00Z")
+        db.weatherDao().upsertObservation(
+            it.apexweather.data.local.ObservationEntity(
+                DORF_TIROL.istat,
+                Fixtures.json.encodeToString(
+                    it.apexweather.domain.model.StationObservation.serializer(),
+                    it.apexweather.domain.model.StationObservation(
+                        stationName = "Meran", time = earlier, tempC = 18.0, humidityPct = 50,
+                        windKmh = 4.0, windDir = "W", gustKmh = null, precipTodayMm = 1.2,
+                        pressureHpa = 1010.0,
+                    ),
+                ),
+                earlier.toEpochMilli(), null, null,
+            ),
+        )
+
+        assertTrue(repo.refreshObservation(DORF_TIROL))
+
+        val o = repo.snapshot(DORF_TIROL, "de").first().observation!!
+        assertEquals("the gauge lost its previous point", earlier, o.previousTime)
+        assertEquals(1.2, o.previousPrecipTodayMm!!, 0.0)
+    }
+
+    /** The reason this exists at all: an hour the hourly worker was too late for is still filed. */
+    @Test
+    fun `a station refresh records the hour in station history`() = runTest {
+        repo.refreshObservation(DORF_TIROL)
+        val rows = history.stationHistoryDao().history(DORF_TIROL.istat, 0).first()
+        assertEquals(1, rows.size)
+        assertNotNull(rows.single().observedC)
+    }
+
+    /**
+     * Pruning is the hourly worker's job. A ten-minute poll sweeping ninety days of history would be
+     * 144 sweeps a day for nothing.
+     */
+    @Test
+    fun `a station refresh does not prune the history`() = runTest {
+        val old = clock.now.minus(Duration.ofDays(120)).epochSecond / 3600 * 3600
+        history.stationHistoryDao().upsert(
+            StationHistoryEntity(DORF_TIROL.istat, old, observedC = 1.0, modelsJson = "{}"),
+        )
+        repo.refreshObservation(DORF_TIROL)
+        val rows = history.stationHistoryDao().history(DORF_TIROL.istat, 0).first()
+        assertTrue("the ancient row was pruned by the station path", rows.any { it.hourEpoch == old })
+    }
+
+    @Test
+    fun `a place without a station makes no station call and says so`() = runTest {
+        assertFalse(repo.refreshObservation(STERZING))
+        assertEquals(0, siag.stationCalls)
+    }
+
+    /** A failed poll leaves the cached reading where it is and reports the failure to its caller. */
+    @Test
+    fun `a failed station refresh keeps what was cached`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        val before = repo.snapshot(DORF_TIROL, "de").first().observation
+        siag.fail = true
+        clock.now = clock.now.plus(Duration.ofMinutes(10))
+
+        assertFalse(repo.refreshObservation(DORF_TIROL))
+        assertEquals(before, repo.snapshot(DORF_TIROL, "de").first().observation)
+    }
+
+    /**
+     * The reason `refreshObservation` takes the same mutex as `refresh` rather than slipping past
+     * it: the observation write is a read-modify-write, and two of them interleaving would lose the
+     * carried previous reading.
+     */
+    @Test
+    fun `a station refresh and a full refresh do not interleave`() = runTest {
+        val full = async { repo.refresh(DORF_TIROL, "de") }
+        val station = async { repo.refreshObservation(DORF_TIROL) }
+        full.await()
+        station.await()
+
+        val s = repo.snapshot(DORF_TIROL, "de").first()
+        assertNotNull(s.observation)
+        assertEquals(Source.entries.toSet(), s.forecasts.keys)
+    }
+
+    /** What the loop reads to know when it last asked, as opposed to when SIAG last measured. */
+    @Test
+    fun `the snapshot says when the station was last asked`() = runTest {
+        assertNull(repo.snapshot(DORF_TIROL, "de").first().lastObservationFetch)
+        repo.refreshObservation(DORF_TIROL)
+        assertEquals(clock.now, repo.snapshot(DORF_TIROL, "de").first().lastObservationFetch)
+    }
 }

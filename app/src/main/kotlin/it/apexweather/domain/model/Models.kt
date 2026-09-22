@@ -391,6 +391,15 @@ data class WeatherSnapshot(
     val warningStatus: SourceStatus?,
     val lastSuccessfulRefresh: Instant?,
     val lastRefreshFailed: Boolean,
+    /**
+     * When the station was last asked, successfully or not.
+     *
+     * Separate from [observationStatus] and from [lastSuccessfulRefresh] because the foreground loop
+     * polls the station on its own cadence: it needs to know when *it* last asked, and the
+     * observation's own timestamp is SIAG's reading time, which lags the fetch by up to twenty
+     * minutes. Null before the first attempt.
+     */
+    val lastObservationFetch: Instant? = null,
 ) {
     val isEmpty: Boolean get() = forecasts.isEmpty() && bulletin == null && observation == null
 

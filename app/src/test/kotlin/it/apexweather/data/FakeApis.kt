@@ -140,7 +140,12 @@ internal class FakeSiag(var fail: Boolean = false) : SiagApi {
         val fixture = if (istat == "021101") "siag_kmos.json" else "siag_kmos_sterzing.json"
         return Fixtures.json.decodeFromString(KmosResponse.serializer(), Fixtures.read(fixture))
     }
+    /** How many times the station list was asked for, so a station-only refresh can be counted. */
+    var stationCalls: Int = 0
+        private set
+
     override suspend fun stations(categoryId: Int, visibility: Int): SiagStationsResponse {
+        stationCalls++
         if (fail) throw IOException("siag down")
         return Fixtures.json.decodeFromString(SiagStationsResponse.serializer(), Fixtures.read("siag_stations.json"))
     }
