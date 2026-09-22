@@ -2,6 +2,8 @@ package it.apexweather.ui.share
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -153,7 +155,10 @@ class ShareSheetTest {
             ApexTheme {
                 CompositionLocalProvider(LocalFormats provides Formats(Locale.US, true)) {
                     val base = LocalDensity.current
-                    Column {
+                    // Scrollable, so the column's max height is unbounded. A plain Column hands
+                    // its last child whatever height is left on screen, which squeezed the second
+                    // card and made this test fail for a reason that had nothing to do with fonts.
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
                         listOf(1f, 2f).forEach { scale ->
                             CompositionLocalProvider(
                                 LocalDensity provides Density(base.density, fontScale = scale),
@@ -167,8 +172,8 @@ class ShareSheetTest {
         }
         val one = rule.onNodeWithTag("scaled_1.0").getUnclippedBoundsInRoot()
         val two = rule.onNodeWithTag("scaled_2.0").getUnclippedBoundsInRoot()
-        assertEquals(one.width.value, two.width.value, 0.5f)
-        assertEquals(one.height.value, two.height.value, 0.5f)
+        assertEquals((one.right - one.left).value, (two.right - two.left).value, 0.5f)
+        assertEquals((one.bottom - one.top).value, (two.bottom - two.top).value, 0.5f)
     }
 
     /** And the disabled case, driven through the hero rather than through the builder. */
