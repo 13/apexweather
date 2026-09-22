@@ -29,7 +29,7 @@ class SettingsContentTest {
         ApexTheme {
             SettingsContent(
                 settings = settings,
-                onLanguage = {}, onWindUnit = {}, onAnimations = {}, onRefresh = {},
+                onLanguage = {}, onWindUnit = {}, onAnimations = {}, onAmateurStations = {}, onRefresh = {},
                 notificationsAllowed = notificationsAllowed,
                 onNotifySummary = onNotifySummary,
                 onNotifySummaryHour = onNotifySummaryHour,
