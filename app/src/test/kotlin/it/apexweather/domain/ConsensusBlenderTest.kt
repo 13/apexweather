@@ -833,4 +833,52 @@ class ConsensusBlenderTest {
         )
         assertEquals(40, ConsensusBlender().blend(f, ensemble = elsewhere).hourly.single().precipProb)
     }
+
+    /**
+     * The offset is the median of the per-model differences, not the difference of the two medians.
+     *
+     * Constructed so the two arithmetics disagree: every model publishes a temperature, only two
+     * publish an apparent one, so the temperature median is over three models and the apparent
+     * median over two. Median of temps = 12,0; median of the two published feels = 17,0; their
+     * difference is 5,0. The paired differences are +2,0 and +4,0, whose median is 3,0.
+     */
+    @Test
+    fun `feels-like offset pairs each model with itself`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, feelsLike = 12.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 12.0))),
+            Source.ICON_2I to forecast(Source.ICON_2I, listOf(point(0, 18.0, feelsLike = 22.0))),
+        )
+        val h = blender.blend(f).hourly.single()
+        assertEquals(12.0, h.tempC, 0.0)
+        assertEquals(17.0, h.feelsLikeC!!, 0.0)
+        assertEquals(3.0, h.feelsOffsetC!!, 0.0)
+    }
+
+    @Test
+    fun `feels-like offset is null when no model publishes an apparent temperature`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 14.0))),
+        )
+        assertNull(blender.blend(f).hourly.single().feelsOffsetC)
+    }
+
+    /**
+     * BiasCorrector subtracts the same correction from tempC and from feelsLikeC, so inside the
+     * pair it cancels exactly. That is what makes the offset safe to add to the hero, which has
+     * been through a different correction path entirely.
+     */
+    @Test
+    fun `bias correction cancels inside the feels-like offset`() {
+        val f = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, feelsLike = 13.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 12.0, feelsLike = 15.0))),
+        )
+        val plain = blender.blend(f).hourly.single()
+        val corrected = blender.blend(f, bias = bias(Source.ICON_CH1, 2.0)).hourly.single()
+        assertEquals(3.0, plain.feelsOffsetC!!, 0.0)
+        assertEquals(3.0, corrected.feelsOffsetC!!, 0.0)
+        assertTrue(corrected.tempC < plain.tempC)
+    }
 }
