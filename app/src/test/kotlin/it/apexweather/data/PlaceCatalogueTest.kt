@@ -134,4 +134,67 @@ class PlaceCatalogueTest {
         val collator = java.text.Collator.getInstance(Locale.ITALIAN).apply { strength = java.text.Collator.PRIMARY }
         assertEquals(italian.sortedWith(collator), italian)
     }
+
+    /**
+     * An amateur station never replaces the provincial one; it stands beside it, and
+     * [Place.readingStation] is the one everything else asks. The provincial record is what the app
+     * falls back to when the amateur station goes quiet — which it does routinely, since Weather
+     * Underground answers "nothing in the last 60 minutes" for a live station too.
+     */
+    @Test
+    fun `a place with an amateur station reads it and keeps the provincial one`() {
+        val json = """
+            [{"istat":"021101","nameDe":"Dorf Tirol","nameIt":"Tirolo","nameEn":"Tirol",
+              "lat":46.688958,"lon":11.156624,"altitudeM":594,"district":2,
+              "station":{"code":"23200MS","name":"Meran","lat":46.688,"lon":11.1366,
+                         "altitudeM":330,"distanceKm":1.53},
+              "pws":{"network":"wu","code":"ITIROL16","name":"Tirolo - Tirol",
+                     "lat":46.693246,"lon":11.155237,"altitudeM":634,"distanceKm":0.49}}]
+        """.trimIndent()
+        val place = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            .decodeFromString(
+                kotlinx.serialization.builtins.ListSerializer(it.apexweather.domain.Place.serializer()),
+                json,
+            )
+            .single()
+        assertEquals("ITIROL16", place.pws!!.code)
+        assertEquals("wu", place.pws!!.network)
+        assertEquals("23200MS", place.station!!.code)
+        // Defaulted, so a catalogue written before this reads as the province's own — which it is.
+        assertEquals("siag", place.station!!.network)
+        assertEquals("ITIROL16", place.readingStation!!.code)
+    }
+
+    @Test
+    fun `a place without an amateur station reads the provincial one`() {
+        val json = """
+            [{"istat":"021115","nameDe":"Sterzing","nameIt":"Vipiteno","nameEn":"Vipiteno",
+              "lat":46.8967,"lon":11.4333,"altitudeM":948,"district":5,
+              "station":{"code":"X","name":"X","lat":46.9,"lon":11.4,"altitudeM":900,"distanceKm":2.0}}]
+        """.trimIndent()
+        val place = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            .decodeFromString(
+                kotlinx.serialization.builtins.ListSerializer(it.apexweather.domain.Place.serializer()),
+                json,
+            )
+            .single()
+        assertNull(place.pws)
+        assertEquals("X", place.readingStation!!.code)
+    }
+
+    /** A place with neither has nothing to measure, and that is not a failure. */
+    @Test
+    fun `a place with no station at all reads nothing`() {
+        val json = """
+            [{"istat":"021115","nameDe":"Sterzing","nameIt":"Vipiteno","nameEn":"Vipiteno",
+              "lat":46.8967,"lon":11.4333,"altitudeM":948,"district":5}]
+        """.trimIndent()
+        val place = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            .decodeFromString(
+                kotlinx.serialization.builtins.ListSerializer(it.apexweather.domain.Place.serializer()),
+                json,
+            )
+            .single()
+        assertNull(place.readingStation)
+    }
 }
