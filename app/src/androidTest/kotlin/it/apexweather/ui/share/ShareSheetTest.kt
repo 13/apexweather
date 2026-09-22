@@ -182,4 +182,73 @@ class ShareSheetTest {
         showHome(state.copy(place = null))
         rule.onNodeWithTag("share_today").assertIsNotEnabled()
     }
+
+    // ---- how far the picture reaches ----
+
+    @Test
+    fun theHeroShareOffersThreeRanges() {
+        showHome()
+        rule.onNodeWithTag("share_today").performClick()
+        rule.onNodeWithTag("share_range_chips").assertIsDisplayed()
+        rule.onNodeWithTag("share_range_TODAY").assertIsDisplayed()
+        rule.onNodeWithTag("share_range_THREE_DAYS").assertIsDisplayed()
+        rule.onNodeWithTag("share_range_SEVEN_DAYS").assertIsDisplayed()
+    }
+
+    /**
+     * A day picked from the day sheet is a question about that day; offering "7 Tage" there would
+     * answer one the reader did not ask.
+     */
+    @Test
+    fun theDaySheetShareOffersNoRanges() {
+        showHome()
+        rule.onNodeWithTag("home_list").performScrollToNode(hasTestTag("day_row_4"))
+        rule.onNodeWithTag("day_row_4").performClick()
+        rule.onNodeWithTag("day_detail_share").performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals(0, rule.onAllNodesWithTag("share_range_chips").fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun pickingAWeekDrawsDayRowsAndReportsIt() {
+        var picked: ShareRange? = null
+        rule.setContent {
+            ApexTheme { HomeContent(state = state, onRefresh = {}, onOpenBulletin = {}, onShareRange = { picked = it }) }
+        }
+        rule.onNodeWithTag("share_today").performClick()
+        rule.onNodeWithTag("share_range_SEVEN_DAYS").performClick()
+
+        assertEquals(ShareRange.SEVEN_DAYS, picked)
+        rule.onNodeWithTag("share_card_days").assertIsDisplayed()
+    }
+
+    /** The promise holds for the day cards too, not only the one the guard was written for. */
+    @Test
+    fun everyRangeIsTheSameSizeAtEveryFontScale() {
+        val cards = ShareRange.entries.associateWith { ShareCardStateBuilder.today(state, Locale.US, it)!! }
+        rule.setContent {
+            ApexTheme {
+                CompositionLocalProvider(LocalFormats provides Formats(Locale.US, true)) {
+                    val base = LocalDensity.current
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        cards.forEach { (range, card) ->
+                            listOf(1f, 2f).forEach { scale ->
+                                CompositionLocalProvider(
+                                    LocalDensity provides Density(base.density, fontScale = scale),
+                                ) {
+                                    Box(Modifier.testTag("${range.name}_$scale")) { ShareCard(card) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        ShareRange.entries.forEach { range ->
+            val one = rule.onNodeWithTag("${range.name}_1.0").getUnclippedBoundsInRoot()
+            val two = rule.onNodeWithTag("${range.name}_2.0").getUnclippedBoundsInRoot()
+            assertEquals("$range width", (one.right - one.left).value, (two.right - two.left).value, 0.5f)
+            assertEquals("$range height", (one.bottom - one.top).value, (two.bottom - two.top).value, 0.5f)
+        }
+    }
 }

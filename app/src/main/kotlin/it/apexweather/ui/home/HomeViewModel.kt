@@ -3,10 +3,12 @@ package it.apexweather.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WarningDismissals
 import it.apexweather.domain.model.Warning
 import it.apexweather.ui.StaleRefresher
 import it.apexweather.ui.WeatherStateHolder
+import it.apexweather.ui.share.ShareRange
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -21,6 +23,7 @@ class HomeViewModel @Inject constructor(
     private val holder: WeatherStateHolder,
     private val refresher: StaleRefresher,
     private val dismissals: WarningDismissals,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
 
     // The shared state is already built; this only stamps on whether a refresh is in flight.
@@ -53,6 +56,9 @@ class HomeViewModel @Inject constructor(
     fun dismissWarning(warning: Warning) = viewModelScope.launch { dismissals.dismiss(warning) }
 
     fun restoreWarning(warning: Warning) = viewModelScope.launch { dismissals.restore(warning) }
+
+    /** How far the shared picture reaches, remembered for the next share. */
+    fun setShareRange(range: ShareRange) = viewModelScope.launch { settings.setShareRange(range) }
 
 
 }

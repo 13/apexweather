@@ -496,7 +496,7 @@ internal fun agreementColor(agreement: Float): Color = when {
 }
 
 /** Neutral grey: not agreement, not disagreement, simply nothing to compare. */
-private val SingleModelColor = Color(0xFF9AA6B8)
+internal val SingleModelColor = Color(0xFF9AA6B8)
 
 @Composable
 private fun AgreementDot(agreement: Float, sourceCount: Int, ensembleBacked: Boolean) {

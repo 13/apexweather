@@ -399,4 +399,7 @@
     <string name="share_snow_from_with_chance">Snow from %1$s · %2$d %%</string>
     <string name="share_snow_chance">Chance of snow %1$d %%</string>
     <string name="updated_at_stale">Updated %1$s · cannot be reached</string>
+    <string name="share_range_today">Today</string>
+    <string name="share_range_3">3 days</string>
+    <string name="share_range_7">7 days</string>
 </resources>

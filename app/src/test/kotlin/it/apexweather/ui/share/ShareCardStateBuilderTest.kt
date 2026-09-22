@@ -14,6 +14,7 @@ import it.apexweather.domain.point
 import it.apexweather.ui.home.HomeStateBuilder
 import it.apexweather.ui.home.HomeUiState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -34,10 +35,14 @@ class ShareCardStateBuilderTest {
     private val blender = ConsensusBlender()
     private val german = Locale.GERMANY
 
-    /** Three days of hours, so a card for tomorrow has something to draw. */
+    /**
+     * Nine days of hours: enough that a seven-day card is a real seven rather than a truncated one,
+     * and that the truncation case has to be built deliberately rather than falling out of a short
+     * fixture.
+     */
     private val forecasts = mapOf(
-        Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 72).map { point(it, 10.0 + it % 10, precip = 0.4, condition = Condition.RAIN) }),
-        Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 72).map { point(it, 12.0 + it % 10, precip = 0.6, condition = Condition.RAIN) }),
+        Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 216).map { point(it, 10.0 + it % 10, precip = 0.4, condition = Condition.RAIN) }),
+        Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 216).map { point(it, 12.0 + it % 10, precip = 0.6, condition = Condition.RAIN) }),
     )
     private val snapshot = WeatherSnapshot.EMPTY.copy(forecasts = forecasts)
     private val consensus = blender.blend(forecasts)
@@ -146,5 +151,101 @@ class ShareCardStateBuilderTest {
         val card = ShareCardStateBuilder.today(state, german)!!
         assertEquals(state.palette, card.palette)
         assertNotNull(card.condition)
+    }
+
+    // ---- the day ranges ----
+
+    @Test
+    fun `three days carries three rows beginning with today`() {
+        val card = ShareCardStateBuilder.today(home(), german, ShareRange.THREE_DAYS)!!
+        assertEquals(3, card.days.size)
+        assertEquals(card.date, card.days.first().date)
+        assertEquals(card.date.plusDays(2), card.days.last().date)
+    }
+
+    @Test
+    fun `seven days carries seven`() {
+        assertEquals(7, ShareCardStateBuilder.today(home(), german, ShareRange.SEVEN_DAYS)!!.days.size)
+    }
+
+    /**
+     * One or the other, never both. A card that answered "what is this afternoon like" and "what is
+     * the week like" at once would be two cards stapled together, taller than a chat preview shows.
+     */
+    @Test
+    fun `a day range drops the hours and today drops the days`() {
+        val week = ShareCardStateBuilder.today(home(), german, ShareRange.SEVEN_DAYS)!!
+        assertTrue(week.hours.isEmpty())
+
+        val today = ShareCardStateBuilder.today(home(), german, ShareRange.TODAY)!!
+        assertTrue(today.days.isEmpty())
+        assertTrue(today.hours.isNotEmpty())
+    }
+
+    /**
+     * Each row answers for itself, which is the whole argument for showing a week: the far days are
+     * built from fewer models and have to be able to say so.
+     */
+    @Test
+    fun `each row carries its own agreement and source count`() {
+        val card = ShareCardStateBuilder.today(home(), german, ShareRange.SEVEN_DAYS)!!
+        val source = home().days.filter { !it.date.isBefore(card.date) }.take(7)
+        assertEquals(source.map { it.sourceCount }, card.days.map { it.sourceCount })
+        assertEquals(source.map { it.agreement }, card.days.map { it.agreement })
+    }
+
+    /**
+     * Whatever the forecast reaches, never padded: a seventh empty row is a claim about a day
+     * nobody computed.
+     */
+    @Test
+    fun `a forecast that does not reach seven days yields only what it has`() {
+        val short = home()
+        val trimmed = short.copy(days = short.days.take(4))
+        assertEquals(4, ShareCardStateBuilder.today(trimmed, german, ShareRange.SEVEN_DAYS)!!.days.size)
+    }
+
+    /**
+     * A reader switching chips must not watch the current temperature change underneath them. The
+     * hero is one answer about now, and the range is a question about how far the picture reaches.
+     */
+    @Test
+    fun `the hero is identical across every range`() {
+        val state = home().copy(heroTempC = 99.0, heroAdjustmentC = -1.9)
+        val cards = ShareRange.entries.map { ShareCardStateBuilder.today(state, german, it)!! }
+        assertEquals(1, cards.map { it.tempC }.distinct().size)
+        assertEquals(1, cards.map { it.adjustmentC }.distinct().size)
+        assertEquals(1, cards.map { it.condition }.distinct().size)
+    }
+
+    /**
+     * Read from the data rather than from the arithmetic that it cannot happen inside seven days —
+     * a reach that shortens upstream must not quietly turn the card into one model's opinion.
+     */
+    @Test
+    fun `a single-model day is noticed wherever it falls`() {
+        val state = home()
+        val thinned = state.copy(
+            days = state.days.mapIndexed { i, d -> if (i >= 5) d.copy(sourceCount = 1, ensembleHalfWidthC = null) else d },
+        )
+        val card = ShareCardStateBuilder.today(thinned, german, ShareRange.SEVEN_DAYS)!!
+        assertTrue(card.hasSingleModelDay)
+        assertFalse(card.singleModelDaysAreEnsembleBacked)
+
+        val backed = state.copy(
+            days = state.days.mapIndexed { i, d -> if (i >= 5) d.copy(sourceCount = 1, ensembleHalfWidthC = 2.0) else d },
+        )
+        assertTrue(ShareCardStateBuilder.today(backed, german, ShareRange.SEVEN_DAYS)!!.singleModelDaysAreEnsembleBacked)
+    }
+
+    @Test
+    fun `a full week of models says nothing about thinning`() {
+        assertFalse(ShareCardStateBuilder.today(home(), german, ShareRange.SEVEN_DAYS)!!.hasSingleModelDay)
+    }
+
+    @Test
+    fun `there is nothing to share in any range before the first fetch`() {
+        val empty = HomeStateBuilder.build(DORF_TIROL, WeatherSnapshot.EMPTY, AppSettings(), blender.blend(emptyMap()), now = hour(10))
+        ShareRange.entries.forEach { assertNull(ShareCardStateBuilder.today(empty, german, it)) }
     }
 }

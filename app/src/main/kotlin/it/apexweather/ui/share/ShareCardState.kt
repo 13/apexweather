@@ -21,6 +21,46 @@ data class ShareHour(
 )
 
 /**
+ * How much of the forecast the picture carries.
+ *
+ * Three, and not a slider: the two questions people actually have are "the next few days" and "the
+ * week". A date picker on a share sheet is a different product.
+ *
+ * Fourteen is deliberately absent even though the day list runs that far. Past about day ten the
+ * consensus is down to one model, and the list can afford that because the reader can tap the day
+ * and be told what the grey dot means. A picture cannot be tapped, so it would carry a caveat its
+ * recipient can do nothing with.
+ */
+enum class ShareRange(val days: Int) {
+    TODAY(0),
+    THREE_DAYS(3),
+    SEVEN_DAYS(7),
+}
+
+/**
+ * One day as the shared picture draws it.
+ *
+ * It carries its **own** agreement and source count rather than the card's, because that is the
+ * whole argument for showing a week at all: `ApexWidget`'s tall size stops at five days on the
+ * ground that past about day five only the globals reach and a widget has nowhere to put the badge
+ * or its explanation. A card has room for both, so the far days say for themselves how well the
+ * models agreed.
+ */
+data class ShareDay(
+    val date: LocalDate,
+    val condition: Condition,
+    val minC: Double,
+    val maxC: Double,
+    val precipMm: Double,
+    val snowCm: Double?,
+    val precipProb: Int,
+    val agreement: Float,
+    val sourceCount: Int,
+    /** Whether an ensemble reached this day, which is what makes a one-model day's dot coloured. */
+    val ensembleBacked: Boolean,
+)
+
+/**
  * Everything the shared picture says, and nothing that would have to be recomputed to draw it.
  *
  * This is deliberately a snapshot rather than a view onto [HomeUiState]: the card is captured into a
@@ -50,8 +90,27 @@ data class ShareCardState(
     /** How many models the day was built from, for the footer. Zero where nothing was blended. */
     val sourceCount: Int,
     val palette: SkyPalette,
+    /** Today's hours — populated for [ShareRange.TODAY] and empty for the day ranges. */
     val hours: List<ShareHour>,
-)
+    /** The day rows — populated for the day ranges and empty for [ShareRange.TODAY]. */
+    val days: List<ShareDay> = emptyList(),
+    val range: ShareRange = ShareRange.TODAY,
+) {
+    /**
+     * Whether any day on this card is down to a single model, which is when the tail sentence has to
+     * be said.
+     *
+     * Read from the data rather than from the arithmetic that it cannot happen inside seven days.
+     * It is true today that GFS reaches 336 h, GEM 243 h and UKMO 171 h, so day seven still has
+     * several models — but a reach that shortens upstream must not quietly turn this card into one
+     * model's opinion wearing a consensus's clothes.
+     */
+    val hasSingleModelDay: Boolean get() = days.any { it.sourceCount == 1 }
+
+    /** And whether an ensemble stood behind those days, which decides which sentence it is. */
+    val singleModelDaysAreEnsembleBacked: Boolean
+        get() = days.any { it.sourceCount == 1 && it.ensembleBacked }
+}
 
 /**
  * Builds [ShareCardState] from the state the home screen already holds.
@@ -80,12 +139,20 @@ object ShareCardStateBuilder {
      * blank sky, and a card of dashes is worse than no card — the buttons are disabled for exactly
      * this state rather than producing one.
      */
-    fun today(state: HomeUiState, locale: java.util.Locale): ShareCardState? {
+    fun today(
+        state: HomeUiState,
+        locale: java.util.Locale,
+        range: ShareRange = ShareRange.TODAY,
+    ): ShareCardState? {
         val place = state.place ?: return null
         if (state.isEmpty) return null
         val date = state.now.atZone(SouthTyrol.ZONE).toLocalDate()
         val day = state.days.firstOrNull { it.date == date }
-        val hours = todayHours(state, date)
+        // One or the other, never both: "what is this afternoon like" and "what is the week like"
+        // are different questions, and a card answering both is two cards stapled together — taller
+        // than a chat preview shows, with the important half below the crop.
+        val hours = if (range == ShareRange.TODAY) todayHours(state, date) else emptyList()
+        val days = if (range == ShareRange.TODAY) emptyList() else dayRows(state, date, range.days)
         return ShareCardState(
             placeName = place.name(locale),
             date = date,
@@ -100,6 +167,8 @@ object ShareCardStateBuilder {
             sourceCount = day?.sourceCount ?: state.currentHour?.sourceCount ?: 0,
             palette = state.palette,
             hours = hours,
+            days = days,
+            range = range,
         )
     }
 
@@ -153,6 +222,28 @@ object ShareCardStateBuilder {
         }
         return ofDay.drop(start).take(TODAY_COLUMNS).map { it.toShareHour(state) }
     }
+
+    /**
+     * The day rows, from today forward.
+     *
+     * Whatever the forecast actually reaches, never padded: a six-day card on a short forecast is
+     * honest where a seventh empty row is a claim about a day nobody computed.
+     */
+    private fun dayRows(state: HomeUiState, from: LocalDate, count: Int): List<ShareDay> =
+        state.days.filter { !it.date.isBefore(from) }.take(count).map {
+            ShareDay(
+                date = it.date,
+                condition = it.condition,
+                minC = it.minC,
+                maxC = it.maxC,
+                precipMm = it.precipMm,
+                snowCm = it.snowCm,
+                precipProb = it.precipProb,
+                agreement = it.agreement,
+                sourceCount = it.sourceCount,
+                ensembleBacked = it.ensembleHalfWidthC != null,
+            )
+        }
 
     /** A future day at three-hour steps, so six columns cover the daylight a reader plans around. */
     private fun dayHours(state: HomeUiState, date: LocalDate): List<ShareHour> {

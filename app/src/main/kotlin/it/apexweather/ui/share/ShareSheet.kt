@@ -16,6 +16,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,6 +31,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import it.apexweather.R
+import it.apexweather.ui.common.CompactLabel
 
 /**
  * The preview the reader sees before anything leaves the phone.
@@ -48,6 +52,13 @@ fun ShareSheetContent(
     layer: GraphicsLayer,
     onShare: () -> Unit,
     onClose: () -> Unit,
+    /**
+     * Null where the reader has already picked a day.
+     *
+     * Opening the preview from the day sheet means they asked about Thursday, and offering "7 Tage"
+     * there would answer a question they did not ask.
+     */
+    onRange: ((ShareRange) -> Unit)? = null,
 ) {
     Column(
         Modifier.verticalScroll(rememberScrollState())
@@ -64,6 +75,10 @@ fun ShareSheetContent(
             IconButton(onClick = onClose, modifier = Modifier.testTag("share_sheet_close")) {
                 Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), tint = Color.White.copy(alpha = 0.8f))
             }
+        }
+        if (onRange != null) {
+            Spacer(Modifier.height(4.dp))
+            RangeChips(state.range, onRange)
         }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -85,6 +100,38 @@ fun ShareSheetContent(
             Icon(Icons.Filled.Share, contentDescription = null)
             Spacer(Modifier.padding(horizontal = 4.dp))
             Text(stringResource(R.string.share_action))
+        }
+    }
+}
+
+/**
+ * How far the picture reaches.
+ *
+ * `icon = {}` because Material reserves about 24 dp for a tick in *every* segment whether it is
+ * shown or not, and the fill already says which one is on; `CompactLabel` because these labels sit
+ * in a control whose width is not their own, and "7 Tage" must not wrap inside its own segment at a
+ * 2x font scale — the same rule the comparison and settings screens are held to.
+ */
+@Composable
+private fun RangeChips(selected: ShareRange, onRange: (ShareRange) -> Unit) {
+    val labels = mapOf(
+        ShareRange.TODAY to R.string.share_range_today,
+        ShareRange.THREE_DAYS to R.string.share_range_3,
+        ShareRange.SEVEN_DAYS to R.string.share_range_7,
+    )
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().testTag("share_range_chips")) {
+        ShareRange.entries.forEachIndexed { i, range ->
+            SegmentedButton(
+                selected = selected == range,
+                onClick = { onRange(range) },
+                shape = SegmentedButtonDefaults.itemShape(i, ShareRange.entries.size),
+                icon = {},
+                modifier = Modifier.testTag("share_range_${range.name}"),
+            ) {
+                CompactLabel {
+                    Text(stringResource(labels.getValue(range)), maxLines = 1)
+                }
+            }
         }
     }
 }

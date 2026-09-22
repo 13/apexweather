@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,8 +20,11 @@ import it.apexweather.ui.common.Formats
 import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.share.ShareCard
 import it.apexweather.ui.share.ShareCardState
+import it.apexweather.ui.share.ShareDay
+import it.apexweather.ui.share.ShareRange
 import it.apexweather.ui.share.ShareHour
 import it.apexweather.ui.theme.ApexTheme
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -148,4 +152,64 @@ class ShareCardScreenshotTest {
             hours = hours(from = 16, precip = List(8) { 0.0 }, phase = SunPhase.NIGHT),
         ),
     )
+
+    private fun days(count: Int, thinFrom: Int? = null, ensembleBacked: Boolean = false): List<ShareDay> =
+        (0 until count).map { i ->
+            val thin = thinFrom != null && i >= thinFrom
+            ShareDay(
+                date = at(12).atZone(ROME).toLocalDate().plusDays(i.toLong()),
+                condition = listOf(Condition.CLEAR, Condition.PARTLY_CLOUDY, Condition.RAIN, Condition.CLOUDY)[i % 4],
+                minC = 8.0 + i % 4,
+                maxC = 19.0 + i % 5,
+                precipMm = if (i % 3 == 2) 2.4 else 0.0,
+                snowCm = null,
+                precipProb = if (i % 3 == 2) 70 else 10 * i % 40,
+                agreement = if (thin) 0.4f else 0.9f - 0.08f * i,
+                sourceCount = if (thin) 1 else 13 - i,
+                ensembleBacked = thin && ensembleBacked,
+            )
+        }
+
+    private fun dayCard(range: ShareRange, rows: List<ShareDay>) =
+        card(hours = emptyList()).copy(range = range, days = rows)
+
+    @Test
+    fun `three days`() = capture("share_card_3d", dayCard(ShareRange.THREE_DAYS, days(3)))
+
+    @Test
+    fun `seven days`() = capture("share_card_7d", dayCard(ShareRange.SEVEN_DAYS, days(7)))
+
+    /**
+     * The tail that has to be accounted for: a grey dot needs its sentence, and this is the only
+     * place that pairing is pinned. Built deliberately, because at seven days the real forecast
+     * still has several models — and the card must not depend on that staying true.
+     */
+    @Test
+    fun `seven days with a thinning consensus`() = capture(
+        "share_card_7d_thin",
+        dayCard(ShareRange.SEVEN_DAYS, days(7, thinFrom = 5)),
+    )
+
+    /**
+     * Chat clients crop previews, and the half that survives a crop is the top. A card much taller
+     * than about 1:1.8 loses its rows in the thumbnail — so the constraint is a measurement rather
+     * than a hope.
+     */
+    @Test
+    fun `the seven-day card stays inside a preview's crop`() {
+        val state = dayCard(ShareRange.SEVEN_DAYS, days(7, thinFrom = 5))
+        var ratio = 0f
+        captureRoboImage("build/tmp/share_card_ratio.png") {
+            ApexTheme {
+                CompositionLocalProvider(LocalFormats provides Formats(Locale.GERMANY, true)) {
+                    Box(
+                        Modifier.onGloballyPositioned { ratio = it.size.height.toFloat() / it.size.width },
+                    ) {
+                        ShareCard(state)
+                    }
+                }
+            }
+        }
+        assertTrue("the card is $ratio tall for its width; a preview would crop its rows", ratio < 1.8f)
+    }
 }

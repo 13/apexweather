@@ -1,5 +1,6 @@
 package it.apexweather.ui.share
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
@@ -21,6 +23,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -36,10 +41,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import it.apexweather.R
 import it.apexweather.domain.SouthTyrol
+import it.apexweather.domain.SunPhase
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.iconRes
 import it.apexweather.ui.common.label
+import it.apexweather.ui.home.SingleModelColor
+import it.apexweather.ui.home.agreementColor
 import it.apexweather.ui.home.PrecipScale
 import it.apexweather.ui.theme.fromArgb
 
@@ -140,7 +148,8 @@ private fun ShareCardBody(state: ShareCardState, modifier: Modifier) {
         AdjustmentLine(state)
 
         Spacer(Modifier.height(14.dp))
-        HourRow(state)
+        // One or the other; see ShareCardStateBuilder for why they are never stacked.
+        if (state.range == ShareRange.TODAY) HourRow(state) else DayRows(state)
         Spacer(Modifier.height(16.dp))
         Footer(state)
     }
@@ -243,6 +252,117 @@ private fun HourRow(state: ShareCardState) {
 }
 
 private val BarTrack = 26.dp
+
+/**
+ * The week, in the day list's own layout and the day list's own vocabulary.
+ *
+ * Same order as `DailySection` — weekday, icon, amount over chance, low, range, high, dot — because
+ * a reader who has learnt one should not have to learn the other, and a shared image is the worst
+ * place to introduce private notation.
+ *
+ * The rows are sized by their content rather than by `DayRowMinHeight`. That constant is 44 dp
+ * because a finger has to hit the row and open a sheet; there are no fingers in a PNG.
+ */
+@Composable
+private fun DayRows(state: ShareCardState) {
+    if (state.days.isEmpty()) return
+    val formats = LocalFormats.current
+    val accent = Color.fromArgb(state.palette.accent)
+    // Normalised across the days actually shown, so the bars compare with each other and with
+    // nothing else — which is what makes a week scannable at a glance.
+    val low = state.days.minOf { it.minC }
+    val high = state.days.maxOf { it.maxC }
+    Column(Modifier.fillMaxWidth().testTag("share_card_days")) {
+        state.days.forEachIndexed { i, d ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (i == 0) stringResource(R.string.today) else Format.weekday(d.date, formats),
+                    style = MaterialTheme.typography.labelMedium, color = Color.White,
+                    modifier = Modifier.width(46.dp),
+                )
+                Icon(
+                    painterResource(d.condition.iconRes(SunPhase.DAY)),
+                    contentDescription = null, tint = Color.White,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Column(Modifier.width(44.dp)) {
+                    val frozen = Format.showsSnow(d.snowCm, d.condition)
+                    Text(
+                        when {
+                            frozen -> Format.precip(d.precipMm, d.snowCm, d.condition, formats)
+                            d.precipMm >= 0.5 -> Format.mm(d.precipMm, formats)
+                            else -> ""
+                        },
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                        color = Color(0xFFB9D2F5),
+                        maxLines = 1,
+                    )
+                    Text(
+                        if (d.precipProb > 0) stringResource(R.string.unit_percent, d.precipProb) else "",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                        color = Color(0xFFB9D2F5).copy(alpha = 0.7f),
+                        maxLines = 1,
+                    )
+                }
+                Text(
+                    Format.temp(d.minC, formats),
+                    style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.width(32.dp),
+                )
+                ShareRangeBar(d.minC, d.maxC, low, high, accent, Modifier.weight(1f).height(5.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    Format.temp(d.maxC, formats),
+                    style = MaterialTheme.typography.labelMedium, color = Color.White,
+                    fontWeight = FontWeight.SemiBold, modifier = Modifier.width(32.dp),
+                )
+                // The day list's dot, unchanged. This is the whole reason a week is defensible on a
+                // picture: ApexWidget stops at five days because a widget has nowhere to put the
+                // badge or its explanation, and a card has room for both.
+                val single = d.sourceCount == 1 && !d.ensembleBacked
+                Box(
+                    Modifier.padding(start = 6.dp).size(7.dp).clip(CircleShape)
+                        .background(if (single) SingleModelColor else agreementColor(d.agreement)),
+                )
+            }
+        }
+        // Said once, and only where the data says it: a coloured dot on a single-model day has to be
+        // accounted for, and a grey one has to be explained.
+        if (state.hasSingleModelDay) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(
+                    if (state.singleModelDaysAreEnsembleBacked) R.string.daily_tail_note_ensemble
+                    else R.string.daily_tail_note,
+                ),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                color = Color.White.copy(alpha = 0.55f),
+                modifier = Modifier.testTag("share_card_tail_note"),
+            )
+        }
+    }
+}
+
+/** The day list's range bar, at the card's own proportions. */
+@Composable
+private fun ShareRangeBar(min: Double, max: Double, low: Double, high: Double, accent: Color, modifier: Modifier) {
+    Canvas(modifier) {
+        val span = (high - low).coerceAtLeast(1.0)
+        val x0 = ((min - low) / span * size.width).toFloat()
+        val x1 = ((max - low) / span * size.width).toFloat()
+        drawRoundRect(Color.White.copy(alpha = 0.12f), cornerRadius = CornerRadius(size.height / 2))
+        drawRoundRect(
+            Brush.horizontalGradient(listOf(Color(0xFF8FB3E8), accent), startX = x0, endX = x1),
+            topLeft = Offset(x0, 0f),
+            size = Size((x1 - x0).coerceAtLeast(size.height), size.height),
+            cornerRadius = CornerRadius(size.height / 2),
+        )
+    }
+}
 
 @Composable
 private fun CompactText(text: String, alpha: Float, weight: FontWeight? = null) {

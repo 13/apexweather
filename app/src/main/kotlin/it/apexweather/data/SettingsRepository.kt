@@ -13,6 +13,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Source
+import it.apexweather.ui.share.ShareRange
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -38,6 +39,14 @@ data class AppSettings(
     val animations: Boolean = true,
     val compareSources: Set<Source> = Source.entries.toSet(),
     val compareVariable: CompareVariable = CompareVariable.TEMPERATURE,
+    /**
+     * How far the shared picture reaches, remembered between shares.
+     *
+     * A single value rather than the exclusion set `compare_hidden_sources` uses: that one stores
+     * what is *hidden* because storing the visible set froze the list the day an eleventh model
+     * appeared. An enum has no such failure — an unknown stored name simply falls back.
+     */
+    val shareRange: ShareRange = ShareRange.TODAY,
     /**
      * Notifications, every one of them off until asked for. Android's own permission is a second
      * gate on top of these: a switch on here with the permission refused posts nothing.
@@ -108,6 +117,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         // who had hidden something one visit to this screen, and reads as everything being on.
         val hiddenCompareSources = stringSetPreferencesKey("compare_hidden_sources")
         val compareVariable = stringPreferencesKey("compare_variable")
+        val shareRange = stringPreferencesKey("share_range")
         val notifySummary = booleanPreferencesKey("notify_summary")
         val notifySummaryHour = intPreferencesKey("notify_summary_hour")
         val notifyRain = booleanPreferencesKey("notify_rain")
@@ -131,6 +141,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             compareSources = visibleSources(p[Keys.hiddenCompareSources]),
             compareVariable = p[Keys.compareVariable]?.let { runCatching { CompareVariable.valueOf(it) }.getOrNull() }
                 ?: CompareVariable.TEMPERATURE,
+            shareRange = p[Keys.shareRange]?.let { name -> runCatching { ShareRange.valueOf(name) }.getOrNull() }
+                ?: ShareRange.TODAY,
             notifySummary = p[Keys.notifySummary] ?: false,
             // Anything outside a day is a corrupt preference, not a choice; fall back rather than
             // schedule a summary for hour 47.
@@ -150,6 +162,9 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         it[Keys.hiddenCompareSources] = (Source.entries.toSet() - v).map { s -> s.name }.toSet()
     }
     suspend fun setCompareVariable(v: CompareVariable) = context.settingsStore.edit { it[Keys.compareVariable] = v.name }
+
+    suspend fun setShareRange(v: ShareRange) =
+        context.settingsStore.edit { prefs -> prefs[Keys.shareRange] = v.name }
     suspend fun setNotifySummary(v: Boolean) = context.settingsStore.edit { it[Keys.notifySummary] = v }
     suspend fun setNotifySummaryHour(v: Int) = context.settingsStore.edit { it[Keys.notifySummaryHour] = v.coerceIn(0, 23) }
     suspend fun setNotifyRain(v: Boolean) = context.settingsStore.edit { it[Keys.notifyRain] = v }

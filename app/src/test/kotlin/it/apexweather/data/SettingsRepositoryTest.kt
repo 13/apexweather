@@ -233,4 +233,16 @@ class SettingsRepositoryTest {
         assertEquals(kept.distinct(), kept)
         assertTrue(kept.size <= SettingsRepository.MAX_KEPT_PLACES)
     }
+
+    /**
+     * A single value rather than the exclusion set `compare_hidden_sources` uses: an enum cannot
+     * freeze a list the way a stored visible set did, and an unknown name simply falls back.
+     */
+    @Test
+    fun `the share range round-trips and an unknown value falls back`() = runTest {
+        assertEquals(it.apexweather.ui.share.ShareRange.TODAY, repo.settings.first().shareRange)
+
+        repo.setShareRange(it.apexweather.ui.share.ShareRange.SEVEN_DAYS)
+        assertEquals(it.apexweather.ui.share.ShareRange.SEVEN_DAYS, repo.settings.first().shareRange)
+    }
 }

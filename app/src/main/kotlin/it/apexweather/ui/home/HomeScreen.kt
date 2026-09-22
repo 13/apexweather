@@ -51,6 +51,7 @@ import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
 import it.apexweather.ui.common.labelRes
 import it.apexweather.ui.share.ShareCapture
+import it.apexweather.ui.share.ShareRange
 import it.apexweather.ui.share.ShareCardStateBuilder
 import it.apexweather.ui.share.ShareSheetContent
 import it.apexweather.ui.share.shareText
@@ -69,6 +70,7 @@ fun HomeScreen(onOpenBulletin: () -> Unit, onOpenPlaces: () -> Unit, viewModel: 
         onOpenPlaces = onOpenPlaces,
         onDismissWarning = viewModel::dismissWarning,
         onRestoreWarning = viewModel::restoreWarning,
+        onShareRange = viewModel::setShareRange,
     )
 }
 
@@ -81,11 +83,16 @@ fun HomeContent(
     onOpenPlaces: () -> Unit = {},
     onDismissWarning: (it.apexweather.domain.model.Warning) -> Unit = {},
     onRestoreWarning: (it.apexweather.domain.model.Warning) -> Unit = {},
+    onShareRange: (ShareRange) -> Unit = {},
 ) {
     var selectedHour by remember { mutableStateOf<Instant?>(null) }
     var selectedDay by remember { mutableStateOf<LocalDate?>(null) }
     var warningsOpen by remember { mutableStateOf(false) }
     var shareTarget by remember { mutableStateOf<LocalDate?>(null) }
+    // Which day the preview is rooted at, and how far it reaches. A day picked from the day sheet
+    // is a question about that day, so it gets no range chips; the hero's share does.
+    var shareIsToday by remember { mutableStateOf(true) }
+    var shareRange by remember(state.settings.shareRange) { mutableStateOf(state.settings.shareRange) }
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(state.isEmpty) { if (!state.isEmpty) appeared = true }
     val accent = Color.fromArgb(state.palette.accent)
@@ -105,7 +112,10 @@ fun HomeContent(
                     HeroSection(
                         state,
                         onOpenPlaces = onOpenPlaces,
-                        onShare = { shareTarget = state.now.atZone(SouthTyrol.ZONE).toLocalDate() },
+                        onShare = {
+                            shareIsToday = true
+                            shareTarget = state.now.atZone(SouthTyrol.ZONE).toLocalDate()
+                        },
                     )
                 }
                 item {
@@ -178,14 +188,20 @@ fun HomeContent(
             containerColor = MaterialTheme.colorScheme.surface,
             modifier = Modifier.testTag("day_detail_sheet"),
         ) {
-            DayDetail(day, state, onClose = { selectedDay = null }, onShare = { selectedDay = null; shareTarget = day.date })
+            DayDetail(day, state, onClose = { selectedDay = null }, onShare = { selectedDay = null; shareIsToday = false; shareTarget = day.date })
         }
     }
 
     // The preview, and the capture behind it. The card is built from the state as it stands the
     // moment the sheet opens and then held: a bitmap taken while the minute tick moved underneath it
     // would be a picture of two different minutes.
-    val shareState = shareTarget?.let { ShareCardStateBuilder.day(state, it, LocalConfiguration.current.locales[0]) }
+    val shareLocale = LocalConfiguration.current.locales[0]
+    val shareState = shareTarget?.let {
+        // Rebuilt from this same state whichever chip is on, so the hero cannot change under the
+        // reader while they are choosing how far the picture reaches.
+        if (shareIsToday) ShareCardStateBuilder.today(state, shareLocale, shareRange)
+        else ShareCardStateBuilder.day(state, it, shareLocale)
+    }
     if (shareState != null) {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
@@ -210,6 +226,7 @@ fun HomeContent(
                 state = shareState,
                 layer = layer,
                 onClose = { shareTarget = null },
+                onRange = if (shareIsToday) { picked -> shareRange = picked; onShareRange(picked) } else null,
                 onShare = {
                     scope.launch {
                         val uri = ShareCapture.write(context, layer.toImageBitmap(), state.now)
