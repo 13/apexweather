@@ -34,6 +34,34 @@ converted number and becomes a reading taken at roughly the reader's own altitud
 The same table is the argument for everything defensive in this design. Four of the seven report an
 altitude that cannot be true, and one still evening spreads six degrees over two kilometres.
 
+## What a good amateur station actually looks like here
+
+ITIROL16 against the official Meran thermometer, both hourly, 2026-09-22 (Meran from Open Data Hub,
+ITIROL16 from 263 WU readings):
+
+```
+hour   Meran 330 m   ITIROL16 ~634 m    diff    qc=0 share
+00        11,5           14,9          +3,4        0 %
+05         7,9           12,0          +4,1        0 %
+07        15,7           11,2          -4,5        0 %
+08        18,0           11,4          -6,6        0 %
+11        23,1           20,1          -3,0       75 %
+13        25,8           22,4          -3,3       92 %
+15        25,2           25,2          +0,1       33 %
+17        20,9           24,8          +3,8        0 %
+```
+
+The village-minus-valley difference runs from +4,1 K to −6,6 K inside one day. That is not noise and
+it is not a broken sensor: it is the nocturnal inversion this province's CLAUDE.md already describes,
+followed by the village sitting in the Texelgruppe's shadow until nine — which is what `Horizon` says
+about Dorf Tirol, 19,4° of ridge to the north and the sun arriving 70 minutes after "sunrise" in
+September — while the valley floor gains ten degrees in three hours, and then the afternoon
+crossover as the slope clears and the valley shades.
+
+Ten and a half kelvin of swing is also the size of the thing `StationDownscale` is currently asked
+to model with a station 264 m below. It is the whole case for this feature, and it is the reason the
+runtime quality control below refuses to second-guess a reading that disagrees with the models.
+
 ## Two facts that constrain the whole design
 
 **The key is personal and quota-limited.** `api.weather.com`'s PWS tier issues keys free to people
@@ -43,10 +71,12 @@ the key lives in `local.properties` and reaches the code through `BuildConfig`, 
 file; the app must build and run **without** it, falling back to SIAG everywhere, or CI cannot build
 and nobody else can; and the amateur reading must not be redistributed — see "The share card" below.
 
-**AWEKAS is closed.** The account's key is recognised and the account is not entitled:
+**AWEKAS is closed to the API, though the station is real.** The account's key is recognised and the
+account is not entitled:
 `GET api.awekas.at/current.php?key=…&station=53677` answers
 `{"fetchdate":1790106490,"error":"AWEKAS plus not active"}`, with and without a station parameter.
-The design leaves room for a second network but implements one.
+The station page itself is public — `awekas.at/en/instrument.php4?id=53677` — and reports no solar
+or UV sensor. The design leaves room for a second network but implements one.
 
 ## Choosing the station — `tools/generate-places.py`
 
@@ -59,8 +89,15 @@ For each of the 116 places the generator asks
 
 1. **It answers.** HTTP 204 means nothing observed in the last hour. A station that is not
    uploading today will not be uploading when a reader opens the app.
-2. **`qcStatus` is not 0.** WU's own flag: 1 passed, −1 not checked, 0 failed. A station WU says
-   failed its checks is not one this app should lead with. `−1` survives here and is caught below.
+2. **`qcStatus` is recorded and never obeyed.** WU's flag — 1 passed, −1 not checked, 0 failed — is
+   a *neighbour-consistency* test, and in this terrain a correctly sited station fails it for being
+   right. Measured on ITIROL16 over 263 readings on 2026-09-22: 40 flagged 0, **every one of them
+   between 10:44 and 19:04**, peaking at 92 % of the 13:00 hour. Those are exactly the hours it
+   disagrees with ITIROL23, ITIROL25 and ITIROL24 — the three stations gate 3 drops for claiming
+   128 to 182 m on a hillside that is 419 to 598 m high. Obeying the flag would throw away the best
+   thermometer's whole afternoon and fall back to one 300 m below it, which is the mistake this
+   feature exists to correct. The value is stored with the observation so it can be scored later,
+   and it decides nothing.
 3. **The DEM agrees with the claimed altitude.** `tools/horizons.py.ground()` already reads 30 m
    SRTM tiles out of `tools/.dem-cache`; the claimed altitude is compared against the ground under
    the claimed coordinates. Measured on the eight stations above:
@@ -143,8 +180,6 @@ Three gates on the phone, and then the app's own evidence.
 `PWS_MAX_AGE` (30 min) old for the hero, because a PWS that uploads every few minutes going quiet
 for half an hour is a PWS that has stopped. `Source.staleAfterHours`' existing 90 min for an
 observation stays the rule for the SIAG record.
-
-**`qcStatus == 0` is refused** at runtime as well as at generation time; a station's flag can change.
 
 **The fault rule already written.** `ForecastScores` drops an hour for every model when the station
 reads more than 15 K or 60 km/h from the models' weighted median at that station, and counts it. The
@@ -260,7 +295,22 @@ thermometer out of the window — the one place in the catalogue where that is p
 a fortnight and read the statistics screen, which is the only honest verdict available.
 
 Two things that cannot be verified this way and should be said rather than assumed: the fallback
-path needs ITIROL16 to actually go quiet, so it is covered by tests and not by observation; and
-`ITIROL26`, the owner's own station, returned **HTTP 204 on current, on 1-day and on history** while
-IMERAN10 answered 200 with the same key — so either it is not uploading or the id is not that. Worth
-settling before the generator runs, since a station that answers 204 is dropped by gate 1.
+path needs ITIROL16 to actually go quiet, so it is covered by tests and not by observation; and the
+intermittency below has to be lived with rather than reproduced on demand.
+
+## The owner's own station, and what it taught the design
+
+`ITIROL26` is the same instrument as AWEKAS 53677, "Dorf Tirol III": 669 m declared on AWEKAS,
+654 m under its coordinates on the DEM, 0,68 km from the village centre, and on 2026-09-22 at 21:55
+both networks served 16 °C at 37 % within minutes of each other. It passes the DEM gate at Δ15 m and
+is a second real candidate for Dorf Tirol beside ITIROL16.
+
+Two things about it are load-bearing for this design rather than incidental:
+
+- **It answered HTTP 204 and then, minutes later, 200.** A live station with a working key returns
+  "nothing in the last 60 minutes" intermittently. The fallback to SIAG is therefore an ordinary
+  hourly event, not an error path — it must be silent, it must not mark the source as failed, and
+  `silentSources` must not accuse anybody over it.
+- **`/observations/all/1day` returns 204 for it while ITIROL16 returns 263 readings.** The rapid
+  history is not available for every station, so nothing in the app or the generator may depend on
+  it. Only `current` is guaranteed, which is all the phone asks for anyway.
