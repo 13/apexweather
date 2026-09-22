@@ -641,6 +641,13 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   `PathStrategy` per authority statically while Robolectric gives each test method its own data
   directory, so a second call fails with "Failed to find configured root" — a harness failure that
   reads exactly like a broken `share_paths.xml`.
+  Verified by hand on the phone, 2026-09-22: the preview, the chooser ("1 Bild" plus the text
+  fallback "Dorf Tirol · 12° · Klar"), the day card sharing tomorrow rather than today, and the card
+  unchanged at font scale 2,0 while the chrome around it grows. The German, Italian and English
+  footers read "Apex Wetter · 8 Modelle", "Apex Weather · 8 modelli" and "Apex Weather · 8 models" —
+  and with the in-app language set to English on a German phone the launcher still says "Apex
+  Wetter", which is the per-app-locale divergence noted under Conventions, observed rather than
+  assumed.
 - `update/` is the in-app updater and is deliberately self-contained: it reads GitHub releases,
   verifies the download against the asset's sha256 and hands the APK to `PackageInstaller`. Nothing
   in the weather code imports it — the settings sheet takes it as a slot. Removing the feature means
