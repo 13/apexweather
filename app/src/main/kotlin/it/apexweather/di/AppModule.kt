@@ -19,6 +19,7 @@ import it.apexweather.data.remote.OdhApi
 import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.RainViewerApi
 import it.apexweather.data.remote.SiagApi
+import it.apexweather.data.remote.WeatherUndergroundApi
 import it.apexweather.data.remote.SourceMetaApi
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.SouthTyrol
@@ -84,6 +85,7 @@ object AppModule {
     @Provides @Singleton fun geoSphere(c: OkHttpClient, j: Json): GeoSphereApi = retrofit(GeoSphereApi.BASE_URL, c, j).create(GeoSphereApi::class.java)
     @Provides @Singleton fun siag(c: OkHttpClient, j: Json): SiagApi = retrofit(SiagApi.BASE_URL, c, j).create(SiagApi::class.java)
     @Provides @Singleton fun odh(c: OkHttpClient, j: Json): OdhApi = retrofit(OdhApi.BASE_URL, c, j).create(OdhApi::class.java)
+    @Provides @Singleton fun weatherUnderground(c: OkHttpClient, j: Json): WeatherUndergroundApi = retrofit(WeatherUndergroundApi.BASE_URL, c, j).create(WeatherUndergroundApi::class.java)
     // Returns the Atom feed as a raw body: Retrofit hands ResponseBody back without a converter,
     // and MeteoAlarmMapper does the XML parsing.
     @Provides @Singleton fun ensemble(c: OkHttpClient, j: Json): EnsembleApi = retrofit(EnsembleApi.BASE_URL, c, j).create(EnsembleApi::class.java)

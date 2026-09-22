@@ -30,6 +30,18 @@ fun signingSecret(envName: String, propName: String): String? =
 
 val releaseStoreFile: String? = signingSecret("APEX_KEYSTORE_FILE", "storeFile")
 
+// The Weather Underground contributor key, if this checkout has one. It is personal, capped at
+// 1500 requests a day, and not licensed for redistribution — so it lives in local.properties
+// (gitignored, beside sdk.dir) or in the environment, and never in git.
+//
+// **Absent is the normal case.** CI has no key and neither does anyone else's checkout, and the app
+// must build and run without it: every place then reads its provincial station, as it always has.
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val wuApiKey: String = (System.getenv("APEX_WU_API_KEY") ?: localProps.getProperty("wu.apiKey") ?: "").trim()
+
 // Which commit a build came from, for bug reports. Deliberately the commit's own hash and date
 // rather than the wall clock: a build timestamp would change on every single build and force
 // BuildConfig, and everything that reads it, to recompile each time.
@@ -63,6 +75,7 @@ android {
         buildConfigField("String", "UPDATE_REPO", "\"13/apexweather\"")
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
         buildConfigField("String", "GIT_DATE", "\"$gitDate\"")
+        buildConfigField("String", "WU_API_KEY", "\"$wuApiKey\"")
     }
 
     signingConfigs {
