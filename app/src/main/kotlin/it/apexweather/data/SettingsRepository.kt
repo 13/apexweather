@@ -37,6 +37,20 @@ data class AppSettings(
     val language: LanguageSetting = LanguageSetting.SYSTEM,
     val windUnit: WindUnit = WindUnit.KMH,
     val animations: Boolean = true,
+    /**
+     * Whether a place may read an amateur station instead of the province's own.
+     *
+     * On by default, because where the catalogue names one it has already been checked against a
+     * DEM and has beaten the provincial thermometer on eight weeks of measured stability — for Dorf
+     * Tirol that is a reading at the village's own height against one 264 m below it.
+     *
+     * Off is still worth having, and not only as a preference. An amateur station is an instrument
+     * nobody maintains: it can be moved into the sun, brought indoors, or left reading a sheltered
+     * corner, and none of that looks like a fault to [it.apexweather.domain.StationFault]. A reader
+     * who can see out of the window is better placed to judge that than any rule here, and this is
+     * how they say so. With it off the app reads the provincial network exactly as it always did.
+     */
+    val amateurStations: Boolean = true,
     val compareSources: Set<Source> = Source.entries.toSet(),
     val compareVariable: CompareVariable = CompareVariable.TEMPERATURE,
     /**
@@ -107,6 +121,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val language = stringPreferencesKey("language")
         val windUnit = stringPreferencesKey("wind_unit")
         val animations = booleanPreferencesKey("animations")
+        val amateurStations = booleanPreferencesKey("amateur_stations")
         // The sources the reader has switched **off**, not the ones left on.
         //
         // Storing the visible set froze the list at whatever existed when they last touched it: add
@@ -138,6 +153,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             language = p[Keys.language]?.let { runCatching { LanguageSetting.valueOf(it) }.getOrNull() } ?: LanguageSetting.SYSTEM,
             windUnit = p[Keys.windUnit]?.let { runCatching { WindUnit.valueOf(it) }.getOrNull() } ?: WindUnit.KMH,
             animations = p[Keys.animations] ?: true,
+            amateurStations = p[Keys.amateurStations] ?: true,
             compareSources = visibleSources(p[Keys.hiddenCompareSources]),
             compareVariable = p[Keys.compareVariable]?.let { runCatching { CompareVariable.valueOf(it) }.getOrNull() }
                 ?: CompareVariable.TEMPERATURE,
@@ -158,6 +174,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     suspend fun setLanguage(v: LanguageSetting) = context.settingsStore.edit { it[Keys.language] = v.name }
     suspend fun setWindUnit(v: WindUnit) = context.settingsStore.edit { it[Keys.windUnit] = v.name }
     suspend fun setAnimations(v: Boolean) = context.settingsStore.edit { it[Keys.animations] = v }
+    suspend fun setAmateurStations(v: Boolean) = context.settingsStore.edit { it[Keys.amateurStations] = v }
     suspend fun setCompareSources(v: Set<Source>) = context.settingsStore.edit {
         it[Keys.hiddenCompareSources] = (Source.entries.toSet() - v).map { s -> s.name }.toSet()
     }

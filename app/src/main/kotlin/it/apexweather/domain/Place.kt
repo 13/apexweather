@@ -102,6 +102,21 @@ data class Place(
      */
     val readingStation: NearbyStation? get() = pws ?: station
 
+    /**
+     * This place as the reader's settings have it — without its amateur station where they have
+     * switched amateur stations off.
+     *
+     * Applied at the edge, where settings and place meet, rather than inside
+     * [it.apexweather.data.WeatherRepository]. The repository deliberately knows nothing about
+     * settings, and the alternative — a flag threaded through `refresh`, `refreshObservation`, the
+     * snapshot flow and `recordStationHour` — would be four places that have to agree about one
+     * boolean. A place with no `pws` is a state the whole feature already handles correctly,
+     * because it is the state 100-odd of the 116 are in, so removing it here needs nothing
+     * downstream to change.
+     */
+    fun withAmateurStation(allowed: Boolean): Place =
+        if (allowed || pws == null) this else copy(pws = null)
+
     /** The name in the reader's language, never in the JVM's default. */
     fun name(locale: Locale): String = when (locale.language) {
         "it" -> nameIt
