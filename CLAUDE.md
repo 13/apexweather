@@ -705,6 +705,19 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   `TopLevelNavigationTest` drives the real routes with stub screens and guards this.
 - `hiltViewModel` comes from `androidx.hilt.lifecycle.viewmodel.compose` (the navigation-package variant is deprecated).
 - Strings live in `values` (German, default), `values-it`, `values-en`; add every new key to all three.
+- **The app's own name is one of those strings.** It is **Apex Wetter** in German and **Apex Weather**
+  in Italian and English, and four other German strings spell it out in prose (`empty_body`,
+  `about`, `update_needs_permission`, `setting_notif_permission`) — `AppNameTest` sweeps the
+  resources so the next German sentence cannot drift back to the English name, and sweeps the other
+  two languages for the German one. A locale the app does not ship (French, Spanish) falls back to
+  `values` and therefore reads "Apex Wetter"; that is the decision, since every other string in that
+  file is already German. `archivesName = "ApexWeather"`, the `ApexWeather-<version>.apk` asset and
+  `release.yml`'s release title are **file names and stay English**.
+  **The launcher label follows the system locale, not the in-app language switch.**
+  `AppCompatDelegate.setApplicationLocales` changes resources inside this process; the home screen's
+  label is resolved by the launcher in its own. So a phone in English with the in-app language set
+  to German is German inside and "Apex Weather" under the icon. That is Android's answer for per-app
+  languages, not something to chase.
 - Nothing user-visible may name Dorf Tirol. The place is a setting now, so a hardcoded place name is
   a bug — three of them survived the first pass and were only caught by switching place on the phone,
   and a fourth sat in `widget_preview.xml`, which the launcher's widget picker shows to every reader.

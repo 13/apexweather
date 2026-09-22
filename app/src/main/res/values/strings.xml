@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Apex Weather</string>
+    <string name="app_name">Apex Wetter</string>
     <string name="cond_clear">Klar</string>
     <string name="cond_mostly_clear">Heiter</string>
     <string name="cond_partly_cloudy">Wolkig</string>
@@ -29,7 +29,7 @@
     <string name="offline_banner">Daten von %1$s · offline</string>
     <string name="offline_banner_no_time">Keine Verbindung</string>
     <string name="empty_title">Noch keine Daten</string>
-    <string name="empty_body">Apex Weather braucht einmal Internet, um die Vorhersagen für %1$s zu laden.</string>
+    <string name="empty_body">Apex Wetter braucht einmal Internet, um die Vorhersagen für %1$s zu laden.</string>
     <string name="retry">Erneut versuchen</string>
     <string name="stat_temp">Temperatur</string>
     <string name="stat_feels">Gefühlt</string>
@@ -110,7 +110,7 @@
     <string name="setting_wind">WINDEINHEIT</string>
     <string name="setting_animations">Himmel animieren</string>
     <string name="refresh_now">Jetzt aktualisieren</string>
-    <string name="about">Apex Weather %1$s · Südtirol · Konsens aus 10 Wettermodellen</string>
+    <string name="about">Apex Wetter %1$s · Südtirol · Konsens aus 10 Wettermodellen</string>
     <string name="widget_description">Aktuelle Temperatur und die nächsten Stunden für den gewählten Ort · größer gezogen auch die nächsten Tage</string>
     <string name="open_day_details">Tagesdetails öffnen</string>
     <string name="section_day_hours">STUNDENVERLAUF</string>
@@ -158,7 +158,7 @@
     <string name="update_ready_unverified">Version %1$s bereit · ohne Prüfsumme veröffentlicht</string>
     <string name="update_install">Installieren</string>
     <string name="update_installing">Android fragt gleich nach der Bestätigung</string>
-    <string name="update_needs_permission">Android muss Apex Weather erlauben, Apps zu installieren</string>
+    <string name="update_needs_permission">Android muss Apex Wetter erlauben, Apps zu installieren</string>
     <string name="update_grant_permission">Erlauben</string>
     <string name="update_open_release">Release-Seite öffnen</string>
     <string name="update_failed_network">GitHub nicht erreichbar</string>
@@ -246,7 +246,7 @@
     <string name="setting_notif_summary_time">Um %1$s</string>
     <string name="setting_notif_rain">Regen zieht auf</string>
     <string name="setting_notif_warning">Unwetterwarnungen</string>
-    <string name="setting_notif_permission">Android muss Apex Weather Mitteilungen erlauben</string>
+    <string name="setting_notif_permission">Android muss Apex Wetter Mitteilungen erlauben</string>
     <string name="setting_notif_grant">Erlauben</string>
 
     <!-- The station stands 270 m below the village, so its reading is carried up before it is quoted. -->
