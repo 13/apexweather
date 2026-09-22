@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The one directory the share provider may reach.
+
+  It is a cache directory the app writes pictures into and nothing else. Nothing the app *stores* —
+  not the Room databases, not station_history, not the settings — is reachable through this
+  provider, and nothing should be added here to make it so.
+-->
+<paths>
+    <cache-path name="shares" path="share/" />
+</paths>

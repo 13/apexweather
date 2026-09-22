@@ -4,6 +4,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,7 +47,7 @@ import java.time.Duration
  * than as invented agreement.
  */
 @Composable
-fun DayDetail(day: ConsensusDay, state: HomeUiState, onClose: () -> Unit = {}) {
+fun DayDetail(day: ConsensusDay, state: HomeUiState, onClose: () -> Unit = {}, onShare: () -> Unit = {}) {
     val locale = LocalConfiguration.current.locales[0]
     val formats = LocalFormats.current
     val accent = Color.fromArgb(state.palette.accent)
@@ -69,6 +70,12 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState, onClose: () -> Unit = {}) {
                 style = MaterialTheme.typography.headlineMedium, color = Color.White,
                 modifier = Modifier.weight(1f),
             )
+            // Sharing this day is a second act on this header, so it is a second button rather
+            // than anything folded into the cross. It shares the day the sheet is about, never
+            // today.
+            IconButton(onClick = onShare, modifier = Modifier.testTag("day_detail_share")) {
+                Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.share_day), tint = Color.White.copy(alpha = 0.8f))
+            }
             IconButton(onClick = onClose, modifier = Modifier.testTag("day_detail_close")) {
                 Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), tint = Color.White.copy(alpha = 0.8f))
             }

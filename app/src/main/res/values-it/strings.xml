@@ -392,4 +392,25 @@
         <item quantity="other">Affidabilità: %1$d° su %2$d · Ø %3$s (30 giorni, 6 h)</item>
     </plurals>
     <string name="source_rank_not_enough">Affidabilità: ancora pochi dati</string>
+
+    <!-- Condividere una giornata come immagine. -->
+    <string name="share_today">Condividi il meteo di oggi</string>
+    <string name="share_day">Condividi questa giornata</string>
+    <string name="share_sheet_title">Condividi come immagine</string>
+    <string name="share_action">Condividi</string>
+    <plurals name="share_card_models">
+        <item quantity="one">%1$d modello</item>
+        <!-- CLDR gives Italian a "many" class (10⁶, 10⁹ …). Never reachable here — there are
+             thirteen models — but the plural is incomplete without it and lint says so. -->
+        <item quantity="many">%1$d di modelli</item>
+        <item quantity="other">%1$d modelli</item>
+    </plurals>
+    <string name="share_card_attribution">Dati: Servizio meteo provinciale · GeoSphere Austria (CC BY 4.0) · Open-Meteo</string>
+    <string name="share_rain_from">Pioggia dalle %1$s</string>
+    <string name="share_rain_from_with_chance">Pioggia dalle %1$s · %2$d %%</string>
+    <string name="share_rain_chance">Probabilità di pioggia %1$d %%</string>
+    <string name="share_from_station_adjusted">Misura portata alla quota del paese di %1$s</string>
+    <string name="share_snow_from">Neve dalle %1$s</string>
+    <string name="share_snow_from_with_chance">Neve dalle %1$s · %2$d %%</string>
+    <string name="share_snow_chance">Probabilità di neve %1$d %%</string>
 </resources>

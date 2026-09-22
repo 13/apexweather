@@ -380,4 +380,22 @@
         <item quantity="other">Accuracy: rank %1$d of %2$d · avg. %3$s (30 days, 6 h)</item>
     </plurals>
     <string name="source_rank_not_enough">Accuracy: not enough data yet</string>
+
+    <!-- Sharing a day as a picture. -->
+    <string name="share_today">Share today\'s weather</string>
+    <string name="share_day">Share this day</string>
+    <string name="share_sheet_title">Share as an image</string>
+    <string name="share_action">Share</string>
+    <plurals name="share_card_models">
+        <item quantity="one">%1$d model</item>
+        <item quantity="other">%1$d models</item>
+    </plurals>
+    <string name="share_card_attribution">Data: South Tyrol weather service · GeoSphere Austria (CC BY 4.0) · Open-Meteo</string>
+    <string name="share_rain_from">Rain from %1$s</string>
+    <string name="share_rain_from_with_chance">Rain from %1$s · %2$d %%</string>
+    <string name="share_rain_chance">Chance of rain %1$d %%</string>
+    <string name="share_from_station_adjusted">Reading carried to the village by %1$s</string>
+    <string name="share_snow_from">Snow from %1$s</string>
+    <string name="share_snow_from_with_chance">Snow from %1$s · %2$d %%</string>
+    <string name="share_snow_chance">Chance of snow %1$d %%</string>
 </resources>

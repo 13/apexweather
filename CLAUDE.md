@@ -614,6 +614,33 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   `nowcast-v1-15min-1km` on payload —
   `docs/superpowers/specs/2026-09-10-icons-bars-and-radar-design.md` — was measuring a whole-province
   box; a place-centred one is a twelfth of that, which is what changed the answer.
+- **`ui/share/` turns a day into a picture, and everything difficult about it is in four rules.**
+  `ShareCardStateBuilder` is pure and chooses only *which* facts travel — it computes no weather,
+  because the hero it reads has already been through `StationDownscale`, `StationFog`, `StationSun`,
+  `StationDry` and `MeasuredRain`, and a second answer about one hour on a picture that then leaves
+  the phone is the hero/strip disagreement with no screen left to correct it. `ShareCard` draws it,
+  `ShareSheetContent` previews it, `ShareCapture` writes the PNG and builds the chooser.
+  **It is drawn at `fontScale = 1f`, always.** Everywhere else a larger text setting is honoured all
+  the way down; here the output is a bitmap that leaves the phone, the receiver has their own
+  screen, and at 2x the eight columns do not fit the fixed 360 dp. `ShareSheetTest` composes the
+  card at 1x and 2x side by side and asserts the measured size does not move.
+  **It previews before it shares.** The reader sees what goes into someone else's chat, and
+  `GraphicsLayer.toImageBitmap()` then captures something that is genuinely on screen — capturing an
+  off-screen composition is a layout bug found on somebody else's phone rather than here. Opening it
+  from the day sheet closes that sheet: two stacked `ModalBottomSheet`s fight over the drag.
+  **The footer carries the data credit**, not only the app's name: sharing redistributes the data
+  and GeoSphere's is CC BY 4.0, the same licence behind `map_attribution`. `share_card_attribution`
+  is the short form and does not get dropped for room.
+  **A moved reading still says it was moved**, and the word for precipitation follows
+  `Condition.isFrozen` — a snow icon over "Regenwahrscheinlichkeit" is the snow-unit bug again, one
+  level up. The strip is eight columns and always one day: a share at 21:00 backs up into the hours
+  already gone rather than running into tomorrow under today's date.
+  The `FileProvider` (`${applicationId}.shares`, `@xml/share_paths`) reaches one cache directory and
+  nothing the app stores; `ShareCapture.write` prunes anything over an hour old on its way in.
+  **`ShareCaptureTest` calls `write` exactly once for a reason**: `FileProvider` caches one
+  `PathStrategy` per authority statically while Robolectric gives each test method its own data
+  directory, so a second call fails with "Failed to find configured root" — a harness failure that
+  reads exactly like a broken `share_paths.xml`.
 - `update/` is the in-app updater and is deliberately self-contained: it reads GitHub releases,
   verifies the download against the asset's sha256 and hands the APK to `PackageInstaller`. Nothing
   in the weather code imports it — the settings sheet takes it as a slot. Removing the feature means

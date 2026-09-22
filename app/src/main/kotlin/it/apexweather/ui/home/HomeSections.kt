@@ -21,7 +21,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,7 +43,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
@@ -69,27 +74,62 @@ import java.time.LocalDate
 import kotlin.math.roundToInt
 
 @Composable
-fun HeroSection(state: HomeUiState, modifier: Modifier = Modifier, onOpenPlaces: () -> Unit = {}) {
+fun HeroSection(
+    state: HomeUiState,
+    modifier: Modifier = Modifier,
+    onOpenPlaces: () -> Unit = {},
+    onShare: () -> Unit = {},
+) {
     val locale = LocalConfiguration.current.locales[0]
     val formats = LocalFormats.current
     Column(modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.Start) {
         // The place name is already the first line on the screen, so it is the button too rather
         // than adding a second affordance to a screen whose point is the sky behind it.
-        Row(
-            Modifier.clickable(onClickLabel = stringResource(R.string.change_place), onClick = onOpenPlaces)
-                .padding(vertical = 2.dp)
-                .testTag("place_button"),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                state.place?.name(locale).orEmpty(),
-                style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f),
-            )
-            Icon(
-                Icons.Filled.ExpandMore, contentDescription = null,
-                tint = Color.White.copy(alpha = 0.75f), modifier = Modifier.size(18.dp),
-            )
+        //
+        // The share icon is the one thing that sits on this line beside it, and it sits at the far
+        // *end* of the row rather than next to the name — outside the place button's tap target, so
+        // the rule above still holds for the name itself. It is its own button for the reason the
+        // pin star is: choosing a place and sharing one are different acts and must not share a
+        // gesture. Its test tag goes **inside** clearAndSetSemantics, because that clears the node's
+        // whole config and a tag further along the chain is cleared with it — which is why nothing
+        // tested the star until it was reported by hand.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.clickable(onClickLabel = stringResource(R.string.change_place), onClick = onOpenPlaces)
+                    .padding(vertical = 2.dp)
+                    .testTag("place_button"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    state.place?.name(locale).orEmpty(),
+                    style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f),
+                )
+                Icon(
+                    Icons.Filled.ExpandMore, contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.75f), modifier = Modifier.size(18.dp),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            // Drawn dim rather than hidden while there is nothing to share: "not yet" and "never"
+            // are different messages, and the first one resolves itself in a few seconds.
+            val canShare = !state.isEmpty && state.place != null
+            val shareLabel = stringResource(R.string.share_today)
+            IconButton(
+                onClick = onShare,
+                enabled = canShare,
+                modifier = Modifier.size(32.dp).clearAndSetSemantics {
+                    contentDescription = shareLabel
+                    testTag = "share_today"
+                    if (!canShare) disabled()
+                },
+            ) {
+                Icon(
+                    Icons.Filled.Share, contentDescription = null,
+                    tint = Color.White.copy(alpha = if (canShare) 0.75f else 0.3f),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
         // The number and the picture are the two halves of one answer, so they share a line. The
         // icon carries no content description: the word for the condition is directly underneath,

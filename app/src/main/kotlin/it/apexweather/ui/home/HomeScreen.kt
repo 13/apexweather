@@ -31,12 +31,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -46,7 +49,13 @@ import it.apexweather.R
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
+import it.apexweather.ui.common.labelRes
+import it.apexweather.ui.share.ShareCapture
+import it.apexweather.ui.share.ShareCardStateBuilder
+import it.apexweather.ui.share.ShareSheetContent
+import it.apexweather.ui.share.shareText
 import it.apexweather.ui.theme.fromArgb
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 
@@ -76,6 +85,7 @@ fun HomeContent(
     var selectedHour by remember { mutableStateOf<Instant?>(null) }
     var selectedDay by remember { mutableStateOf<LocalDate?>(null) }
     var warningsOpen by remember { mutableStateOf(false) }
+    var shareTarget by remember { mutableStateOf<LocalDate?>(null) }
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(state.isEmpty) { if (!state.isEmpty) appeared = true }
     val accent = Color.fromArgb(state.palette.accent)
@@ -91,7 +101,13 @@ fun HomeContent(
                 if (state.visibleWarnings.isNotEmpty()) {
                     item { WarningSection(state.visibleWarnings, state.now, onDismissWarning) { warningsOpen = true } }
                 }
-                item { HeroSection(state, onOpenPlaces = onOpenPlaces) }
+                item {
+                    HeroSection(
+                        state,
+                        onOpenPlaces = onOpenPlaces,
+                        onShare = { shareTarget = state.now.atZone(SouthTyrol.ZONE).toLocalDate() },
+                    )
+                }
                 item {
                     AnimatedVisibility(appeared, enter = fadeIn(tween(500)) + slideInVertically(tween(500)) { it / 4 }) {
                         HourlySection(state.upcomingHours, state::phaseAt) { selectedHour = it }
@@ -162,7 +178,46 @@ fun HomeContent(
             containerColor = MaterialTheme.colorScheme.surface,
             modifier = Modifier.testTag("day_detail_sheet"),
         ) {
-            DayDetail(day, state, onClose = { selectedDay = null })
+            DayDetail(day, state, onClose = { selectedDay = null }, onShare = { selectedDay = null; shareTarget = day.date })
+        }
+    }
+
+    // The preview, and the capture behind it. The card is built from the state as it stands the
+    // moment the sheet opens and then held: a bitmap taken while the minute tick moved underneath it
+    // would be a picture of two different minutes.
+    val shareState = shareTarget?.let { ShareCardStateBuilder.day(state, it, LocalConfiguration.current.locales[0]) }
+    if (shareState != null) {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val layer = rememberGraphicsLayer()
+        val formats = LocalFormats.current
+        val condition = stringResource(shareState.condition.labelRes())
+        val title = stringResource(R.string.share_sheet_title)
+        val text = shareText(
+            shareState.placeName,
+            shareState.tempC?.let { Format.temp(it, formats) } ?: "",
+            condition,
+        )
+        ModalBottomSheet(
+            onDismissRequest = { shareTarget = null },
+            // Its content scrolls at a large text size, so it skips the half state — and therefore
+            // carries a cross, for the reason the day sheet does.
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.testTag("share_sheet_container"),
+        ) {
+            ShareSheetContent(
+                state = shareState,
+                layer = layer,
+                onClose = { shareTarget = null },
+                onShare = {
+                    scope.launch {
+                        val uri = ShareCapture.write(context, layer.toImageBitmap(), state.now)
+                        context.startActivity(ShareCapture.chooser(uri, text, title))
+                        shareTarget = null
+                    }
+                },
+            )
         }
     }
 }

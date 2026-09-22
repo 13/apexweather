@@ -72,5 +72,21 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+
+        <!--
+          Sharing a day as a picture. The provider reaches exactly one cache directory
+          (@xml/share_paths) and is not exported: the only way another app sees a file through it is
+          a Uri this app handed to the share sheet with FLAG_GRANT_READ_URI_PERMISSION, for as long
+          as that grant lasts. Nothing the app stores is reachable through it.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.shares"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/share_paths" />
+        </provider>
     </application>
 </manifest>

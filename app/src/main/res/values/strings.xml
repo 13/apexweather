@@ -389,4 +389,22 @@
         <item quantity="other">Treffsicherheit: Platz %1$d von %2$d · Ø %3$s (30 Tage, 6 h)</item>
     </plurals>
     <string name="source_rank_not_enough">Treffsicherheit: noch zu wenig Daten</string>
+
+    <!-- Sharing a day as a picture. -->
+    <string name="share_today">Heutiges Wetter teilen</string>
+    <string name="share_day">Diesen Tag teilen</string>
+    <string name="share_sheet_title">Als Bild teilen</string>
+    <string name="share_action">Teilen</string>
+    <plurals name="share_card_models">
+        <item quantity="one">%1$d Modell</item>
+        <item quantity="other">%1$d Modelle</item>
+    </plurals>
+    <string name="share_card_attribution">Daten: Landeswetterdienst Südtirol · GeoSphere Austria (CC BY 4.0) · Open-Meteo</string>
+    <string name="share_rain_from">Regen ab %1$s</string>
+    <string name="share_rain_from_with_chance">Regen ab %1$s · %2$d %%</string>
+    <string name="share_rain_chance">Regenwahrscheinlichkeit %1$d %%</string>
+    <string name="share_from_station_adjusted">Messwert um %1$s auf Ortshöhe gebracht</string>
+    <string name="share_snow_from">Schneefall ab %1$s</string>
+    <string name="share_snow_from_with_chance">Schneefall ab %1$s · %2$d %%</string>
+    <string name="share_snow_chance">Schneewahrscheinlichkeit %1$d %%</string>
 </resources>
