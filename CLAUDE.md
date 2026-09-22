@@ -641,6 +641,28 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   `PathStrategy` per authority statically while Robolectric gives each test method its own data
   directory, so a second call fails with "Failed to find configured root" — a harness failure that
   reads exactly like a broken `share_paths.xml`.
+  **The preview offers Heute · 3 Tage · 7 Tage**, and the day ranges *replace* the hour strip
+  rather than stacking on it: "what is this afternoon like" and "what is the week like" are
+  different questions, and a card answering both is taller than a chat preview shows with the
+  important half below the crop. **Seven days is defensible on a picture for a reason the widget's
+  five is not.** `ApexWidget` stops at five because past about day five only the globals reach and a
+  4x5 widget has neither room for the agreement badge nor anywhere to put the explanation; a picture
+  has the first half of that problem — nobody can tap it — but not the second. So the rows carry the
+  day list's own dot, colours, grey single-model variant and tail sentence, and nothing new is
+  invented to say "less certain": a shared image is the worst place for private vocabulary. That
+  tail condition is read from the data, not from the arithmetic that it cannot happen inside seven
+  days (GFS reaches 336 h, GEM 243 h, UKMO 171 h), because a reach that shortens upstream must not
+  quietly turn the card into one model's opinion. **Fourteen is refused** for the opposite reason:
+  past day ten the consensus is one model and the caveat is one the recipient cannot act on.
+  The chips are absent from the day sheet's share, which is already a question about one day, and
+  the choice is remembered as `AppSettings.shareRange` — a single enum, not the exclusion set
+  `compare_hidden_sources` needs, because an enum cannot freeze a list the way a stored visible set
+  did. Rows are sized by their content, not `DayRowMinHeight`: that constant is 44 dp because a
+  finger has to hit the row, and there are no fingers in a PNG.
+  Measured on the phone 2026-09-22: the shared week is **968 x 1234 px, 1:1.27**, well inside the
+  1:1.8 the screenshot test asserts — chat clients crop previews and the top is what survives. The
+  chips do not wrap at font scale 2, the card is unchanged there, the range survives a force-stop,
+  and all three languages read correctly.
   Verified by hand on the phone, 2026-09-22: the preview, the chooser ("1 Bild" plus the text
   fallback "Dorf Tirol · 12° · Klar"), the day card sharing tomorrow rather than today, and the card
   unchanged at font scale 2,0 while the chrome around it grows. The German, Italian and English
