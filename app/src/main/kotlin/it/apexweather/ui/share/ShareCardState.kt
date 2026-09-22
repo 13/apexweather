@@ -156,14 +156,19 @@ object ShareCardStateBuilder {
         return ShareCardState(
             placeName = place.name(locale),
             date = date,
-            tempC = state.heroTempC,
+            // The hero, unless the hero is an amateur reading — Weather Underground's data is not
+            // licensed for redistribution and this PNG goes into somebody else's chat. Then it is
+            // the models' own value for the hour. See HomeUiState.publishableTempC.
+            tempC = if (state.observationIsPrivate) state.publishableTempC else state.heroTempC,
             condition = state.heroCondition,
             phase = state.phase,
             minC = day?.minC,
             maxC = day?.maxC,
             precipStart = state.minutelyStart,
             precipProb = state.currentHour?.precipProb,
-            adjustmentC = state.heroAdjustmentC,
+            // Nothing was adjusted when the number is the models' own, and a card claiming a
+            // correction that did not happen is worse than one that says nothing.
+            adjustmentC = state.heroAdjustmentC?.takeUnless { state.observationIsPrivate },
             sourceCount = day?.sourceCount ?: state.currentHour?.sourceCount ?: 0,
             palette = state.palette,
             hours = hours,

@@ -16,9 +16,12 @@ import it.apexweather.data.remote.OpenMeteoResponse
 import it.apexweather.data.remote.OpenMeteoStationResponse
 import it.apexweather.data.remote.SiagApi
 import it.apexweather.data.remote.SiagStationsResponse
+import it.apexweather.data.remote.WeatherUndergroundApi
+import it.apexweather.data.remote.WuResponse
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
+import retrofit2.Response
 import java.io.IOException
 import java.time.Clock
 import java.time.Instant
@@ -181,6 +184,52 @@ internal class FakeEnsemble(var fail: Boolean = false) : EnsembleApi {
         val fixture =
             if (models == EnsembleApi.ECMWF_ENS) "openmeteo_ensemble_ecmwf.json" else "openmeteo_ensemble.json"
         return Fixtures.json.decodeFromString(EnsembleResponse.serializer(), Fixtures.read(fixture))
+    }
+}
+
+/**
+ * Weather Underground's PWS endpoint.
+ *
+ * **It checks its `stationId`**, for the reason [FakeGeoSphere] does: a fake that hands back the
+ * fixture whatever it is asked cannot fail for the one reason that matters, and that is how the app
+ * asked GeoSphere for an un-interpolated string template for months while every test passed.
+ *
+ * [noContent] is HTTP 204 — "nothing observed in the last 60 minutes" — which is an ordinary
+ * outcome rather than a failure: a live station produces it intermittently, and ITIROL26 answered
+ * 204 on three endpoints minutes before answering 200 with a reading.
+ */
+internal class FakeWeatherUnderground(
+    var fail: Boolean = false,
+    var noContent: Boolean = false,
+    /** Degrees, so a test can put the station far enough from the models to be a fault. */
+    var tempC: Double? = null,
+    /**
+     * When the reading was taken. The fixture's own time is a real one from 2026-09-22; a test that
+     * needs the models to have an opinion about the same hour has to move it onto the hours the
+     * other fixtures cover, or StationFault has nothing to compare against and lets it stand.
+     */
+    var time: Instant? = null,
+) : WeatherUndergroundApi {
+    val asked: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+    val askedKeys: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+    val askedFor: String? get() = asked.lastOrNull()
+
+    override suspend fun current(stationId: String, apiKey: String): Response<WuResponse> {
+        asked += stationId
+        askedKeys += apiKey
+        if (fail) throw IOException("wu down")
+        if (noContent) return Response.success(null)
+        val text = Fixtures.read("wu_itirol16_current.json")
+        val body = Fixtures.json.decodeFromString(WuResponse.serializer(), text)
+        val patched = body.copy(
+            observations = body.observations.map { o ->
+                o.copy(
+                    metric = tempC?.let { t -> o.metric?.copy(temp = t) } ?: o.metric,
+                    obsTimeUtc = time?.toString() ?: o.obsTimeUtc,
+                )
+            },
+        )
+        return Response.success(patched)
     }
 }
 

@@ -25,6 +25,8 @@ import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.OpenMeteoMapper
 import it.apexweather.data.remote.OpenMeteoStationMapper
 import it.apexweather.data.remote.SiagApi
+import it.apexweather.data.remote.WeatherUndergroundApi
+import it.apexweather.data.remote.WeatherUndergroundMapper
 import it.apexweather.data.remote.SiagMappers
 import it.apexweather.domain.model.Bulletin
 import it.apexweather.domain.model.Source
@@ -33,6 +35,10 @@ import it.apexweather.domain.model.SourceStatus
 import it.apexweather.domain.model.StationObservation
 import it.apexweather.domain.model.Warning
 import it.apexweather.domain.model.WeatherSnapshot
+import it.apexweather.di.WuApiKey
+import it.apexweather.domain.ConsensusBlender
+import it.apexweather.domain.NearbyStation
+import it.apexweather.domain.StationFault
 import it.apexweather.domain.BiasCorrector
 import it.apexweather.domain.Place
 import it.apexweather.domain.LeadBucket
@@ -83,6 +89,16 @@ class WeatherRepository @Inject constructor(
     private val openMeteo: OpenMeteoApi,
     private val geoSphere: GeoSphereApi,
     private val siag: SiagApi,
+    private val wu: WeatherUndergroundApi,
+    /**
+     * Weather Underground's contributor key, injected rather than read from `BuildConfig` here.
+     *
+     * Every other checkout and CI have none, and a repository that reached for the constant
+     * directly would make its own tests pass or fail depending on whether the person running them
+     * happens to have a key in `local.properties` — which is the kind of test that proves nothing
+     * anywhere. Empty means the amateur path is switched off entirely: no request is made at all.
+     */
+    @WuApiKey private val wuApiKey: String,
     private val odh: OdhApi,
     private val meteoAlarm: MeteoAlarmApi,
     private val ensembleApi: EnsembleApi,
@@ -111,13 +127,15 @@ class WeatherRepository @Inject constructor(
             dao.warnings(), dao.stationReference(place.istat),
             // The snapshot keeps reading only BiasCorrector.WINDOW; stationHistory below reads the
             // longer VerificationHistory.KEEP for the statistics screen.
-            historyWindow(BiasCorrector.WINDOW).flatMapLatest { since -> history.history(place.istat, since) },
+            historyWindow(BiasCorrector.WINDOW).flatMapLatest { since ->
+                history.history(place.istat, since).map { rows -> rows.fromStationOf(place) }
+            },
             dao.ensemble(place.istat), ::Sidecars,
         )
         return combine(
             dao.forecasts(place.istat), dao.bulletin(place.district, language),
-            dao.observation(place.istat), sidecars, dao.meta(place.istat),
-        ) { rows, bulletinRow, obsRow, (warningRow, referenceRow, historyRows, ensembleRow), meta ->
+            dao.observations(place.istat), sidecars, dao.meta(place.istat),
+        ) { rows, bulletinRow, obsRows, (warningRow, referenceRow, historyRows, ensembleRow), meta ->
             val now = clock.instant()
             val forecasts = mutableMapOf<Source, SourceForecast>()
             val status = mutableMapOf<Source, SourceStatus>()
@@ -135,7 +153,15 @@ class WeatherRepository @Inject constructor(
                 )
             }
             val bulletin = bulletinRow?.json?.let { decode("bulletin", Bulletin.serializer(), it) }
-            val observation = obsRow?.json?.let { decode("observation", StationObservation.serializer(), it) }
+            // Both readings, kept apart. The amateur one leads where the catalogue names a station,
+            // it answered recently enough, and it is not a fault; otherwise the provincial one does,
+            // and that fallback is an ordinary hourly event rather than an error — Weather
+            // Underground answers "nothing in the last 60 minutes" for a live station too, and
+            // ITIROL26 did so minutes before answering with a reading.
+            val obsRow = obsRows.firstOrNull { it.network == "siag" }
+            val pwsRow = obsRows.firstOrNull { it.network == "wu" }
+            val official = obsRow?.json?.let { decode("observation", StationObservation.serializer(), it) }
+            val amateur = pwsRow?.json?.let { decode("observation", StationObservation.serializer(), it) }
             // A cached warning outlives the refresh that fetched it, so it is filtered here rather
             // than at fetch time: one that expired since is gone from the app the minute it expires.
             val warnings = warningRow?.json?.let { decode("warnings", WARNINGS, it) }
@@ -156,10 +182,27 @@ class WeatherRepository @Inject constructor(
                     }.toMap(),
                 )
             }
+            // Which of the two leads. The amateur reading is refused only for being old or
+            // impossible: PWS_MAX_AGE, because a station that uploads every few minutes going quiet
+            // for half an hour has stopped, and StationFault, because a reading fifteen degrees
+            // from the models at its own coordinates is broken rather than interesting. It is
+            // deliberately *not* second-guessed below that — a village thermometer disagreeing with
+            // the models by several degrees is the entire reason for reading one.
+            val amateurUsable = amateur != null &&
+                Duration.between(amateur.time, now) <= PWS_MAX_AGE &&
+                StationFault.usable(
+                    amateur.tempC,
+                    reference?.at(amateur.time.truncatedTo(ChronoUnit.HOURS))
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let(ConsensusBlender::weightedMedian),
+                )
+            val observation = if (amateurUsable) amateur else official
+
             WeatherSnapshot(
                 forecasts = forecasts,
                 bulletin = bulletin,
                 observation = observation,
+                officialObservation = official,
                 warnings = warnings.orEmpty().filter { it.isActiveAt(now) },
                 stationReference = reference,
                 // How wrong each model has lately been here, by part of the day; empty until enough
@@ -204,8 +247,23 @@ class WeatherRepository @Inject constructor(
     fun stationHistory(place: Place): Flow<List<VerificationHour>> =
         historyWindow(VerificationHistory.KEEP)
             .flatMapLatest { since -> history.history(place.istat, since) }
-            .map { rows -> VerificationHistory.hours(rows.mapNotNull(::decodeRow), SouthTyrol.ZONE) }
+            .map { rows -> VerificationHistory.hours(rows.fromStationOf(place).mapNotNull(::decodeRow), SouthTyrol.ZONE) }
             .flowOn(Dispatchers.Default)
+
+    /**
+     * The rows of this place's *current* thermometer, and nothing else.
+     *
+     * Rows of a station the place is no longer on are **kept, not deleted** — they are a record of
+     * a real measurement, they are already inside VerificationHistory.KEEP's ninety days, and
+     * deleting data because it became inconvenient is what put this table in its own database in
+     * the first place. They are simply not this station's evidence, so neither BiasCorrector nor
+     * the statistics screen may count them: a habit averaged over two thermometers 264 m apart is
+     * worse than no habit at all, and nothing about it would show on screen.
+     */
+    private fun List<StationHistoryEntity>.fromStationOf(place: Place): List<StationHistoryEntity> {
+        val code = place.readingStation?.code ?: return this
+        return filter { it.belongsTo(code, place.station?.code) }
+    }
 
     private fun decodeRow(row: StationHistoryEntity): StationHistoryRow? {
         fun leads(text: String?): Map<LeadBucket, Map<Source, Double>> =
@@ -369,12 +427,30 @@ class WeatherRepository @Inject constructor(
                         val o = attempt("SIAG_STATION") {
                             SiagMappers.mapObservation(siag.stations(), station) ?: error("station ${station.code} not in response")
                         }
-                        storeObservation(place, o, failed["SIAG_STATION"], now)
+                        storeObservation(place, "siag", o, failed["SIAG_STATION"], now)
+                    }
+                }
+            }
+            // The amateur reading, where the catalogue names one and this build has a key. A
+            // separate isolate from the provincial fetch on purpose: the two fail independently,
+            // losing one must not cost the other, and a 204 is an ordinary hour rather than a fault
+            // — so nothing here reaches silentSources and nothing accuses anybody.
+            val pws = async {
+                place.pws?.let { station ->
+                    isolate("WU_STATION") {
+                        val o = attempt("WU_STATION") { fetchAmateur(station) }
+                        storeObservation(place, "wu", o, failed["WU_STATION"], now)
                     }
                 }
             }
             val sr = async {
-                place.station?.let { station ->
+                // **readingStation, not station.** StationDownscale quotes the village as the
+                // models' village plus however much the thermometer disagrees with the models about
+                // its own site — so the models have to be asked about *that* site. Asking about the
+                // provincial station while the hero reads an amateur one 300 m higher would pair
+                // two different points and report the difference as the height of the hill, which
+                // is the mistake StationDownscale's own documentation is mostly about.
+                place.readingStation?.let { station ->
                     isolate("OPEN_METEO_STATION") {
                         val ref = attempt("OPEN_METEO_STATION") {
                             OpenMeteoStationMapper.map(openMeteo.stationForecast(station.lat, station.lon, station.altitudeM), now)
@@ -458,7 +534,7 @@ class WeatherRepository @Inject constructor(
                     )
                 }
             }
-            om.await(); gs.await(); km.await(); bl.await(); ob.await(); wa.await(); sr.await(); en.await()
+            om.await(); gs.await(); km.await(); bl.await(); ob.await(); pws.await(); wa.await(); sr.await(); en.await()
         }
 
         recordStationHour(place, now)
@@ -505,19 +581,33 @@ class WeatherRepository @Inject constructor(
                 val forecasts = HourForecasts.at(reference, target)
                 // A model whose run does not reach that far contributes nothing rather than a gap
                 // that later reads as agreement.
-                if (forecasts.temps.isNotEmpty()) mergeStationHour(place, target, lead = lead, forecasts = forecasts)
+                // Stamped with the station the catalogue reads, because that is the point these
+                // forecasts were asked about — see the StationReference fetch, which uses
+                // place.readingStation's coordinates.
+                if (forecasts.temps.isNotEmpty()) {
+                    mergeStationHour(place, target, place.readingStation?.code, lead = lead, forecasts = forecasts)
+                }
             }
         }
 
         // The reading, and the same run's word on the hour it belongs to — which is the station's
         // own hour, not the clock's: a reading taken at 13:40 is verified against what the models
         // said about 13:00, whatever time the refresh happens to run at.
-        val observation = dao.observationOnce(place.istat)?.json
-            ?.let { decode("observation", StationObservation.serializer(), it) }
+        //
+        // Whichever thermometer actually produced a reading, and stamped with that one. The amateur
+        // station leads where it has answered recently; where it has not, this hour is the
+        // provincial station's and is filed as such, so BiasCorrector never averages the two.
+        val amateurRow = place.pws?.let { dao.observationOnce(place.istat, "wu") }
+            ?.json?.let { decode("observation", StationObservation.serializer(), it) }
+            ?.takeIf { it.tempC != null && Duration.between(it.time, now) <= PWS_MAX_AGE }
+        val officialRow = place.station?.let { dao.observationOnce(place.istat, "siag") }
+            ?.json?.let { decode("observation", StationObservation.serializer(), it) }
+        val observation = amateurRow ?: officialRow
+        val stationCode = if (amateurRow != null) place.pws?.code else place.station?.code
         if (observation?.tempC != null) {
             val hour = observation.time.truncatedTo(ChronoUnit.HOURS)
             val atHour = reference?.let { HourForecasts.at(it, hour) }
-            mergeStationHour(place, hour, reading = observation, lead = LeadBucket.NOW, forecasts = atHour)
+            mergeStationHour(place, hour, stationCode, reading = observation, lead = LeadBucket.NOW, forecasts = atHour)
         }
         if (prune) history.prune(now.minus(VerificationHistory.KEEP).epochSecond)
     }
@@ -545,16 +635,28 @@ class WeatherRepository @Inject constructor(
      * ten-minute poll doing it would be 144 sweeps a day for nothing.
      */
     suspend fun refreshObservation(place: Place): Boolean = refreshMutex.withLock {
-        val station = place.station ?: return@withLock false
         val now = clock.instant()
-        val attempt = runCatchingCancellable {
-            SiagMappers.mapObservation(siag.stations(), station) ?: error("station ${station.code} not in response")
+
+        // Both thermometers, because both are needed: the amateur one leads the screen and the
+        // provincial one supplies whatever it does not publish. Where the place has no amateur
+        // station this is exactly what it always was.
+        var any = false
+        place.station?.let { station ->
+            val attempt = runCatchingCancellable {
+                SiagMappers.mapObservation(siag.stations(), station) ?: error("station ${station.code} not in response")
+            }
+            val observation = attempt.getOrNull()
+            storeObservation(place, "siag", observation, attempt.exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName }, now)
+            any = any || observation != null
         }
-        val observation = attempt.getOrNull()
-        val error = attempt.exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName }
-        storeObservation(place, observation, error, now)
-        if (observation != null) recordStationHour(place, now, prune = false)
-        observation != null
+        place.pws?.let { station ->
+            val attempt = runCatchingCancellable { fetchAmateur(station) }
+            val observation = attempt.getOrNull()
+            storeObservation(place, "wu", observation, attempt.exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName }, now)
+            any = any || observation != null
+        }
+        if (any) recordStationHour(place, now, prune = false)
+        any
     }
 
     /**
@@ -567,19 +669,37 @@ class WeatherRepository @Inject constructor(
      */
     private suspend fun storeObservation(
         place: Place,
+        network: String,
         observation: StationObservation?,
         error: String?,
         now: Instant,
     ) {
-        val prev = dao.observationOnce(place.istat)
+        // The previous reading of **this network**, never of the other one. StationDry.withPrevious
+        // decides whether the gauge has risen since the reading before, and two different gauges
+        // hundreds of metres apart compared with each other is not a rise, it is a different
+        // instrument.
+        val prev = dao.observationOnce(place.istat, network)
         val carried = observation?.let {
             val cached = prev?.json?.let { j -> runCatching { json.decodeFromString(StationObservation.serializer(), j) }.getOrNull() }
             StationDry.withPrevious(it, cached)
         }
         dao.upsertObservation(
-            if (carried != null) ObservationEntity(place.istat, json.encodeToString(StationObservation.serializer(), carried), now.toEpochMilli(), null, null)
-            else ObservationEntity(place.istat, prev?.json, prev?.fetchedAtMs, error, now.toEpochMilli())
+            if (carried != null) ObservationEntity(place.istat, network, json.encodeToString(StationObservation.serializer(), carried), now.toEpochMilli(), null, null)
+            else ObservationEntity(place.istat, network, prev?.json, prev?.fetchedAtMs, error, now.toEpochMilli())
         )
+    }
+
+    /**
+     * The amateur station's current reading, or null where there is none to have.
+     *
+     * Null covers three ordinary cases that are not failures: the place names no amateur station,
+     * this build has no key (which is every checkout but the author's, and CI), and **HTTP 204** —
+     * "nothing observed in the last 60 minutes", which a live station produces intermittently.
+     */
+    private suspend fun fetchAmateur(station: NearbyStation): StationObservation? {
+        if (wuApiKey.isEmpty()) return null
+        val response = wu.current(station.code, wuApiKey)
+        return WeatherUndergroundMapper.map(response.body().takeIf { response.isSuccessful }, station)
     }
 
     /** What one run says about one hour at the station: source name → value, per quantity. */
@@ -610,11 +730,27 @@ class WeatherRepository @Inject constructor(
     private suspend fun mergeStationHour(
         place: Place,
         hour: Instant,
+        /**
+         * The thermometer this row is about, passed in rather than derived from [place].
+         *
+         * It is not always `place.readingStation`: where the amateur station is stale or faulty the
+         * hero falls back to the provincial one, and the row then holds a provincial reading. A row
+         * stamped with the station the catalogue *prefers* rather than the one the reading came
+         * from is the exact confusion the column was added to prevent.
+         */
+        stationCode: String?,
         reading: StationObservation? = null,
         lead: LeadBucket? = null,
         forecasts: HourForecasts? = null,
     ) {
-        val existing = history.at(place.istat, hour.epochSecond)
+        val found = history.at(place.istat, hour.epochSecond)
+        // A row belongs to one thermometer. A place can change station now — an amateur one can
+        // displace the provincial one and be hundreds of metres from it — and an hour's row is
+        // filled in over half a day, so the forecasts already in it may have been written about a
+        // different point. Merging those would produce one row whose models and whose reading
+        // describe two places, which is exactly what the `station` column exists to prevent. A
+        // change of station therefore starts the hour again rather than continuing it.
+        val existing = found?.takeIf { it.belongsTo(stationCode, place.station?.code) }
         fun stored(text: String?) = text?.let { decode("station history", LEAD_MODEL_TEMPS, it) }.orEmpty()
         fun withLead(map: Map<String, Map<String, Double>>, add: Map<String, Double>?) =
             if (lead == null || add.isNullOrEmpty()) map else map + (lead.name to add)
@@ -632,6 +768,7 @@ class WeatherRepository @Inject constructor(
                 observedPrecipTodayMm = reading?.precipTodayMm?.let(::hundredths) ?: existing?.observedPrecipTodayMm,
                 modelsRainJson = rain.takeIf { it.isNotEmpty() }?.let { json.encodeToString(LEAD_MODEL_TEMPS, it) },
                 modelsWindJson = wind.takeIf { it.isNotEmpty() }?.let { json.encodeToString(LEAD_MODEL_TEMPS, it) },
+                station = stationCode,
             ),
         )
     }
@@ -709,6 +846,18 @@ class WeatherRepository @Inject constructor(
 
         /** MeteoAlarm publishes a few times a day; six hours without one means we are behind. */
         private val WARNINGS_STALE_AFTER: Duration = Duration.ofHours(6)
+
+        /**
+         * How old an amateur reading may be and still lead the screen.
+         *
+         * Tighter than the ninety minutes a SIAG observation is allowed, and for a different
+         * reason. SIAG publishes on a slow cadence by design — Meran every twenty minutes — so an
+         * hour-old reading there is ordinary. An amateur station uploads every few minutes
+         * (ITIROL16 filed 263 readings on 2026-09-22), so half an hour of silence does not mean a
+         * slow publisher, it means the station has stopped. The provincial reading takes over,
+         * quietly.
+         */
+        private val PWS_MAX_AGE: Duration = Duration.ofMinutes(30)
 
         fun statusOf(
             hasData: Boolean, issuedAt: Instant?, fetchedAtMs: Long?,

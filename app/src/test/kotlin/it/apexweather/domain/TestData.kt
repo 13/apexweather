@@ -38,6 +38,18 @@ val DORF_TIROL = Place(
     station = NearbyStation("23200MS", "Meran", 46.688, 11.1366, 330, 1.53),
 )
 
+/**
+ * Dorf Tirol as it looks once the generator has found it an amateur station.
+ *
+ * ITIROL16 is real: 0,49 km from the village and, per the DEM under its coordinates, within a few
+ * tens of metres of its height — against the provincial thermometer in Meran, 1,53 km away and
+ * 264 m below. It publishes no radiation at all, which is why the provincial reading is still
+ * fetched and still feeds StationSun.
+ */
+val DORF_TIROL_WITH_PWS = DORF_TIROL.copy(
+    pws = NearbyStation("ITIROL16", "Tirolo - Tirol", 46.693246, 11.155237, 634, 0.49, network = "wu"),
+)
+
 /** Sterzing: another district, another valley, and — as constructed here — no station at all. */
 val STERZING = Place(
     istat = "021115", nameDe = "Sterzing", nameIt = "Vipiteno", nameEn = "Vipiteno",

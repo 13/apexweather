@@ -76,6 +76,28 @@ data class HomeUiState(
      * beside the temperature depends on it, because a moved reading has to say so.
      */
     val heroAdjustmentC: Double? = null,
+    /**
+     * Whether [observation] came from an amateur station rather than the provincial network.
+     *
+     * The hero already names its station and says when it was read; this is what makes it say *what
+     * kind* of station. It is not a disclaimer — the station was checked against a DEM and won on
+     * eight weeks of measured stability, and it is usually the better thermometer — it is the
+     * reader being told which instrument they are looking at.
+     */
+    val observationIsPrivate: Boolean = false,
+    /**
+     * The models' own value for the hero's hour — a number the app is free to publish.
+     *
+     * Read **only when [observationIsPrivate]**, and ignored otherwise. Weather Underground's data
+     * is not licensed for redistribution and `ShareCapture` writes a PNG that goes into somebody
+     * else's chat, so a card built over an amateur reading quotes this instead.
+     *
+     * Deliberately *not* "the hero, or this when it may not be shared". A second field that has to
+     * be kept in step with [heroTempC] is one that callers will copy one of and not the other —
+     * which is how a test that set only the hero got a card quoting the consensus, and would
+     * eventually have been a real screen disagreeing with a real card.
+     */
+    val publishableTempC: Double? = null,
     val upcomingHours: List<ConsensusHour> = emptyList(),
     val days: List<ConsensusDay> = emptyList(),
     /** Every consensus hour of the week, grouped by local day, so a day sheet can show its hours. */
@@ -197,6 +219,17 @@ object HomeStateBuilder {
         // last resort, never the first choice. How far it has to travel bounds how far it may be
         // moved, so the two altitudes go in with it.
         val heightDifferenceM = place?.station?.let { place.altitudeM - it.altitudeM }
+        // The reading on screen is an amateur one when the place *has* one and the snapshot's
+        // primary is not the province's own.
+        //
+        // The `place.pws != null` half is load-bearing and was missing once: without it, a snapshot
+        // that simply has no provincial record — a hand-built state, or a place whose SIAG fetch has
+        // never succeeded — made every reading look amateur, and the share card then quietly
+        // replaced a perfectly publishable hero with the models' value. Absence of the provincial
+        // record is not evidence about where the reading came from.
+        val isPrivate = place?.pws != null &&
+            snapshot.observation != null &&
+            snapshot.observation != snapshot.officialObservation
         val heroFromStation = if (heightDifferenceM == null) null else obs?.let {
             StationDownscale.villageTemperature(it, snapshot.stationReference, snapshot.forecastsForBlend, consensus, now, heightDifferenceM)
         }
@@ -291,6 +324,10 @@ object HomeStateBuilder {
             palette = SkyPaletteSelector.select(heroCondition, phase, current?.precipMm ?: 0.0),
             heroTempC = heroFromStation ?: current?.tempC ?: obs?.tempC,
             heroAdjustmentC = adjustment?.takeIf { heroFromStation != null },
+            observationIsPrivate = isPrivate,
+            // `current` is the re-voted hour *before* its temperature was swapped for the
+            // station's, which is exactly the models' own number wanted here.
+            publishableTempC = current?.tempC,
             heroCondition = heroCondition,
             // The ensemble's own spread where it reaches this hour, the models' disagreement otherwise.
             bandHalfWidth = current?.let { it.ensembleHalfWidthC ?: (it.tempMaxC - it.tempMinC) / 2.0 },

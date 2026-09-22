@@ -192,7 +192,8 @@ class BiasAccumulationTest {
         history = HistoryDatabase.inMemory(ApplicationProvider.getApplicationContext())
         repo = WeatherRepository(
             db.weatherDao(), history.stationHistoryDao(), Models(), NoGeoSphere(), Station(),
-            NoOdh(), NoMeteoAlarm(), NoEnsemble(), Fixtures.json, clock,
+            // No amateur station in this test's catalogue, so this is never called.
+            FakeWeatherUnderground(), "", NoOdh(), NoMeteoAlarm(), NoEnsemble(), Fixtures.json, clock,
         )
     }
 
