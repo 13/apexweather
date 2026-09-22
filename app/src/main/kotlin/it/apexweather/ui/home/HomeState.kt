@@ -86,6 +86,16 @@ data class HomeUiState(
     val updatedAt: Instant? = null,
     val offline: Boolean = false,
     /**
+     * Refreshing has been failing, on a phone that believes it has a connection.
+     *
+     * A fact about failure rather than about age. Data an hour old on a mountain with no signal is
+     * not a fault and the offline banner already says so; what had no symptom at all was a phone
+     * with a bar of signal that cannot reach an upstream — the "Aktualisiert 09:12" line stayed
+     * exactly as confident for hours. Now that the app refreshes itself while it is open, an hour
+     * without a new timestamp means something has gone wrong rather than that nobody asked.
+     */
+    val staleOnScreen: Boolean = false,
+    /**
      * Sources that have never managed to deliver anything, while the app as a whole is working.
      *
      * GeoSphere AROME answered HTTP 400 to every request for months and the only place that said so
@@ -140,6 +150,14 @@ object HomeStateBuilder {
      * implying a consensus.
      */
     const val MAX_DAYS = 14
+
+    /**
+     * How old the data may be before the line that claims its age says something is wrong.
+     *
+     * An hour, which is two missed full refreshes: one late cycle is a slow network, two in a row
+     * on a connected phone is an upstream that has stopped answering.
+     */
+    val STALE_ON_SCREEN: Duration = Duration.ofHours(1)
 
     fun build(
         place: Place?,
@@ -289,6 +307,10 @@ object HomeStateBuilder {
             bulletin = snapshot.bulletin,
             updatedAt = snapshot.lastSuccessfulRefresh,
             offline = snapshot.lastRefreshFailed,
+            // Not while offline: two things saying one thing is how the hero got long enough to
+            // need cutting back in the first place.
+            staleOnScreen = !snapshot.lastRefreshFailed && snapshot.lastSuccessfulRefresh != null &&
+                Duration.between(snapshot.lastSuccessfulRefresh, now) > STALE_ON_SCREEN,
             // Only once something has worked at least once: during the very first fetch every
             // source has yet to deliver, and that is not the same as being broken.
             silentSources = if (snapshot.lastSuccessfulRefresh == null) emptyList() else {

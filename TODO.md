@@ -1,40 +1,20 @@
 # TODO
 
-## Automatic refresh while the app is open
+## Automatic refresh while the app is open — **done 2026-09-22**
 
-Planned 2026-09-16, not started. Today the app refreshes on resume when the cache is older than
-30 min, on pull-to-refresh, and hourly in the background (WorkManager); while it stays open,
-nothing refreshes. Each source should be refreshed as often as it changes, not everything on one
-timer.
+Built as `docs/superpowers/plans/2026-09-22-fresh-while-open.md`. The station is polled every 10
+minutes while the app is open (20 on a metered connection), everything else every 30, and the
+"Aktualisiert" line says so when refreshing has been failing on a connected phone. `RefreshDue` is
+the pure rule, `ForegroundRefreshLoop` the timing, `StaleRefresher` the wiring, and
+`ApexApplication`'s count of started activities starts and stops it.
 
-| Source | Changes | Refresh while open |
-|---|---|---|
-| Station (SIAG) | every 10–20 min | every 10 min |
-| Radar at the place | every 10 min | already (`RadarRepository.latestAt`, one tile) |
-| Models, ensembles, bulletin, warnings | hourly to a few times a day | every 30 min (`STALE_ON_OPEN`) |
-| Map forecast (INCA) | every 15 min | already (`NowcastRepository.due`) |
+Two items from the original plan were **not** done, and deliberately:
 
-- [ ] **Foreground loop in `StaleRefresher`**, `repeatOnLifecycle(STARTED)` at process level, so it
-  stops in the background by itself. Every 10 min the station alone, every 30 min a full refresh.
-  Skips while offline (`NetworkCallback`) and resumes when the network returns. Exponential
-  backoff after failures (1 → 2 → 4 min, at most 30). Goes through the repository's existing
-  coalescing, so it never fetches twice.
-- [ ] **`WeatherRepository.refreshObservation(place)`**: a station-only refresh that also writes
-  `station_history`, so the 10-minute readings help the statistics.
-- [ ] **OkHttp disk cache** (a few MB). SIAG's station list sends `ETag` and `max-age=600`; a
-  conditional request answers `304` with 0 bytes against 80 kB uncompressed (measured
-  2026-09-16), which is what makes a 10-minute poll affordable. Open Data Hub's single-station
-  `latest` is 834 B but ran more than an hour behind SIAG that evening, so it cannot replace it.
-- [ ] **Background stays at 60 min.** Respect Data Saver (`getRestrictBackgroundStatus`) as well
-  as metered networks. A background-interval setting was considered and not recommended.
-- [ ] **Metered connection**: the station every 20 min instead of 10; the full refresh stays at
-  30; pins stay Wi-Fi only.
-- [ ] **Freshness on screen**: when the data is older than 60 min because refreshing failed, mark
-  the "Aktualisiert" line, not only the offline banner.
-- [ ] **Tests**: a pure `due(now, lastStation, lastFull, failures, metered)` rule tested like
-  `RefreshWorker.pinsToRefresh`; the loop against the test clock; the cache against a fake server
-  answering `304`. On the phone: 40 minutes open, then count requests and bytes with
-  `dumpsys netstats`.
+- **Data Saver** belongs to the hourly worker and not to this loop: `getRestrictBackgroundStatus`
+  restricts *background* data and a foreground app is explicitly exempt, so honouring it here would
+  throttle the one case the platform says is fine.
+- **Freshness on screen** was built as a fact about *failure* rather than about age — an hour-old
+  cache on a mountain with no signal is not a fault and the offline banner already says so.
 
 ## Other open points
 

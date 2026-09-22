@@ -1022,6 +1022,31 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   and each has a `labelRes()` form as well as a composable one because the widget renders outside a
   composition. They reuse the one warning glyph — the level is what a reader takes in first and the
   colour carries it.
+- **And refreshing *while* open is `ForegroundRefreshLoop`'s.** The station is asked every 10 min
+  (20 on a metered connection), everything else every 30 — each upstream's own publication rate
+  rather than a preference. **Ten is not a round number**: SIAG sends `max-age=600`, so inside ten
+  minutes OkHttp answers from its disk cache with no network call at all and a faster poll would
+  only re-read the same bytes; past them a conditional request costs a `304` with no body against
+  about 80 kB. That cache (`AppModule.HTTP_CACHE_BYTES`, 5 MB) is what makes the poll affordable.
+  `RefreshDue` is the pure rule and `ForegroundRefreshLoop` the timing, split for the reason
+  `RefreshWorker.pinsToRefresh` is pure — and because the loop takes *functions* rather than a
+  `WeatherStateHolder` and a `WeatherRepository`, so a test of one `delay` need not stand up a
+  DataStore, a Room database, an asset read and three `WhileSubscribed` flows. `StaleRefresher`
+  wires it; `ApexApplication` starts and stops it from a count of started activities, because
+  `ProcessLifecycleOwner` would want `lifecycle-process` and this app has one Activity.
+  **Two shapes here are load-bearing and were both bugs first.** The rule's `wait` is only
+  meaningful when nothing is due: returning `FULL` *with* its thirty-minute wait made the loop do a
+  full refresh and then go quiet for half an hour, so the station was never polled at ten and twenty
+  at all — after acting it asks again. And failures are **not** an input to the rule; a rule that
+  suppresses itself while a phone is failing can never recover, because the count only clears on a
+  success it is refusing to attempt. The backoff (1, 2, 4 … 30 min) belongs to the loop.
+  `isOnline` deliberately does not require `NET_CAPABILITY_VALIDATED` — that is the platform's
+  opinion, reported differently across OEMs, and a captive portal is a fetch that fails, which the
+  backoff handles more honestly than a prediction. `WeatherRepository.refreshObservation` takes the
+  same mutex as `refresh`, because the observation write is a read-modify-write that
+  `StationDry.withPrevious` depends on, and it does not prune history — that is the worker's job.
+  `HomeUiState.staleOnScreen` marks the "Aktualisiert" line after an hour **on a connected phone
+  only**: offline already has its banner, and two things saying one thing is what crowded the hero.
 - **Refreshing on open is `StaleRefresher`'s job, not a screen's.** It is app-scoped, holds the
   30-minute rule, and owns the whole refresh path — fetch, place eviction, dismissal pruning, widget
   update — so there is exactly one. `AppNavigation` calls it on every resume, above the tabs,

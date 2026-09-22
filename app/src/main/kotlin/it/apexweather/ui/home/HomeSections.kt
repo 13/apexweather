@@ -611,10 +611,15 @@ private fun HeroQuiet(
             modifier = Modifier.testTag("hero_source"),
         )
         state.updatedAt?.let {
+            // Still one line at either reading: the hero's vertical budget was measured, and the
+            // footnote was cut from three lines to two to fit. Amber is chrome here, as it is on
+            // the rain ribbon, and never a rain colour.
+            val stamp = Format.timestamp(it, SouthTyrol.ZONE, state.now, formats)
             Text(
-                stringResource(R.string.updated_at, Format.timestamp(it, SouthTyrol.ZONE, state.now, formats)),
+                if (state.staleOnScreen) stringResource(R.string.updated_at_stale, stamp)
+                else stringResource(R.string.updated_at, stamp),
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.5f),
+                color = if (state.staleOnScreen) Color(0xFFFFCC80) else Color.White.copy(alpha = 0.5f),
                 modifier = Modifier.testTag("hero_updated"),
             )
         }

@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import it.apexweather.R
 import it.apexweather.data.AppSettings
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.model.Condition
@@ -354,5 +355,40 @@ class HomeScreenTest {
         rule.onNodeWithTag("warning_card").performClick()
         rule.onNodeWithTag("warning_dismiss_0").performScrollTo().performClick()
         assertEquals("a", dismissed?.identifier)
+    }
+
+    /**
+     * The line that claims how fresh the data is says so when refreshing has been failing.
+     *
+     * Resolved from the resources rather than asserted as German: CI's emulators are en-US. It stays
+     * one line either way, which is the constraint — the hero's vertical budget was measured and its
+     * footnote was cut from three lines to two to fit.
+     */
+    @Test
+    fun theUpdatedLineSaysWhenNothingCanBeReached() {
+        val stamp = context.getString(R.string.updated_at, "")
+        val stale = context.getString(R.string.updated_at_stale, "")
+
+        rule.setContent {
+            ApexTheme { HomeContent(state.copy(updatedAt = t0, staleOnScreen = true), onRefresh = {}, onOpenBulletin = {}) }
+        }
+
+        val node = rule.onNodeWithTag("hero_updated").fetchSemanticsNode()
+        val text = node.config[SemanticsProperties.Text].joinToString(" ") { it.text }
+        assertTrue("expected the unreachable wording, got: $text", text.contains(stale.trim().substringAfterLast("· ")))
+        assertEquals("it should still be one line", 1, text.lines().size)
+        assertTrue(stamp.isNotEmpty())
+    }
+
+    /** And says nothing of the sort while it is working. */
+    @Test
+    fun theUpdatedLineIsQuietWhenRefreshingWorks() {
+        val stale = context.getString(R.string.updated_at_stale, "")
+        rule.setContent {
+            ApexTheme { HomeContent(state.copy(updatedAt = t0, staleOnScreen = false), onRefresh = {}, onOpenBulletin = {}) }
+        }
+        val node = rule.onNodeWithTag("hero_updated").fetchSemanticsNode()
+        val text = node.config[SemanticsProperties.Text].joinToString(" ") { it.text }
+        assertTrue(!text.contains(stale.trim().substringAfterLast("· ")))
     }
 }

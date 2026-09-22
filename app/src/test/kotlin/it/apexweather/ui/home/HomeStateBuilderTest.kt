@@ -549,4 +549,42 @@ class HomeStateBuilderTest {
         )
     }
 
+
+    // ---- the line that claims how fresh the data is ----
+
+    /**
+     * A fact about failure, not about age.
+     *
+     * Now that the app refreshes itself while it is open, an hour without a newer timestamp on a
+     * connected phone means an upstream has stopped answering — which until this had no symptom at
+     * all: the "Aktualisiert 09:12" line stayed exactly as confident for hours.
+     */
+    @Test
+    fun `an hour-old cache on a working connection is marked stale`() {
+        val stale = snapshot.copy(lastSuccessfulRefresh = hour(3), lastRefreshFailed = false)
+        val s = HomeStateBuilder.build(DORF_TIROL, stale, AppSettings(), consensus, now = hour(3).plus(Duration.ofMinutes(61)))
+        assertTrue(s.staleOnScreen)
+    }
+
+    /** Offline already has its banner; two things saying one thing is what crowded the hero. */
+    @Test
+    fun `the same cache while offline is not marked`() {
+        val stale = snapshot.copy(lastSuccessfulRefresh = hour(3), lastRefreshFailed = true)
+        val s = HomeStateBuilder.build(DORF_TIROL, stale, AppSettings(), consensus, now = hour(3).plus(Duration.ofMinutes(61)))
+        assertFalse(s.staleOnScreen)
+    }
+
+    @Test
+    fun `a cache inside the hour says nothing`() {
+        val fresh = snapshot.copy(lastSuccessfulRefresh = hour(3), lastRefreshFailed = false)
+        val s = HomeStateBuilder.build(DORF_TIROL, fresh, AppSettings(), consensus, now = hour(3).plus(Duration.ofMinutes(59)))
+        assertFalse(s.staleOnScreen)
+    }
+
+    /** Before the first fetch there is nothing to call stale; the empty state speaks instead. */
+    @Test
+    fun `a cache that has never been filled is not marked stale`() {
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), consensus, now = hour(30))
+        assertFalse(s.staleOnScreen)
+    }
 }
