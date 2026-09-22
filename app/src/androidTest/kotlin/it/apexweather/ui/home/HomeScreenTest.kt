@@ -22,6 +22,7 @@ import it.apexweather.domain.model.HourlyPoint
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.model.SourceForecast
 import it.apexweather.domain.model.WeatherSnapshot
+import it.apexweather.ui.common.labelRes
 import it.apexweather.ui.theme.ApexTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -390,5 +391,66 @@ class HomeScreenTest {
         val node = rule.onNodeWithTag("hero_updated").fetchSemanticsNode()
         val text = node.config[SemanticsProperties.Text].joinToString(" ") { it.text }
         assertTrue(!text.contains(stale.trim().substringAfterLast("· ")))
+    }
+
+    /** A hot hour, built from the models so the whole path is exercised rather than the state faked. */
+    private fun hotState(): HomeUiState {
+        fun hot(source: Source) = SourceForecast(
+            source, t0, t0,
+            hourly = (0 until 168).map {
+                HourlyPoint(
+                    t0.plusSeconds(it * 3600L), 30.0, feelsLikeC = 34.0,
+                    precipMm = 0.0, windKmh = 6.0, gustKmh = 21.0,
+                    condition = Condition.CLEAR,
+                )
+            },
+            daily = emptyList(),
+        )
+        val snap = WeatherSnapshot.EMPTY.copy(
+            forecasts = mapOf(Source.ICON_CH1 to hot(Source.ICON_CH1), Source.ICON_D2 to hot(Source.ICON_D2)),
+        )
+        return HomeStateBuilder.build(dorfTirol, snap, AppSettings(), ConsensusBlender().blend(snap.forecasts), t0.plusSeconds(60))
+    }
+
+    @Test
+    fun hotHourShowsTheFeelsLikeClause() {
+        val hot = hotState()
+        rule.setContent { ApexTheme { HomeContent(hot, onRefresh = {}, onOpenBulletin = {}) } }
+        val expected = context.getString(
+            R.string.hero_condition_feels,
+            context.getString(Condition.CLEAR.labelRes()),
+            "34°",
+        )
+        rule.onNodeWithTag("hero_feels").assertTextContains(expected)
+    }
+
+    /** The default fixture sits in the mild middle, so the hero says nothing about how it feels. */
+    @Test
+    fun mildHourShowsTheConditionAlone() {
+        rule.setContent { ApexTheme { HomeContent(state, onRefresh = {}, onOpenBulletin = {}) } }
+        rule.onNodeWithTag("hero_feels")
+            .assertTextContains(context.getString(Condition.PARTLY_CLOUDY.labelRes()))
+    }
+
+    /**
+     * The clause lives inside the condition's own string precisely so this row does not change
+     * shape. At a 2x font scale the rain line still has to be on screen beside it — that is the
+     * assertion that the FlowRow was not turned into a three-child SpaceBetween.
+     */
+    @Test
+    fun atLargeTextTheRainLineSurvivesTheFeelsLikeClause() {
+        val hot = hotState().copy(minutelyStart = t0.plusSeconds(3600))
+        rule.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
+                    density = androidx.compose.ui.platform.LocalDensity.current.density,
+                    fontScale = 2.0f,
+                ),
+            ) {
+                ApexTheme { HomeContent(hot, onRefresh = {}, onOpenBulletin = {}) }
+            }
+        }
+        rule.onNodeWithTag("hero_feels").assertIsDisplayed()
+        rule.onNodeWithTag("rain_starts_at").assertIsDisplayed()
     }
 }

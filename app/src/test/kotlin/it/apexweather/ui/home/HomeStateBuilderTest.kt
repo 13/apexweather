@@ -10,6 +10,7 @@ import it.apexweather.domain.forecast
 import it.apexweather.domain.hour
 import it.apexweather.domain.point
 import it.apexweather.domain.DORF_TIROL
+import it.apexweather.domain.FeelsLike
 import it.apexweather.domain.model.Condition
 import it.apexweather.domain.model.ConsensusForecast
 import it.apexweather.domain.model.DailyPoint
@@ -50,6 +51,23 @@ class HomeStateBuilderTest {
         // fixture's rain hours (see StationDry).
         gustKmh = null, precipTodayMm = null, pressureHpa = 1010.0,
     )
+
+    /**
+     * The same, for a consensus a test built itself. [reference] is hardwired to the class
+     * fixture's, which is right for the tests that use that fixture and silently wrong for a test
+     * with models of its own: the reference then describes a different set of models from the one
+     * being blended, the anomaly comes out enormous, and StationDownscale's bracket hands the
+     * screen back to the consensus. That reads exactly like the station path being broken.
+     */
+    private fun referenceFor(c: ConsensusForecast, warmerBy: Double) =
+        it.apexweather.data.remote.StationReference(
+            fetchedAt = hour(3),
+            elevationM = 330.0,
+            bySource = mapOf(
+                Source.ICON_CH1.name to c.hourly.associate { it.time.epochSecond to it.tempC + warmerBy },
+                Source.ICON_D2.name to c.hourly.associate { it.time.epochSecond to it.tempC + warmerBy },
+            ),
+        )
 
     /** The models' view from down at the station, warmer than the village by [warmerBy]. */
     private fun reference(warmerBy: Double, fetchedAt: java.time.Instant = hour(3)) =
@@ -586,5 +604,97 @@ class HomeStateBuilderTest {
     fun `a cache that has never been filled is not marked stale`() {
         val s = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), consensus, now = hour(30))
         assertFalse(s.staleOnScreen)
+    }
+
+    /**
+     * A hot afternoon: the models put the hour at 27 °C and feeling 4 K hotter, so the clause is
+     * shown at 31.
+     */
+    @Test
+    fun `hero feels-like is shown on a hot hour`() {
+        val hot = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 48).map { point(it, 27.0, feelsLike = 31.0) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 48).map { point(it, 27.0, feelsLike = 31.0) }),
+        )
+        val snap = WeatherSnapshot.EMPTY.copy(forecasts = hot)
+        val s = HomeStateBuilder.build(DORF_TIROL, snap, AppSettings(), blender.blend(hot), now = hour(3).plusSeconds(600))
+        assertEquals(31.0, s.heroFeelsLikeC!!, 0.0)
+    }
+
+    @Test
+    fun `hero feels-like is silent in the mild middle`() {
+        val mild = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 48).map { point(it, 18.0, feelsLike = 23.0) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 48).map { point(it, 18.0, feelsLike = 23.0) }),
+        )
+        val snap = WeatherSnapshot.EMPTY.copy(forecasts = mild)
+        val s = HomeStateBuilder.build(DORF_TIROL, snap, AppSettings(), blender.blend(mild), now = hour(3).plusSeconds(600))
+        assertNull(s.heroFeelsLikeC)
+    }
+
+    @Test
+    fun `hero feels-like is null when no model publishes an apparent temperature`() {
+        val s = HomeStateBuilder.build(DORF_TIROL, snapshot, AppSettings(), consensus, now = hour(3).plusSeconds(600))
+        assertNull(s.heroFeelsLikeC)
+    }
+
+    /**
+     * The gate reads the hero, not the models.
+     *
+     * The models put this morning at 11,0 — **above** FeelsLike.COLD_MAX_C, so on the models alone
+     * nothing would be said — while the thermometer, carried up the hill, puts the village at 9,5.
+     * The clause belongs on the air the reader is standing in.
+     *
+     * The anomaly is 1,5 K on purpose: that is StationDownscale.FULLY_TRUSTED_ANOMALY_C, so the
+     * whole of it is carried and the hero is exactly the reading. A larger one is deliberately only
+     * partly shared — a -4 K anomaly moves the hero by two-thirds of a degree, not by four — and a
+     * test built on one would be asserting the fade rather than the gate.
+     */
+    @Test
+    fun `hero feels-like is gated on the station-carried hero and not on the consensus`() {
+        val cold = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 48).map { point(it, 11.0, feelsLike = 8.0) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 48).map { point(it, 11.0, feelsLike = 8.0) }),
+        )
+        val c = blender.blend(cold)
+        val snap = WeatherSnapshot.EMPTY.copy(
+            forecasts = cold,
+            observation = observation(9.5),
+            stationReference = referenceFor(c, warmerBy = 0.0),
+        )
+        val s = HomeStateBuilder.build(DORF_TIROL, snap, AppSettings(), c, now = hour(3).plusSeconds(600))
+        assertEquals(9.5, s.heroTempC!!, 0.01)
+        // On the consensus alone the gate is shut: 11,0 is above COLD_MAX_C.
+        assertNull(FeelsLike.shown(c.hourly[3].tempC, c.hourly[3].feelsOffsetC))
+        // On the hero it is open: 9,5 with an offset of -3,0.
+        assertEquals(6.5, s.heroFeelsLikeC!!, 0.01)
+    }
+
+    /**
+     * The hero and the strip's first column are the same hour. Its temperature was already swapped
+     * for the station's; its apparent temperature has to move with it, or tapping that column
+     * quotes the models' feels-like over the station's air.
+     */
+    @Test
+    fun `the current hour's feels-like moves with its temperature`() {
+        val warm = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, (0 until 48).map { point(it, 20.0, feelsLike = 23.0) }),
+            Source.ICON_D2 to forecast(Source.ICON_D2, (0 until 48).map { point(it, 20.0, feelsLike = 23.0) }),
+        )
+        val c = blender.blend(warm)
+        val snap = WeatherSnapshot.EMPTY.copy(
+            forecasts = warm,
+            // 1,5 K above what the models say about the station's own site: the whole anomaly is
+            // carried, so the hero is exactly the reading and plainly not the models' 20,0.
+            observation = observation(21.5),
+            stationReference = referenceFor(c, warmerBy = 0.0),
+        )
+        val s = HomeStateBuilder.build(DORF_TIROL, snap, AppSettings(), c, now = hour(3).plusSeconds(600))
+        val hero = s.heroTempC!!
+        // Otherwise this passes for the wrong reason: with no station path the hero is the models'
+        // 20,0 and the untouched tile is the models' 23,0, which satisfies the assertion below
+        // while proving nothing.
+        assertEquals(21.5, hero, 0.01)
+        assertEquals(hero + 3.0, s.currentHour!!.feelsLikeC!!, 0.001)
     }
 }

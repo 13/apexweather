@@ -9,6 +9,7 @@ import it.apexweather.domain.SunPhase
 import it.apexweather.domain.SunPhaseCalculator
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.DailyAggregator
+import it.apexweather.domain.FeelsLike
 import it.apexweather.domain.Horizon
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.StationDownscale
@@ -76,6 +77,17 @@ data class HomeUiState(
      * beside the temperature depends on it, because a moved reading has to say so.
      */
     val heroAdjustmentC: Double? = null,
+    /**
+     * What the hero's hour feels like, or null where saying so would tell the reader nothing.
+     *
+     * Already gated: see [it.apexweather.domain.FeelsLike]. The screen prints it where it is
+     * present and prints nothing where it is not — the decision is not the composable's.
+     *
+     * It is the **hero's** temperature plus the models' paired offset, never the models' own
+     * apparent median, because the hero is usually a station reading carried up the hill and those
+     * two numbers come from different populations.
+     */
+    val heroFeelsLikeC: Double? = null,
     val upcomingHours: List<ConsensusHour> = emptyList(),
     val days: List<ConsensusDay> = emptyList(),
     /** Every consensus hour of the week, grouped by local day, so a day sheet can show its hours. */
@@ -274,7 +286,14 @@ object HomeStateBuilder {
         // hours after it are still exactly what the models say — see StationSun, which draws the same
         // line for the same reason.
         val currentShown = current?.let { h ->
-            if (heroFromStation == null || heroFromStation == h.tempC) h else h.copy(tempC = heroFromStation)
+            if (heroFromStation == null || heroFromStation == h.tempC) h else h.copy(
+                tempC = heroFromStation,
+                // The apparent temperature has to move with the real one. Only the condition was
+                // ever carried across to this hour and the temperature quietly was not; this is the
+                // same omission one field further along, and it shows up as a tile in the hour
+                // sheet quoting the models' feels-like over the station's air.
+                feelsLikeC = h.feelsOffsetC?.let { heroFromStation + it },
+            )
         }
         val upcoming = if (currentShown == null || currentShown === rawCurrent) upcomingRaw else listOf(currentShown) + upcomingRaw.drop(1)
         val heroCondition = current?.condition ?: Condition.PARTLY_CLOUDY
@@ -291,6 +310,7 @@ object HomeStateBuilder {
             palette = SkyPaletteSelector.select(heroCondition, phase, current?.precipMm ?: 0.0),
             heroTempC = heroFromStation ?: current?.tempC ?: obs?.tempC,
             heroAdjustmentC = adjustment?.takeIf { heroFromStation != null },
+            heroFeelsLikeC = FeelsLike.shown(heroFromStation ?: current?.tempC ?: obs?.tempC, current?.feelsOffsetC),
             heroCondition = heroCondition,
             // The ensemble's own spread where it reaches this hour, the models' disagreement otherwise.
             bandHalfWidth = current?.let { it.ensembleHalfWidthC ?: (it.tempMaxC - it.tempMinC) / 2.0 },

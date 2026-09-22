@@ -222,6 +222,9 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         val snow = points.mapNotNullValues { it.snowCm }
 
         val feels = points.mapNotNullValues { it.feelsLikeC }
+        // Paired with each model's own temperature before the median is taken; see
+        // ConsensusHour.feelsOffsetC for why this is not `feels` minus `temps`.
+        val feelsOffsets = points.mapNotNullValues { p -> p.feelsLikeC?.let { it - p.tempC } }
         val gusts = values.mapNotNull { it.gustKmh }
         val winds = points.mapNotNullValues { it.windKmh }
         val freezing = points.mapNotNullValues { it.freezingLevelM }
@@ -233,6 +236,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             tempMinC = tMin,
             tempMaxC = tMax,
             feelsLikeC = feels.takeIf { it.isNotEmpty() }?.let(::weightedMedian),
+            feelsOffsetC = feelsOffsets.takeIf { it.isNotEmpty() }?.let(::weightedMedian),
             precipMm = precip,
             snowCm = snow.takeIf { it.isNotEmpty() }?.let(::weightedMean),
             precipProb = precipProb,

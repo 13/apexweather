@@ -282,6 +282,7 @@
 
     <!-- The quarter-hour the rain starts, where a regional model published one. -->
     <string name="rain_starts_at">Niederschlag ab %1$s</string>
+    <string name="hero_condition_feels">%1$s · gefühlt %2$s</string>
 
     <string name="source_detail_open">%1$s, %2$s, Details öffnen</string>
     <string name="source_block_what">WAS ES IST</string>

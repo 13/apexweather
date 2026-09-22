@@ -467,6 +467,25 @@ data class ConsensusHour(
     val tempMinC: Double,
     val tempMaxC: Double,
     val feelsLikeC: Double?,
+    /**
+     * How much warmer or colder the models say this hour feels than it is, as the weighted median
+     * of each model's own (feelsLikeC - tempC).
+     *
+     * Deliberately **not** [feelsLikeC] minus [tempC]. Those are two medians over two populations —
+     * every model publishes a temperature and only the Open-Meteo runs publish an apparent one —
+     * and subtracting them carries the difference between the populations into the answer. Pairing
+     * each model with itself first makes that go away, for the same reason
+     * [it.apexweather.domain.StationDownscale] measures its offset model by model and then medians,
+     * never as one median minus another.
+     *
+     * It is also bias-independent by construction: [it.apexweather.domain.BiasCorrector]'s
+     * correction is subtracted from `tempC` and from `feelsLikeC` alike, so inside the pair it
+     * cancels. That is what makes it safe to add to the hero temperature, which has been through a
+     * different correction path entirely.
+     *
+     * Null where no contributing model publishes an apparent temperature.
+     */
+    val feelsOffsetC: Double? = null,
     val precipMm: Double,
     /**
      * Fresh snow this hour in centimetres, across the models that publish one — null where none
