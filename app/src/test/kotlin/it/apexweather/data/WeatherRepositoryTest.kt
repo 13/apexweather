@@ -20,6 +20,7 @@ import it.apexweather.data.remote.OpenMeteoStationMapper
 import it.apexweather.data.remote.SiagApi
 import it.apexweather.data.remote.SiagStationsResponse
 import it.apexweather.domain.DORF_TIROL
+import it.apexweather.domain.DORF_TIROL_WITH_PWS
 import it.apexweather.domain.STERZING
 import it.apexweather.domain.model.Source
 import it.apexweather.domain.DORF_TIROL
@@ -68,6 +69,14 @@ class WeatherRepositoryTest {
     private val openMeteo = FakeOpenMeteo()
     private val geoSphere = FakeGeoSphere()
     private val siag = FakeSiag()
+    private val wu = FakeWeatherUnderground()
+
+    /**
+     * A stand-in for the contributor key. It is a constructor argument rather than BuildConfig so
+     * these tests behave the same on a machine that has a real key and on one that does not — CI
+     * has none, and a test whose outcome depends on that proves nothing anywhere.
+     */
+    private val WU_KEY = "test-key"
     private val odh = FakeOdh()
     private val meteoAlarm = FakeMeteoAlarm()
     private val ensemble = FakeEnsemble()
@@ -77,7 +86,7 @@ class WeatherRepositoryTest {
     @Before fun setUp() {
         db = AppDatabase.inMemory(ApplicationProvider.getApplicationContext())
         history = HistoryDatabase.inMemory(ApplicationProvider.getApplicationContext())
-        repo = WeatherRepository(db.weatherDao(), history.stationHistoryDao(), openMeteo, geoSphere, siag, odh, meteoAlarm, ensemble, Fixtures.json, clock)
+        repo = WeatherRepository(db.weatherDao(), history.stationHistoryDao(), openMeteo, geoSphere, siag, wu, WU_KEY, odh, meteoAlarm, ensemble, Fixtures.json, clock)
     }
 
     @After fun tearDown() {
@@ -283,7 +292,7 @@ class WeatherRepositoryTest {
     fun `a store failure is isolated and the refresh still records its meta`() = runTest {
         val failing = WeatherRepository(
             FailingStoreDao(db.weatherDao(), Source.GEOSPHERE_AROME.name), history.stationHistoryDao(),
-            openMeteo, geoSphere, siag, odh, meteoAlarm, ensemble, Fixtures.json, clock,
+            openMeteo, geoSphere, siag, wu, WU_KEY, odh, meteoAlarm, ensemble, Fixtures.json, clock,
         )
         val result = failing.refresh(DORF_TIROL, "de")
         assertEquals("store: disk full", result.failed["GEOSPHERE_AROME"])
@@ -644,6 +653,7 @@ class WeatherRepositoryTest {
         db.weatherDao().upsertObservation(
             it.apexweather.data.local.ObservationEntity(
                 DORF_TIROL.istat,
+                "siag",
                 Fixtures.json.encodeToString(
                     it.apexweather.domain.model.StationObservation.serializer(),
                     it.apexweather.domain.model.StationObservation(
@@ -728,5 +738,103 @@ class WeatherRepositoryTest {
         assertNull(repo.snapshot(DORF_TIROL, "de").first().lastObservationFetch)
         repo.refreshObservation(DORF_TIROL)
         assertEquals(clock.now, repo.snapshot(DORF_TIROL, "de").first().lastObservationFetch)
+    }
+
+    // ---- amateur stations ------------------------------------------------------------------
+
+    /**
+     * A fake that ignores its arguments cannot fail for the reason that matters; see FakeGeoSphere,
+     * which learned that the hard way after the app asked GeoSphere for an un-interpolated string
+     * template for months while every test passed.
+     */
+    @Test
+    fun `the amateur station is asked for by its own id, with the key`() = runTest {
+        repo.refresh(DORF_TIROL_WITH_PWS, "de")
+        assertEquals("ITIROL16", wu.askedFor)
+        assertEquals(WU_KEY, wu.askedKeys.last())
+    }
+
+    /** No amateur station in the catalogue means no request at all, not a request that fails. */
+    @Test
+    fun `a place with no amateur station never asks`() = runTest {
+        repo.refresh(DORF_TIROL, "de")
+        assertTrue(wu.asked.isEmpty())
+    }
+
+    /**
+     * The case every other checkout and CI are in. An empty key must switch the path off entirely
+     * rather than send a request that will be refused.
+     */
+    @Test
+    fun `with no key the amateur station is never requested`() = runTest {
+        val keyless = WeatherRepository(
+            db.weatherDao(), history.stationHistoryDao(), openMeteo, geoSphere, siag, wu, "",
+            odh, meteoAlarm, ensemble, Fixtures.json, clock,
+        )
+        keyless.refresh(DORF_TIROL_WITH_PWS, "de")
+        assertTrue(wu.asked.isEmpty())
+    }
+
+    /** Where it answers and is plausible, the amateur reading is the one the app leads with. */
+    @Test
+    fun `a fresh amateur reading becomes the observation`() = runTest {
+        clock.now = Instant.parse("2026-09-22T20:10:00Z")
+        repo.refresh(DORF_TIROL_WITH_PWS, "de")
+        val snapshot = repo.snapshot(DORF_TIROL_WITH_PWS, "de").first()
+        assertEquals("Tirolo - Tirol", snapshot.observation?.stationName)
+        // And the provincial reading is still there, because it supplies what the amateur station
+        // does not publish — ITIROL16 has no pyranometer at all.
+        assertEquals("Meran", snapshot.officialObservation?.stationName)
+    }
+
+    /**
+     * HTTP 204 — "nothing in the last 60 minutes" — is an ordinary hour, not a failure. A live
+     * station produces it: ITIROL26 answered 204 on three endpoints minutes before answering 200.
+     */
+    @Test
+    fun `a 204 leaves the provincial reading leading`() = runTest {
+        wu.noContent = true
+        repo.refresh(DORF_TIROL_WITH_PWS, "de")
+        val snapshot = repo.snapshot(DORF_TIROL_WITH_PWS, "de").first()
+        assertEquals("Meran", snapshot.observation?.stationName)
+    }
+
+    /**
+     * And so does a reading the models cannot account for at all; see StationFault.
+     *
+     * The reading is moved onto an hour the other fixtures cover, because the rule compares it
+     * against the models' median *at the station* — with no model coverage for the hour there is
+     * nothing to compare against and the reading is deliberately left to stand.
+     */
+    @Test
+    fun `an impossible amateur reading falls back to the provincial one`() = runTest {
+        // Inside the station fixture's own range, which begins on 2026-09-10. Outside it the models
+        // have no opinion about the hour, and the rule then deliberately lets the reading stand.
+        val hour = Instant.parse("2026-09-10T12:00:00Z")
+        clock.now = hour
+        wu.time = hour
+        wu.tempC = 99.0
+        repo.refresh(DORF_TIROL_WITH_PWS, "de")
+        val snapshot = repo.snapshot(DORF_TIROL_WITH_PWS, "de").first()
+        // The premise: without this the median is null and the test would pass for the wrong reason.
+        assertTrue(snapshot.stationReference!!.at(hour).isNotEmpty())
+        assertEquals("Meran", snapshot.observation?.stationName)
+    }
+
+    /** An amateur reading half a day old is a station that has stopped, whatever it last said. */
+    @Test
+    fun `a stale amateur reading falls back to the provincial one`() = runTest {
+        clock.now = Instant.parse("2026-09-23T08:00:00Z")
+        repo.refresh(DORF_TIROL_WITH_PWS, "de")
+        val snapshot = repo.snapshot(DORF_TIROL_WITH_PWS, "de").first()
+        assertEquals("Meran", snapshot.observation?.stationName)
+    }
+
+    /** The two rows are kept apart, so one never overwrites the other. */
+    @Test
+    fun `the amateur reading does not overwrite the provincial row`() = runTest {
+        repo.refresh(DORF_TIROL_WITH_PWS, "de")
+        assertNotNull(db.weatherDao().observationOnce(DORF_TIROL_WITH_PWS.istat, "siag"))
+        assertNotNull(db.weatherDao().observationOnce(DORF_TIROL_WITH_PWS.istat, "wu"))
     }
 }

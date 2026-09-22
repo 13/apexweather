@@ -83,12 +83,17 @@ class WeatherStateHolder @Inject constructor(
      * an app with no place at all has nothing to show, and a code can outlive a municipal merger.
      */
     private val place: Flow<Place> = settings
-        .map { it.placeIstat }
+        .map { it.placeIstat to it.amateurStations }
         .distinctUntilChanged()
-        .map { istat ->
-            catalogue.byIstat(istat) ?: checkNotNull(catalogue.byIstat(SouthTyrol.DEFAULT_ISTAT)) {
+        .map { (istat, amateur) ->
+            val found = catalogue.byIstat(istat) ?: checkNotNull(catalogue.byIstat(SouthTyrol.DEFAULT_ISTAT)) {
                 "the catalogue is missing its own default place"
             }
+            // Switching amateur stations off is a change of *place* as far as everything downstream
+            // is concerned — a different thermometer, a different station reference, a different
+            // row in station_history — so it belongs in this flow rather than beside the animations
+            // switch, and it re-subscribes the repository exactly as choosing a new place does.
+            found.withAmateurStation(amateur)
         }
 
     /**

@@ -177,10 +177,15 @@ def fill(places, limit=None):
     """
     # Stations are shared: the 116 places read about 42 thermometers between them, and a skyline is
     # a property of a point rather than of who is looking at it.
+    # Both kinds of station, in one pool. An amateur station has a skyline for exactly the reason a
+    # provincial one does — StationSun asks its question at the pyranometer — and a thermometer
+    # 490 m from the village on a different shoulder has a different ridge in front of it. They
+    # share a pool because a code is a point, whichever network issued it.
     by_station = {}
     for p in places:
-        if p.get("station"):
-            by_station.setdefault(p["station"]["code"], dict(p["station"]))
+        for key in ("station", "pws"):
+            if p.get(key):
+                by_station.setdefault(p[key]["code"], dict(p[key]))
 
     todo = places[:limit] if limit else places
     for n, p in enumerate(todo, start=1):
@@ -195,10 +200,11 @@ def fill(places, limit=None):
     # One thermometer is read by many places, so the profile computed once above is copied onto each
     # of their own station objects.
     for p in places:
-        if p.get("station"):
-            measured = by_station.get(p["station"]["code"], {}).get("horizon")
-            if measured is not None:
-                p["station"]["horizon"] = measured
+        for key in ("station", "pws"):
+            if p.get(key):
+                measured = by_station.get(p[key]["code"], {}).get("horizon")
+                if measured is not None:
+                    p[key]["horizon"] = measured
     return places
 
 

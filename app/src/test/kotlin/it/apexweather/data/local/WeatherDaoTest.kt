@@ -7,6 +7,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -64,16 +65,22 @@ class WeatherDaoTest {
         assertEquals(5L, dao.meta("021101").first()?.lastSuccessMs)
         assertNull(dao.meta("021115").first())
 
-        dao.upsertObservation(ObservationEntity("021101", "{}", 1L, null, null))
-        assertEquals("{}", dao.observation("021101").first()?.json)
-        assertNull(dao.observation("021115").first())
+        // Keyed by place *and* network now: the provincial reading and an amateur one are two rows,
+        // because merging them would put one site's radiation under another site's coordinates.
+        dao.upsertObservation(ObservationEntity("021101", "siag", "{}", 1L, null, null))
+        dao.upsertObservation(ObservationEntity("021101", "wu", "{\"a\":1}", 2L, null, null))
+        val rows = dao.observations("021101").first()
+        assertEquals(2, rows.size)
+        assertEquals("{}", rows.first { it.network == "siag" }.json)
+        assertEquals("{\"a\":1}", rows.first { it.network == "wu" }.json)
+        assertTrue(dao.observations("021115").first().isEmpty())
     }
 
     @Test
     fun `eviction keeps the places it is told to and drops the rest`() = runTest {
         listOf("021101", "021115", "021008", "021051").forEach {
             dao.upsertForecast(forecast(it, "ICON_D2", "{}"))
-            dao.upsertObservation(ObservationEntity(it, "{}", 1L, null, null))
+            dao.upsertObservation(ObservationEntity(it, "siag", "{}", 1L, null, null))
             dao.upsertStationReference(StationReferenceEntity(it, "{}", 1L, null, null))
             dao.upsertMeta(RefreshMetaEntity(it, 1L, 1L, false))
         }
@@ -81,11 +88,11 @@ class WeatherDaoTest {
 
         listOf("021101", "021115", "021008").forEach {
             assertEquals(1, dao.forecasts(it).first().size)
-            assertNotNull(dao.observationOnce(it))
+            assertNotNull(dao.observationOnce(it, "siag"))
             assertNotNull(dao.stationReferenceOnce(it))
         }
         assertEquals(0, dao.forecasts("021051").first().size)
-        assertNull(dao.observationOnce("021051"))
+        assertNull(dao.observationOnce("021051", "siag"))
         assertNull(dao.stationReferenceOnce("021051"))
         assertNull(dao.meta("021051").first())
     }

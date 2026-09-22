@@ -14,6 +14,7 @@
     <string name="cond_heavy_snow">Starker Schneefall</string>
     <string name="cond_thunderstorm">Gewitter</string>
     <string name="now_from_station">Jetzt: Station %1$s, %2$s</string>
+    <string name="station_private">%1$s (private Station)</string>
     <string name="updated_at">Aktualisiert %1$s</string>
     <string name="source_silent_one">Quelle antwortet nicht: %1$s</string>
     <plurals name="source_silent_many">
@@ -109,6 +110,8 @@
     <string name="lang_system">System</string>
     <string name="setting_wind">WINDEINHEIT</string>
     <string name="setting_animations">Himmel animieren</string>
+    <string name="setting_amateur_stations">Private Wetterstationen</string>
+    <string name="setting_amateur_stations_note">Näher oder auf der Höhe des Ortes, aber von niemandem gewartet. Aus: nur das Landesmessnetz.</string>
     <string name="refresh_now">Jetzt aktualisieren</string>
     <string name="about">Apex Wetter %1$s · Südtirol · Konsens aus 10 Wettermodellen</string>
     <string name="widget_description">Aktuelle Temperatur und die nächsten Stunden für den gewählten Ort · größer gezogen auch die nächsten Tage</string>

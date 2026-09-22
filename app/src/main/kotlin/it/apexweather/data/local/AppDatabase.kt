@@ -34,9 +34,23 @@ data class BulletinEntity(
     val lastErrorAtMs: Long?,
 )
 
-@Entity(tableName = "observation")
+@Entity(tableName = "observation", primaryKeys = ["place", "network"])
 data class ObservationEntity(
-    @PrimaryKey val place: String,
+    val place: String,
+    /**
+     * Which network this reading came from: `"siag"` or `"wu"`.
+     *
+     * The two are **kept apart, never merged into one record.** A merged one would carry a
+     * temperature from one site and a radiation from another under a single pair of coordinates,
+     * and [it.apexweather.domain.StationSun] asks its question *at the pyranometer* — it computes
+     * the sun's elevation and reads the skyline there. Mixed provenance under one coordinate pair
+     * is a wrong answer that looks like a right one.
+     *
+     * Keeping both rows is also what makes the fallback free: an amateur station answering "nothing
+     * in the last 60 minutes" — which a live one does intermittently — leaves the provincial
+     * reading exactly where it was.
+     */
+    val network: String = "siag",
     val json: String?,
     val fetchedAtMs: Long?,
     val lastError: String?,
@@ -103,7 +117,34 @@ data class StationHistoryEntity(
     val modelsRainJson: String? = null,
     /** Lead bucket name → source name → wind speed, km/h, as JSON. */
     val modelsWindJson: String? = null,
-)
+    /**
+     * Which thermometer this row's reading came from — the station's own code, `23200MS` or
+     * `ITIROL16`.
+     *
+     * A row is "what the station read and what each model said it would read", and until a place
+     * could change station there was only ever one answer. Now that an amateur station can displace
+     * the provincial one, a row without this is a measurement of an unknown instrument:
+     * [it.apexweather.domain.BiasCorrector] would subtract a habit averaged over two thermometers
+     * 264 m apart, silently, in the one table this app never discards.
+     *
+     * **Null means the place's provincial station**, not "unknown". Rows written before version 3
+     * are left null by the migration rather than stamped from inside SQL, and they can only be the
+     * provincial one, because that is the only thermometer this app had ever read.
+     */
+    val station: String? = null,
+) {
+    /**
+     * Whether this row was written about the thermometer [code], given the place's provincial
+     * station [provincial].
+     *
+     * Null is not "unknown": rows written before version 3 can only be the provincial station's,
+     * because that is the only thermometer this app had ever read. Treating them as unknown would
+     * throw away every reader's accumulated evidence on upgrade, which is the one thing this table
+     * exists to keep.
+     */
+    fun belongsTo(code: String?, provincial: String?): Boolean =
+        code != null && (station == code || (station == null && code == provincial))
+}
 
 @Entity(tableName = "refresh_meta")
 data class RefreshMetaEntity(
@@ -123,8 +164,8 @@ interface WeatherDao {
     @Query("SELECT * FROM bulletin WHERE district = :district AND language = :language") suspend fun bulletinOnce(district: Int, language: String): BulletinEntity?
     @Upsert suspend fun upsertBulletin(entity: BulletinEntity)
 
-    @Query("SELECT * FROM observation WHERE place = :place") fun observation(place: String): Flow<ObservationEntity?>
-    @Query("SELECT * FROM observation WHERE place = :place") suspend fun observationOnce(place: String): ObservationEntity?
+    @Query("SELECT * FROM observation WHERE place = :place") fun observations(place: String): Flow<List<ObservationEntity>>
+    @Query("SELECT * FROM observation WHERE place = :place AND network = :network") suspend fun observationOnce(place: String, network: String): ObservationEntity?
     @Upsert suspend fun upsertObservation(entity: ObservationEntity)
 
     @Query("SELECT * FROM station_reference WHERE place = :place") fun stationReference(place: String): Flow<StationReferenceEntity?>
@@ -180,7 +221,7 @@ interface WeatherDao {
     // analysis, and holds a row before its hour has happened. 8: station_history left for a
     // database of its own — see HistoryDatabase — because it was the one table here that a version
     // bump really cost something, and it had already been paid twice.
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

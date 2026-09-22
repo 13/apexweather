@@ -3,6 +3,7 @@ package it.apexweather.ui.share
 import it.apexweather.data.AppSettings
 import it.apexweather.domain.ConsensusBlender
 import it.apexweather.domain.DORF_TIROL
+import it.apexweather.domain.DORF_TIROL_WITH_PWS
 import it.apexweather.domain.ROME
 import it.apexweather.domain.STERZING
 import it.apexweather.domain.forecast
@@ -248,4 +249,76 @@ class ShareCardStateBuilderTest {
         val empty = HomeStateBuilder.build(DORF_TIROL, WeatherSnapshot.EMPTY, AppSettings(), blender.blend(emptyMap()), now = hour(10))
         ShareRange.entries.forEach { assertNull(ShareCardStateBuilder.today(empty, german, it)) }
     }
+
+    /**
+     * Weather Underground's data is not licensed for redistribution, and `ShareCapture` writes a
+     * PNG that goes into somebody else's chat. So a card built while the hero is an amateur reading
+     * carries the models' own value for the hour instead — and no adjustment, because nothing was
+     * adjusted.
+     *
+     * This is the one place in the feature that is deliberately switched off, and the reason is
+     * legal rather than technical.
+     */
+    @Test
+    fun `the shared card never carries an amateur reading`() {
+        val consensus = blender.blend(forecasts)
+        val state = HomeStateBuilder.build(
+            DORF_TIROL_WITH_PWS,
+            WeatherSnapshot.EMPTY.copy(
+                forecasts = forecasts,
+                // 1,5 K above what the models say about the station's own site, which is
+                // StationDownscale.FULLY_TRUSTED_ANOMALY_C: the whole anomaly is carried, so the
+                // hero is exactly the reading. A larger one is deliberately only partly shared —
+                // a +12 K anomaly moves the hero by nothing at all — and a test built on one would
+                // be asserting the fade rather than the share card's refusal.
+                observation = observation(consensus.hourly[3].tempC + 1.5, "Tirolo - Tirol"),
+                officialObservation = observation(consensus.hourly[3].tempC, "Meran"),
+                stationReference = referenceFor(consensus, warmerBy = 0.0),
+            ),
+            AppSettings(), consensus, now = hour(3).plusSeconds(600),
+        )
+        assertTrue(state.observationIsPrivate)
+        // The hero on screen is the amateur reading, carried up.
+        assertEquals(consensus.hourly[3].tempC + 1.5, state.heroTempC!!, 0.01)
+
+        val card = ShareCardStateBuilder.today(state, german)!!
+        // What leaves the phone is the models' value for the hour, and no correction is claimed.
+        assertEquals(consensus.hourly[3].tempC, card.tempC!!, 0.01)
+        assertNull(card.adjustmentC)
+    }
+
+    /** With the province's own thermometer, nothing changes: the card carries the hero as before. */
+    @Test
+    fun `a provincial reading still reaches the card`() {
+        val consensus = blender.blend(forecasts)
+        val state = HomeStateBuilder.build(
+            DORF_TIROL,
+            WeatherSnapshot.EMPTY.copy(
+                forecasts = forecasts,
+                observation = observation(consensus.hourly[3].tempC + 1.5, "Meran"),
+                officialObservation = observation(consensus.hourly[3].tempC + 1.5, "Meran"),
+                stationReference = referenceFor(consensus, warmerBy = 0.0),
+            ),
+            AppSettings(), consensus, now = hour(3).plusSeconds(600),
+        )
+        assertFalse(state.observationIsPrivate)
+        val card = ShareCardStateBuilder.today(state, german)!!
+        assertEquals(state.heroTempC!!, card.tempC!!, 0.0)
+    }
+
+    private fun observation(temp: Double, name: String) = it.apexweather.domain.model.StationObservation(
+        name, hour(3), tempC = temp, humidityPct = 40, windKmh = 5.0, windDir = "W",
+        gustKmh = null, precipTodayMm = null, pressureHpa = 1010.0,
+    )
+
+    /** A reference built on the consensus the test itself blended; see HomeStateBuilderTest. */
+    private fun referenceFor(c: it.apexweather.domain.model.ConsensusForecast, warmerBy: Double) =
+        it.apexweather.data.remote.StationReference(
+            fetchedAt = hour(3),
+            elevationM = 330.0,
+            bySource = mapOf(
+                Source.ICON_CH1.name to c.hourly.associate { it.time.epochSecond to it.tempC + warmerBy },
+                Source.ICON_D2.name to c.hourly.associate { it.time.epochSecond to it.tempC + warmerBy },
+            ),
+        )
 }

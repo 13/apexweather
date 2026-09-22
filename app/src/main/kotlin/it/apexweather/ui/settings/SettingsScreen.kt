@@ -98,6 +98,7 @@ fun SettingsScreen(
         onLanguage = onLanguage,
         onWindUnit = viewModel::setWindUnit,
         onAnimations = viewModel::setAnimations,
+        onAmateurStations = viewModel::setAmateurStations,
         onRefresh = onRefresh,
         placeName = placeName,
         onOpenPlaces = onOpenPlaces,
@@ -126,6 +127,7 @@ fun SettingsContent(
     onLanguage: (LanguageSetting) -> Unit,
     onWindUnit: (WindUnit) -> Unit,
     onAnimations: (Boolean) -> Unit,
+    onAmateurStations: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     /** The chosen place, and the way to a different one. Empty until the catalogue has been read. */
     placeName: String = "",
@@ -204,6 +206,26 @@ fun SettingsContent(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.setting_animations), style = MaterialTheme.typography.bodyLarge)
                 Switch(checked = settings.animations, onCheckedChange = onAnimations)
+            }
+
+            // The label alone would not say what the switch costs. A private station is usually the
+            // better thermometer — it is only in the catalogue at all because it beat the province's
+            // on eight weeks of measured stability — but it is one nobody maintains, and the second
+            // line is what lets a reader who can see out of the window make that call.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(stringResource(R.string.setting_amateur_stations), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(R.string.setting_amateur_stations_note),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = settings.amateurStations,
+                    onCheckedChange = onAmateurStations,
+                    modifier = Modifier.testTag("setting_amateur_stations"),
+                )
             }
 
             NotificationSettings(

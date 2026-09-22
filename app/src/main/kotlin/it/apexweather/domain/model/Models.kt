@@ -377,6 +377,19 @@ data class WeatherSnapshot(
     val forecasts: Map<Source, SourceForecast>,
     val bulletin: Bulletin?,
     val observation: StationObservation?,
+    /**
+     * The province's own thermometer, always — even where [observation] is an amateur station's
+     * reading and therefore a different instrument at a different point.
+     *
+     * The two are kept apart rather than merged because a merged record would carry a temperature
+     * from one site and a radiation from another under one pair of coordinates, and
+     * [it.apexweather.domain.StationSun] asks its question *at the pyranometer*. It is also what
+     * supplies the quantities an amateur station does not publish: ITIROL16, the best-sited station
+     * in Dorf Tirol, has no pyranometer at all.
+     *
+     * Equal to [observation] where the place has no amateur station, which is most of the 116.
+     */
+    val officialObservation: StationObservation? = null,
     val warnings: List<Warning>,
     /** The models' temperature at the weather station, for carrying its reading up to the village. */
     val stationReference: it.apexweather.data.remote.StationReference?,

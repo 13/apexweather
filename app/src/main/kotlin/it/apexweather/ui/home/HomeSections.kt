@@ -204,9 +204,14 @@ fun HeroSection(
         // without them it is one line, and the block is a row shorter for nothing given up.
         val source = state.observation?.let { obs ->
             val at = Format.timestamp(obs.time, SouthTyrol.ZONE, state.now, formats)
+            // A reading from a neighbour's garden is not a reading from the provincial network, and
+            // the reader is entitled to know which of the two is on their screen. Not a warning:
+            // the station was checked against a DEM and won on eight weeks of measured stability.
+            val name = if (state.observationIsPrivate) stringResource(R.string.station_private, obs.stationName)
+            else obs.stationName
             state.heroAdjustmentC
-                ?.let { stringResource(R.string.now_from_station_adjusted, obs.stationName, at, Format.tempDelta(it, formats)) }
-                ?: stringResource(R.string.now_from_station, obs.stationName, at)
+                ?.let { stringResource(R.string.now_from_station_adjusted, name, at, Format.tempDelta(it, formats)) }
+                ?: stringResource(R.string.now_from_station, name, at)
         } ?: pluralStringResource(R.plurals.now_from_consensus, sourceCount, sourceCount)
 
         // Where the number came from and when it was fetched sit on the left as two plain lines: the

@@ -39,7 +39,7 @@ interface StationHistoryDao {
  * one table has to be migrated. That is the whole point of the separation, and the day it feels
  * inconvenient is the day it is doing its job.
  */
-@Database(entities = [StationHistoryEntity::class], version = 2, exportSchema = true)
+@Database(entities = [StationHistoryEntity::class], version = 3, exportSchema = true)
 abstract class HistoryDatabase : RoomDatabase() {
     abstract fun stationHistoryDao(): StationHistoryDao
 
@@ -57,9 +57,26 @@ abstract class HistoryDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Version 3: which thermometer the reading came from.
+         *
+         * A place can now read an amateur station instead of the province's own, and the two can be
+         * hundreds of metres apart. Mixing their errors into one bias is worse than having no bias
+         * at all, and nothing about it would show on screen.
+         *
+         * Existing rows are left null rather than stamped with a code SQL cannot know. Null is read
+         * as "the provincial station" — see [StationHistoryEntity.station] — which is what every
+         * row written before this version is.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `station_history` ADD COLUMN `station` TEXT")
+            }
+        }
+
         fun build(context: Context): HistoryDatabase =
             Room.databaseBuilder(context, HistoryDatabase::class.java, "apexweather-history.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
 
         fun inMemory(context: Context): HistoryDatabase =

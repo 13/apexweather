@@ -14,6 +14,7 @@
     <string name="cond_heavy_snow">Neve forte</string>
     <string name="cond_thunderstorm">Temporale</string>
     <string name="now_from_station">Ora: stazione %1$s, %2$s</string>
+    <string name="station_private">%1$s (stazione privata)</string>
     <string name="updated_at">Aggiornato %1$s</string>
     <string name="source_silent_one">Una fonte non risponde: %1$s</string>
     <plurals name="source_silent_many">
@@ -109,6 +110,8 @@
     <string name="lang_system">Sistema</string>
     <string name="setting_wind">UNITÀ VENTO</string>
     <string name="setting_animations">Anima il cielo</string>
+    <string name="setting_amateur_stations">Stazioni private</string>
+    <string name="setting_amateur_stations_note">Più vicine o alla quota del paese, ma non sottoposte a manutenzione. Spento: solo la rete provinciale.</string>
     <string name="refresh_now">Aggiorna ora</string>
     <string name="about">Apex Weather %1$s · Alto Adige · consenso di 10 modelli meteo</string>
     <string name="widget_description">Temperatura attuale e prossime ore per il luogo scelto · ingrandito mostra anche i prossimi giorni</string>

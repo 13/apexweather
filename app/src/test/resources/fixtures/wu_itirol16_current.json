@@ -1,0 +1,33 @@
+{
+    "observations": [
+        {
+            "stationID": "ITIROL16",
+            "obsTimeUtc": "2026-09-22T20:04:44Z",
+            "obsTimeLocal": "2026-09-22 22:04:44",
+            "neighborhood": "Tirolo - Tirol",
+            "softwareType": null,
+            "country": "IT",
+            "solarRadiation": null,
+            "lon": 11.155237,
+            "realtimeFrequency": null,
+            "epoch": 1790107484,
+            "lat": 46.693246,
+            "uv": null,
+            "winddir": 338,
+            "humidity": 44,
+            "qcStatus": 1,
+            "metric": {
+                "temp": 13,
+                "heatIndex": 13,
+                "dewpt": 1,
+                "windChill": 13,
+                "windSpeed": 0,
+                "windGust": 0,
+                "pressure": 1023.03,
+                "precipRate": 0.0,
+                "precipTotal": 0.0,
+                "elev": 586
+            }
+        }
+    ]
+}

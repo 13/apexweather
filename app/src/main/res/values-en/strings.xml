@@ -14,6 +14,7 @@
     <string name="cond_heavy_snow">Heavy snow</string>
     <string name="cond_thunderstorm">Thunderstorm</string>
     <string name="now_from_station">Now: station %1$s, %2$s</string>
+    <string name="station_private">%1$s (private station)</string>
     <string name="updated_at">Updated %1$s</string>
     <string name="source_silent_one">A source is not answering: %1$s</string>
     <plurals name="source_silent_many">
@@ -108,6 +109,8 @@
     <string name="lang_system">System</string>
     <string name="setting_wind">WIND UNIT</string>
     <string name="setting_animations">Animate the sky</string>
+    <string name="setting_amateur_stations">Private weather stations</string>
+    <string name="setting_amateur_stations_note">Closer, or at the village\'s own height, but maintained by nobody. Off: the provincial network only.</string>
     <string name="refresh_now">Refresh now</string>
     <string name="about">Apex Weather %1$s · South Tyrol · consensus of 10 weather models</string>
     <string name="widget_description">Current temperature and next hours for the place you choose · resize taller for the coming days</string>

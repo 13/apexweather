@@ -11,6 +11,7 @@ import it.apexweather.domain.DORF_TIROL
 import it.apexweather.data.FakeOdh
 import it.apexweather.data.FakeOpenMeteo
 import it.apexweather.data.FakeSiag
+import it.apexweather.data.FakeWeatherUnderground
 import it.apexweather.data.MutableClock
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
@@ -63,7 +64,7 @@ class WeatherStateHolderTest {
         db = AppDatabase.inMemory(context)
         history = HistoryDatabase.inMemory(context)
         repository = WeatherRepository(
-            db.weatherDao(), history.stationHistoryDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeOdh(), FakeMeteoAlarm(), FakeEnsemble(),
+            db.weatherDao(), history.stationHistoryDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeWeatherUnderground(), "", FakeOdh(), FakeMeteoAlarm(), FakeEnsemble(),
             Fixtures.json, MutableClock(Instant.parse("2026-09-08T14:00:00Z")),
         )
         scope = CoroutineScope(UnconfinedTestDispatcher())

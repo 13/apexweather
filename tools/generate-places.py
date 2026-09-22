@@ -26,6 +26,7 @@ rows, and the overrides are where the judgement actually lives.
 """
 import horizons
 import json
+import os
 import math
 import pathlib
 import sys
@@ -39,6 +40,8 @@ KMOS = "https://api-weather.services.siag.it/api/v2/municipality/MunicipalityBul
 
 # Beyond this a station is not speaking about the place any more; 20 km in this province can cross
 # a ridge. A place with no station within the cap shows the consensus and no measurements card.
+PLACES = pathlib.Path("app/src/main/assets/places.json")
+
 STATION_MAX_KM = 20.0
 
 # And beyond this it is not speaking about the place's *air*. Picking the nearest station by ground
@@ -57,6 +60,32 @@ STATION_MAX_DZ_M = 400
 # see pick_by_stability. HEIGHT_COST_KM_PER_M only orders them when the measurement is unavailable:
 # a hundred metres of height costs as much as a kilometre of ground.
 HEIGHT_COST_KM_PER_M = 1 / 100
+
+# Weather Underground's PWS contributor API. Amateur stations stand where the province's own do not:
+# three of them are inside Dorf Tirol, and one, ITIROL16, sits within a few tens of metres of the
+# village's own height where the provincial thermometer is 264 m below it.
+#
+# The key is the operator's own — personal, capped at 1500 requests a day, and not licensed for
+# redistribution — so it is read from the environment and never committed. Without it this whole
+# step is skipped and every place keeps its provincial station, which is what every other checkout
+# and CI will do.
+WU_KEY = os.environ.get("APEX_WU_API_KEY", "")
+WU_NEAR = "https://api.weather.com/v3/location/near?geocode={lat},{lon}&product=pws&format=json&apiKey={key}"
+WU_CURRENT = "https://api.weather.com/v2/pws/observations/current?stationId={id}&format=json&units=m&apiKey={key}"
+
+# How far a station's claimed altitude may sit from the ground under its own coordinates before the
+# claim is treated as fiction rather than as data.
+#
+# The altitude is typed into a web form by whoever put the station up, and it is wrong far more
+# often than it is right. Measured on the eight stations around Dorf Tirol on 2026-09-22: the three
+# believable ones sat 2, 27 and 48 m from the DEM, and four claimed 93 to 182 m while standing on
+# ground the DEM puts at 303 to 598 — out by 210, 291, 415 and 416 m. The gap between the two groups
+# is an order of magnitude, so anything between about 60 and 200 gives the same seven answers and
+# this threshold is not delicate.
+#
+# It is not tighter than this because SRTM is a 30 m grid over steep ground and is itself out by
+# tens of metres here: Dorf Tirol's own catalogue altitude of 594 m sits 23 m from the DEM under it.
+PWS_MAX_DEM_DISAGREEMENT_M = 100
 
 # The model the stations are judged against, and how much of its past to judge them on. ICON-D2 runs
 # at about 2 km, which is the coarsest resolution at which two points five kilometres apart in
@@ -213,6 +242,88 @@ def stability(place_point, candidate_points):
     return out
 
 
+def wu_fetch(url):
+    """A WU call whose 204 is data rather than an error.
+
+    `current` answers **HTTP 204 with no body** when the station has reported nothing in the last
+    60 minutes, and a live station does that intermittently: ITIROL26 answered 204 and then, minutes
+    later, 200 with a reading. So an empty body means "no reading right now", not "no such station",
+    and it is the caller's job to decide what that is worth.
+    """
+    try:
+        with urllib.request.urlopen(url, timeout=60) as r:
+            body = r.read()
+            return json.loads(body) if body else None
+    except Exception:  # noqa: BLE001 — an amateur station that will not answer is simply not a candidate
+        return None
+
+
+def pws_candidates(lat, lon, altitude):
+    """Amateur stations near a place that are worth putting to the stability test.
+
+    Three gates before a candidate is even measured, and each one earns its place:
+
+    1. **It answers.** See [wu_fetch]: no body means nothing observed in the last hour. This drops
+       some stations that are merely having a quiet hour, which is the safe direction for a choice
+       that gets committed to a catalogue and reviewed by hand.
+    2. **The DEM agrees with the claimed altitude.** [PWS_MAX_DEM_DISAGREEMENT_M] has the measured
+       numbers. The DEM's answer, not the station's claim, is what is written into the catalogue —
+       the claim is what somebody typed into a web form.
+    3. **It is close enough and level enough**, by the same [STATION_MAX_KM] and [STATION_MAX_DZ_M]
+       the provincial stations are held to, ordered by the same [HEIGHT_COST_KM_PER_M].
+
+    `qcStatus` is **recorded and obeyed by nothing**. It is a neighbour-consistency test, and in
+    this terrain a correctly sited station fails it for being right: ITIROL16 was flagged 0 on 40 of
+    263 readings on 2026-09-22, every one of them between 10:44 and 19:04, which is exactly when it
+    disagrees with ITIROL23, ITIROL25 and ITIROL24 — the three that gate 2 drops for claiming 128 to
+    182 m on ground the DEM puts at 419 to 598 m. Obeying the flag would throw away the best
+    thermometer's whole afternoon in favour of one 300 m below it.
+
+    Returns a list shaped like the SIAG `candidates` list: (cost, record, distance_km, dz).
+    """
+    if not WU_KEY:
+        return []
+    near = wu_fetch(WU_NEAR.format(lat=lat, lon=lon, key=WU_KEY))
+    if not near or "location" not in near:
+        return []
+    out = []
+    for code in near["location"].get("stationId", []):
+        body = wu_fetch(WU_CURRENT.format(id=code, key=WU_KEY))
+        observations = (body or {}).get("observations") or []
+        if not observations:
+            continue
+        o = observations[0]
+        claimed = (o.get("metric") or {}).get("elev")
+        if claimed is None or o.get("lat") is None or o.get("lon") is None:
+            continue
+        s_lat, s_lon = o["lat"], o["lon"]
+        dem = horizons.ground(s_lat, s_lon)
+        if abs(dem - claimed) > PWS_MAX_DEM_DISAGREEMENT_M:
+            print(f"    {code}: claims {claimed:.0f} m, DEM {dem:.0f} m — dropped", file=sys.stderr)
+            continue
+        d = distance_km(lat, lon, s_lat, s_lon)
+        dz = abs(altitude - dem)
+        if d > STATION_MAX_KM or dz > STATION_MAX_DZ_M:
+            continue
+        out.append((
+            d + dz * HEIGHT_COST_KM_PER_M,
+            {
+                "network": "wu",
+                "code": code,
+                "name": o.get("neighborhood") or code,
+                "latitude": s_lat,
+                "longitude": s_lon,
+                # The DEM's altitude, never the claim.
+                "altitude": int(round(dem)),
+                "qcStatus": o.get("qcStatus"),
+            },
+            d,
+            dz,
+        ))
+    out.sort(key=lambda c: c[0])
+    return out
+
+
 def pick_by_stability(place_point, candidates):
     """
     The steadiest candidate, or the nearest-by-cost one where the models cannot be asked.
@@ -247,7 +358,39 @@ def district_of(istat, region_name):
     return REGION_TO_DISTRICT.get(region_name)
 
 
+def pws_check(names):
+    """Print the amateur-station candidates for a few places and write nothing.
+
+    The counterpart of `horizons.py --check`: a full run takes minutes and rewrites a committed
+    catalogue, and the one decision worth eyeballing first is which stations the DEM gate keeps.
+
+        APEX_WU_API_KEY=... python3 tools/generate-places.py --pws-check "Dorf Tirol"
+    """
+    if not WU_KEY:
+        print("APEX_WU_API_KEY is not set; nothing to check", file=sys.stderr)
+        return
+    catalogue = json.loads(PLACES.read_text(encoding="utf-8"))
+    wanted = [p for p in catalogue if p["nameDe"] in names] if names else \
+        [p for p in catalogue if p["nameDe"] == "Dorf Tirol"]
+    for place in wanted:
+        lat, lon, altitude = place["lat"], place["lon"], place["altitudeM"]
+        print(f"\n{place['nameDe']} ({altitude} m, DEM {horizons.ground(lat, lon):.0f} m)", file=sys.stderr)
+        for cost, record, d, dz in pws_candidates(lat, lon, altitude):
+            print(f"  kept    {record['code']:12s} DEM {record['altitude']:4d} m  "
+                  f"{d:5.2f} km  dz {dz:4.0f} m  qc {record['qcStatus']}  cost {cost:.2f}",
+                  file=sys.stderr)
+        station = place.get("station")
+        if station:
+            print(f"  provincial: {station['code']} {station['name']} "
+                  f"{station['distanceKm']} km  dz {abs(altitude - station['altitudeM'])} m  "
+                  f"sd {station.get('stabilityK')}", file=sys.stderr)
+    print("\n--pws-check: nothing written", file=sys.stderr)
+
+
 def main():
+    if "--pws-check" in sys.argv:
+        pws_check([a for a in sys.argv[1:] if not a.startswith("--")])
+        return
     municipalities = fetch(ODH_MUNICIPALITIES)
     region_names = {r["Id"]: (r.get("Detail") or {}).get("de", {}).get("Title") for r in fetch(ODH_REGIONS)}
     stations = [
@@ -312,6 +455,44 @@ def main():
                 "stabilityK": None if score is None else round(score, 2),
             }
 
+        # The amateur station competes on exactly the measure the provincial one was chosen by:
+        # pick_by_stability, eight weeks of ICON-D2, village-minus-station. Distance and height only
+        # order the candidates; what decides is which thermometer stands in the same air. It is kept
+        # only where it wins, so most of the 116 keep the station they have and should.
+        pws = None
+        pws_here = pws_candidates(lat, lon, altitude)
+        if pws_here:
+            chosen_p, chosen_p_km, score_p = pick_by_stability((lat, lon, altitude), pws_here)
+            time.sleep(STABILITY_PACE_S)
+            provincial_sd = (station or {}).get("stabilityK")
+            # An unmeasured candidate does not get to displace a measured provincial station: with
+            # no score there is no evidence it stands in the same air, and the provincial one is the
+            # instrument somebody maintains.
+            if station is None:
+                better = True
+            elif score_p is None:
+                better = False
+            elif provincial_sd is None:
+                better = True
+            else:
+                better = score_p < provincial_sd
+            if better:
+                pws = {
+                    "network": "wu",
+                    "code": chosen_p["code"],
+                    "name": chosen_p["name"],
+                    "lat": round(chosen_p["latitude"], 6),
+                    "lon": round(chosen_p["longitude"], 6),
+                    "altitudeM": int(chosen_p["altitude"]),
+                    "distanceKm": round(chosen_p_km, 2),
+                    "stabilityK": None if score_p is None else round(score_p, 2),
+                }
+                print(f"    {chosen_p['code']} (sd {score_p}) beats "
+                      f"{(station or {}).get('code')} (sd {provincial_sd})", file=sys.stderr)
+            else:
+                print(f"    {chosen_p['code']} (sd {score_p}) does not beat "
+                      f"{(station or {}).get('code')} (sd {provincial_sd})", file=sys.stderr)
+
         places.append({
             "istat": istat,
             "nameDe": kmos["nameDe"],
@@ -322,6 +503,7 @@ def main():
             "altitudeM": int(m["Altitude"]),
             "district": district_of(istat, region_names.get(m.get("RegionId"))),
             "station": station,
+            "pws": pws,
         })
         print(f"  {n:>3}/{len(municipalities)} {istat} {kmos['nameDe']}", file=sys.stderr)
 
@@ -340,7 +522,7 @@ def main():
     print("\nmeasuring skylines", file=sys.stderr)
     horizons.fill(places)
 
-    out = pathlib.Path("app/src/main/assets/places.json")
+    out = PLACES
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(places, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
