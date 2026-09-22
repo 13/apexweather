@@ -1047,6 +1047,12 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   `StationDry.withPrevious` depends on, and it does not prune history — that is the worker's job.
   `HomeUiState.staleOnScreen` marks the "Aktualisiert" line after an hour **on a connected phone
   only**: offline already has its banner, and two things saying one thing is what crowded the hero.
+  Measured on the phone, 2026-09-22, by reading `observation.fetchedAtMs` and `refresh_meta` out of
+  the cache database (copying the `-wal` and `-shm` with it): open at 08:45, a full refresh fired at
+  08:51:46 on the clock seeded from the cache; sixteen minutes in the background moved nothing at
+  all; and returning at 09:15:20 fetched the station within twenty-five seconds. The loop runs,
+  stops and resumes. The stale marker has not been seen on a real phone — it needs an upstream to
+  go down for an hour — and is covered by `HomeStateBuilderTest` and `HomeScreenTest` only.
 - **Refreshing on open is `StaleRefresher`'s job, not a screen's.** It is app-scoped, holds the
   30-minute rule, and owns the whole refresh path — fetch, place eviction, dismissal pruning, widget
   update — so there is exactly one. `AppNavigation` calls it on every resume, above the tabs,
