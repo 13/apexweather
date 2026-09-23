@@ -118,6 +118,18 @@ data class Place(
         if (allowed || pws == null) this else copy(pws = null)
 
     /**
+     * This place reading the station its reader picked, where they picked one.
+     *
+     * `"siag"` means they asked for the province's own here, which is exactly a place with no
+     * `pws` — the state 48 of the 116 are in, so nothing downstream needs to learn about it.
+     */
+    fun withChosenStation(chosen: it.apexweather.data.ChosenStation?): Place = when {
+        chosen == null || chosen.istat != istat -> this
+        chosen.network == "siag" -> copy(pws = null)
+        else -> copy(pws = chosen.toStation())
+    }
+
+    /**
      * This place as these settings have it — the policy, where [withAmateurStation] is the
      * mechanism.
      *
@@ -131,9 +143,14 @@ data class Place(
      * no key to fetch it would have the models asked about a point whose thermometer is never read,
      * while the hero fell back to the provincial reading, and the offset between them would be two
      * different places subtracted from each other.
+     *
+     * The reader's own choice is applied *first* and the two global conditions after it, because
+     * both of those are statements about every amateur instrument — "I do not trust ones nobody
+     * maintains" and "I have given no key" — and one place's preference does not answer either.
      */
     fun forSettings(settings: it.apexweather.data.AppSettings): Place =
-        withAmateurStation(settings.amateurStations && !settings.wuApiKey.isNullOrBlank())
+        withChosenStation(settings.chosenStations.firstOrNull { it.istat == istat })
+            .withAmateurStation(settings.amateurStations && !settings.wuApiKey.isNullOrBlank())
 
     /** The name in the reader's language, never in the JVM's default. */
     fun name(locale: Locale): String = when (locale.language) {

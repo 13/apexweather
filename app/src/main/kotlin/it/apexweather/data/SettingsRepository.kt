@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -67,6 +68,17 @@ data class AppSettings(
      * two — and clearing the field is how a reader says they have taken their key back.
      */
     val wuApiKey: String? = null,
+    /**
+     * The stations the reader has picked themselves, at most one per place.
+     *
+     * Empty is the ordinary state and means "the catalogue's own choice everywhere", which is what
+     * the app did before this existed.
+     */
+    val chosenStations: List<ChosenStation> = emptyList(),
+    /** What the app last saw happen to [wuApiKey]. Not a preference — an observation. */
+    val wuKeyVerdict: WuKeyVerdict = WuKeyVerdict.UNCHECKED,
+    /** When that verdict was reached, so the line can say how fresh it is. */
+    val wuKeyCheckedAtMs: Long? = null,
     val compareSources: Set<Source> = Source.entries.toSet(),
     val compareVariable: CompareVariable = CompareVariable.TEMPERATURE,
     /**
@@ -139,6 +151,10 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val animations = booleanPreferencesKey("animations")
         val amateurStations = booleanPreferencesKey("amateur_stations")
         val wuApiKey = stringPreferencesKey("wu_api_key")
+        // JSON rather than the comma-joined form the recents use: a record has eight fields.
+        val chosenStations = stringPreferencesKey("chosen_stations")
+        val wuKeyVerdict = stringPreferencesKey("wu_key_verdict")
+        val wuKeyCheckedAt = longPreferencesKey("wu_key_checked_at")
         // The sources the reader has switched **off**, not the ones left on.
         //
         // Storing the visible set froze the list at whatever existed when they last touched it: add
@@ -172,6 +188,10 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             animations = p[Keys.animations] ?: true,
             amateurStations = p[Keys.amateurStations] ?: true,
             wuApiKey = p[Keys.wuApiKey]?.takeIf { it.isNotBlank() },
+            chosenStations = ChosenStations.decode(p[Keys.chosenStations]),
+            wuKeyVerdict = p[Keys.wuKeyVerdict]?.let { runCatching { WuKeyVerdict.valueOf(it) }.getOrNull() }
+                ?: WuKeyVerdict.UNCHECKED,
+            wuKeyCheckedAtMs = p[Keys.wuKeyCheckedAt],
             compareSources = visibleSources(p[Keys.hiddenCompareSources]),
             compareVariable = p[Keys.compareVariable]?.let { runCatching { CompareVariable.valueOf(it) }.getOrNull() }
                 ?: CompareVariable.TEMPERATURE,
@@ -193,7 +213,26 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     suspend fun setWindUnit(v: WindUnit) = context.settingsStore.edit { it[Keys.windUnit] = v.name }
     suspend fun setAnimations(v: Boolean) = context.settingsStore.edit { it[Keys.animations] = v }
     suspend fun setAmateurStations(v: Boolean) = context.settingsStore.edit { it[Keys.amateurStations] = v }
-    suspend fun setWuApiKey(v: String) = context.settingsStore.edit { it[Keys.wuApiKey] = v }
+    /**
+     * A new key has never been checked, whatever the old one's verdict was. Leaving the verdict
+     * alone would show "gültig" over a key nothing had tried.
+     */
+    suspend fun setWuApiKey(v: String) = context.settingsStore.edit {
+        it[Keys.wuApiKey] = v
+        it[Keys.wuKeyVerdict] = WuKeyVerdict.UNCHECKED.name
+        it.remove(Keys.wuKeyCheckedAt)
+    }
+
+    /** [station] null clears this place's choice and hands it back to the catalogue. */
+    suspend fun setChosenStation(istat: String, station: ChosenStation?) = context.settingsStore.edit { prefs ->
+        val next = ChosenStations.with(ChosenStations.decode(prefs[Keys.chosenStations]), station, istat)
+        prefs[Keys.chosenStations] = ChosenStations.encode(next)
+    }
+
+    suspend fun setWuKeyVerdict(v: WuKeyVerdict, checkedAtMs: Long?) = context.settingsStore.edit {
+        it[Keys.wuKeyVerdict] = v.name
+        if (checkedAtMs != null) it[Keys.wuKeyCheckedAt] = checkedAtMs else it.remove(Keys.wuKeyCheckedAt)
+    }
     suspend fun setCompareSources(v: Set<Source>) = context.settingsStore.edit {
         it[Keys.hiddenCompareSources] = (Source.entries.toSet() - v).map { s -> s.name }.toSet()
     }
