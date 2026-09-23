@@ -446,10 +446,10 @@
     <string name="settings_group_stations">Stazioni</string>
     <string name="settings_group_app">App</string>
     <string name="compare_stations_now">Stazioni adesso</string>
-    <string name="compare_stations_temp">Temperatura</string>
-    <string name="compare_stations_humidity">Umidità</string>
-    <string name="compare_stations_rain">Pioggia oggi</string>
-    <string name="compare_stations_radiation">Radiazione</string>
+    <string name="compare_stations_temp">Temperatura °</string>
+    <string name="compare_stations_humidity">Umidità %</string>
+    <string name="compare_stations_rain">Pioggia oggi mm</string>
+    <string name="compare_stations_radiation">Radiazione W/m²</string>
     <string name="compare_stations_read">letto</string>
     <string name="compare_stations_models">Modelli qui</string>
 </resources>

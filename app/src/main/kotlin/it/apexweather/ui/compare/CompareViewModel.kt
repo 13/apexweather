@@ -231,6 +231,9 @@ class CompareViewModel @Inject constructor(
         val place = checkNotNull(weather.place).forSettings(weather.settings)
         // No key, no neighbourhood, and nothing worth drawing: the province's own station is
         // already on the home screen.
+        // No key, no neighbourhood, and nothing worth drawing: the province's own station is
+        // already on the home screen. A failure leaves the card absent rather than empty — the
+        // stations screen is where a reason for it belongs.
         val found = runCatchingCancellable { stations.neighbourhood(place) }.getOrNull() ?: return@withContext
         _stationsNow.value = StationsNowStateBuilder.build(
             place = place,

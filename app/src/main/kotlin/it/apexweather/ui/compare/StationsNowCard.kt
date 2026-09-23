@@ -83,12 +83,13 @@ fun StationsNowCard(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            ValueRow(R.string.compare_stations_temp, state) { it.tempC?.let { v -> Format.tempDecimal(v, formats) } }
-            ValueRow(R.string.compare_stations_humidity, state) { c -> c.humidityPct?.let { "$it %" } }
+            // The units live in the row labels and the cells carry bare numbers — the same rule as
+            // the per-source table above, and what Format.mmValue exists for. "390,9 W/m²" does not
+            // fit an 84 dp column and was running into its neighbour.
+            ValueRow(R.string.compare_stations_temp, state) { it.tempC?.let { v -> formats.oneDecimal(v) } }
+            ValueRow(R.string.compare_stations_humidity, state) { c -> c.humidityPct?.let { formats.whole(it) } }
             ValueRow(R.string.compare_stations_rain, state) { it.precipTodayMm?.let { v -> Format.mmValue(v, formats) } }
-            ValueRow(R.string.compare_stations_radiation, state) { c ->
-                c.radiationWm2?.let { "${formats.oneDecimal(it)} W/m²" }
-            }
+            ValueRow(R.string.compare_stations_radiation, state) { c -> c.radiationWm2?.let { formats.oneDecimal(it) } }
             ValueRow(R.string.compare_stations_read, state) { c ->
                 c.readAt?.let { Format.timestamp(it, SouthTyrol.ZONE, now, formats) }
             }
@@ -154,6 +155,10 @@ private fun ValueRow(
     }
 }
 
-/** The day table's own widths, so the two cards read as the same kind of object. */
-private val LabelColumn = 84.dp
+/**
+ * The value columns are the day table's own width, so the two cards read as the same kind of
+ * object. The label column is wider than the table's 52 dp because these labels carry their unit —
+ * at 84 dp "Regen heute mm" and "Strahlung W/m²" both wrapped to two lines.
+ */
+private val LabelColumn = 116.dp
 private val ValueColumn = 84.dp
