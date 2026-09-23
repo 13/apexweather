@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import it.apexweather.BuildConfig
@@ -25,11 +26,13 @@ class SettingsContentTest {
         notificationsAllowed: Boolean = true,
         onNotifySummary: (Boolean) -> Unit = {},
         onNotifySummaryHour: (Int) -> Unit = {},
+        onWuApiKey: (String) -> Unit = {},
     ) = rule.setContent {
         ApexTheme {
             SettingsContent(
                 settings = settings,
-                onLanguage = {}, onWindUnit = {}, onAnimations = {}, onAmateurStations = {}, onRefresh = {},
+                onLanguage = {}, onWindUnit = {}, onAnimations = {}, onAmateurStations = {},
+                onWuApiKey = onWuApiKey, onRefresh = {},
                 notificationsAllowed = notificationsAllowed,
                 onNotifySummary = onNotifySummary,
                 onNotifySummaryHour = onNotifySummaryHour,
@@ -106,5 +109,26 @@ class SettingsContentTest {
     fun thePermissionHintAppearsOnceSomethingIsSwitchedOn() {
         show(settings = AppSettings(notifyWarnings = true), notificationsAllowed = false)
         rule.onNodeWithTag("notify_grant").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun theKeyFieldIsShownWhenPrivateStationsAreOn() {
+        show(AppSettings(amateurStations = true))
+        rule.onNodeWithTag("setting_wu_key").assertIsDisplayed()
+    }
+
+    /** With the feature off the field is noise: there is nothing for a key to do. */
+    @Test
+    fun theKeyFieldIsHiddenWhenPrivateStationsAreOff() {
+        show(AppSettings(amateurStations = false))
+        rule.onNodeWithTag("setting_wu_key").assertDoesNotExist()
+    }
+
+    @Test
+    fun typingAKeyReachesTheCallback() {
+        var typed: String? = null
+        show(AppSettings(amateurStations = true), onWuApiKey = { typed = it })
+        rule.onNodeWithTag("setting_wu_key").performTextInput("abc123")
+        assertEquals("abc123", typed)
     }
 }

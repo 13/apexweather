@@ -111,6 +111,8 @@
     <string name="setting_animations">Animate the sky</string>
     <string name="setting_amateur_stations">Private weather stations</string>
     <string name="setting_amateur_stations_note">Closer, or at the village\'s own height, but maintained by nobody. Off: the provincial network only.</string>
+    <string name="setting_wu_key">Weather Underground key</string>
+    <string name="setting_wu_key_note">Free for anyone running their own station. Without a key the app reads the provincial network only.</string>
     <string name="refresh_now">Refresh now</string>
     <string name="about">Apex Weather %1$s · South Tyrol · consensus of 10 weather models</string>
     <string name="widget_description">Current temperature and next hours for the place you choose · resize taller for the coming days</string>
