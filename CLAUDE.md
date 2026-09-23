@@ -806,6 +806,14 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   The star's test tag goes **inside** its `clearAndSetSemantics` block: that clears the node's whole
   config, so a `Modifier.testTag` further along the chain is cleared with it and the button cannot
   be reached by tag at all — which is why nothing tested the star until this was reported by hand.
+- **A tab must bring itself back from a detail screen pushed on top of it.** `selectTab` pops back
+  to the tapped route where it is already underneath the current destination, and navigates
+  otherwise. It used to name one pair — the statistics on the comparison tab — in an `if`, and the
+  rule was always about *any* detail on *any* tab: the stations screen sits on the home tab the same
+  way, and since v0.32.0 on the settings tab too, so tapping "Heute" while looking at it did nothing
+  at all. `popBackStack` returns whether it popped, which is exactly the question, so no list of
+  pairs is kept. `NavDestination.hierarchy` is the wrong question and was tried first — it walks
+  parent graphs, not the back stack.
 - Everything that opens a bottom-bar destination goes through `NavHostController.openTopLevel` in
   `ui/navigation/AppNavigation.kt`. The bulletin has two entrances, its tab and the teaser card on
   home; when the card used a plain `navigate` the home tab could no longer bring itself back.
@@ -854,6 +862,23 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   not: "Met Office UM" came out as "Office UM", and, silently and worse, "KNMI HARMONIE" and "DMI
   HARMONIE" both came out as "HARMONIE", so the comparison screen drew two differently coloured
   columns under one heading. `SourceTest` now pins that they are distinct and fit.
+- **The comparison screen carries a card of the neighbourhood's thermometers** (`StationsNowCard`,
+  `StationsNowStateBuilder`), under the day table and above the statistics. The screen answers
+  "what do the models say" thoroughly and cannot answer what that leaves a reader with — is any of
+  this what it is like outside. Measured round Dorf Tirol on 2026-09-23: four private stations
+  within 1,3 km read 11,0°, 13,0°, 14,0° and 18,0° at the same minute, against a model spread of
+  1,5 K. **One anchor row, and it is the models' consensus rather than the hero**: the hero has been
+  through `StationDownscale`, `StationFog`, `StationSun`, `StationDry` and `MeasuredRain`, and
+  repeating it on a second screen would be a second answer about one hour derived somewhere else —
+  the rule `ShareCardStateBuilder` follows for the same reason. Units live in the row labels and
+  the cells carry bare numbers, as the per-source table does; a dash where a station publishes
+  nothing, never a zero. The card is also a way in: tapping it opens the stations screen.
+- **`NearbyStationsRepository` is the one place a neighbourhood is fetched**, app-scoped and held
+  `FRESH_FOR` (10 minutes) like `RadarRepository`'s frames. One neighbourhood costs a `near` call
+  plus a `current` per station — about eleven requests against a cap of 1500 a day — plus one
+  Open-Meteo elevation call for the ground under all of them. Two callers want it and a bottom-bar
+  tab is one of them, so each fetching for itself is how a quota gets spent. **A failed fetch is not
+  cached**, or one dropped connection costs the card its whole window.
 - **The compare screen stores which sources are switched *off*, never which are on**
   (`compare_hidden_sources`). Storing the visible set froze the list at whatever existed the last
   time the reader touched it: add an eleventh model and everybody who had ever toggled anything had
