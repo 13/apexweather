@@ -114,10 +114,7 @@
     <string name="setting_wu_key">Weather Underground key</string>
     <string name="setting_wu_key_note">Free for anyone running their own station. Without a key the app reads the provincial network only.</string>
     <string name="stations_title">Stations nearby</string>
-    <string name="stations_chosen">chosen</string>
-    <string name="stations_provincial">Provincial network</string>
     <string name="stations_quiet">no reading</string>
-    <string name="stations_altitude_unverified">Altitude implausible</string>
     <string name="stations_no_key">No Weather Underground key set.</string>
     <string name="stations_open">Stations nearby</string>
     <string name="refresh_now">Refresh now</string>
@@ -415,4 +412,18 @@
     <string name="share_range_today">Today</string>
     <string name="share_range_3">3 days</string>
     <string name="share_range_7">7 days</string>
+    <string name="stations_choose">Use</string>
+    <string name="stations_in_use">in use</string>
+    <string name="stations_code">Code %1$s</string>
+    <string name="stations_private_heading">Private stations</string>
+    <string name="stations_official_heading">Provincial network</string>
+    <string name="stations_height_disputed">Recorded height is well off the ground</string>
+    <string name="stations_height_both">%1$s → %2$s</string>
+    <string name="stations_heights_unknown">Ground heights unavailable — no station can be chosen right now.</string>
+    <string name="stations_no_horizon">No horizon profile: sunrise and sunset computed without mountains.</string>
+    <string name="wu_key_checking">checking …</string>
+    <string name="wu_key_good">valid · last checked %1$s</string>
+    <string name="wu_key_refused">refused — check the key</string>
+    <string name="wu_key_over_quota">daily quota used up</string>
+    <string name="wu_key_offline">no connection — not checked</string>
 </resources>

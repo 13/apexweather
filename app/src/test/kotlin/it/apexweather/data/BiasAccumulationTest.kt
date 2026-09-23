@@ -4,6 +4,7 @@ import androidx.test.core.app.ApplicationProvider
 import it.apexweather.Fixtures
 import it.apexweather.data.local.AppDatabase
 import it.apexweather.data.local.HistoryDatabase
+import it.apexweather.data.remote.ElevationResponse
 import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.OpenMeteoMapper
 import it.apexweather.data.remote.OpenMeteoResponse
@@ -114,6 +115,9 @@ class BiasAccumulationTest {
      * of the record being written down before the hour arrives.
      */
     private inner class Models : OpenMeteoApi {
+        override suspend fun elevation(latitude: String, longitude: String): ElevationResponse =
+            throw IOException("not this test")
+
         override suspend fun forecast(
             latitude: Double, longitude: Double, timezone: String, forecastDays: Int,
             models: String, hourly: String, daily: String, minutely: String, minutelySteps: Int,
@@ -193,7 +197,7 @@ class BiasAccumulationTest {
         repo = WeatherRepository(
             db.weatherDao(), history.stationHistoryDao(), Models(), NoGeoSphere(), Station(),
             // No amateur station in this test's catalogue, so this is never called.
-            FakeWeatherUnderground(), WuKeySource { null }, NoOdh(), NoMeteoAlarm(), NoEnsemble(), Fixtures.json, clock,
+            FakeWeatherUnderground(), WuKeySource { null }, WuKeyReporter {}, NoOdh(), NoMeteoAlarm(), NoEnsemble(), Fixtures.json, clock,
         )
     }
 

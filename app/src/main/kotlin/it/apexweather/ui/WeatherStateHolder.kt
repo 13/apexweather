@@ -84,12 +84,11 @@ class WeatherStateHolder @Inject constructor(
      * an app with no place at all has nothing to show, and a code can outlive a municipal merger.
      */
     private val place: Flow<Place> = settings
-        // The place, the switch and the key: the three settings that decide *which thermometer*
-        // this place reads. `distinctUntilChangedBy` rather than a mapped triple so the whole
-        // AppSettings survives to the next step and the rule can stay in one function — see
-        // Place.forSettings. Everything else about settings is deliberately not in this key:
-        // flipping the animations switch must not re-blend seven models.
-        .distinctUntilChangedBy { Triple(it.placeIstat, it.amateurStations, it.wuApiKey) }
+        // `distinctUntilChangedBy` rather than a mapped tuple so the whole AppSettings survives to
+        // the next step and the rule can stay in one function — see Place.forSettings. Everything
+        // else about settings is deliberately not in this key: flipping the animations switch must
+        // not re-blend seven models.
+        .distinctUntilChangedBy(Companion::thermometerKey)
         .map { current ->
             val found = catalogue.byIstat(current.placeIstat)
                 ?: checkNotNull(catalogue.byIstat(SouthTyrol.DEFAULT_ISTAT)) {
@@ -156,4 +155,26 @@ class WeatherStateHolder @Inject constructor(
         }
             .flowOn(Dispatchers.Default)
             .stateIn(scope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
+
+    companion object {
+        /**
+         * The settings that decide **which thermometer this place reads**, and nothing else.
+         *
+         * It was three — the place, the amateur switch and the key — and the reader's own per-place
+         * choice made it four. Left out, a station picked on the stations screen was written to
+         * DataStore and then ignored: the place flow never re-emitted, so the repository went on
+         * fetching the old station and the screen went on marking it as the one in use. Found on the
+         * phone on 2026-09-23 by picking ITIROL26 and watching nothing happen.
+         *
+         * Only *this place's* record is in the key. A station chosen for somewhere else is a change to
+         * a place nobody is looking at, and re-blending thirteen models for it would be the kind of
+         * waste this key exists to prevent.
+         */
+        internal fun thermometerKey(s: AppSettings): List<Any?> = listOf(
+            s.placeIstat,
+            s.amateurStations,
+            s.wuApiKey,
+            s.chosenStations.firstOrNull { it.istat == s.placeIstat },
+        )
+    }
 }

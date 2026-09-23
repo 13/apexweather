@@ -42,6 +42,33 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   addressed by, the coordinates the models are asked about, the altitude, the bulletin district, and
   the nearest weather station — null where none is close enough, in which case the app shows the
   consensus and says nothing about a measurement.
+- **The reader may override the catalogue's station, per place** (`AppSettings.chosenStations`,
+  `Place.withChosenStation`). `forSettings` applies that choice **first** and the two global
+  conditions — the amateur-stations switch and the presence of a key — after it, because both of
+  those are statements about *every* amateur instrument and one place's preference does not answer
+  either. A record with `network = "siag"` means "read the province's own here", which is exactly a
+  place with no `pws` and so needs nothing downstream to change. A chosen station carries no
+  `horizon` and no `stabilityK`: a skyline is tens of thousands of DEM samples and a generator job,
+  and `Horizon.usable` already falls back to the astronomical sun times. **Four settings now decide
+  which thermometer a place reads, not three** — `WeatherStateHolder.thermometerKey` is the
+  `distinctUntilChangedBy` key and the choice was missing from it for one afternoon, so a station
+  picked on the screen was written to DataStore and then ignored: the place flow never re-emitted,
+  the repository went on fetching the old station, and the screen went on marking it as the one in
+  use. Only *this* place's record is in the key; a station chosen elsewhere must not re-blend
+  thirteen models.
+- **A station may only be chosen once the ground under it has been checked** (`domain/StationHeight.kt`).
+  `StationDownscale`'s cap is `2 K + 9,8 K/km × |height difference|`, so a station wrong about its
+  own height by 450 m buys itself four and a half degrees of licence over the hero. WU's elevation
+  is typed into a web form and **that form is in feet**, which is how ITIROL26 came to be recorded
+  at 204 m while standing at 654. Open-Meteo's `v1/elevation` answers a whole list of coordinates in
+  one request, so the stations screen checks every station it lists for one call; the **DEM's answer
+  is what gets stored**, never the claim, exactly as `generate-places.py` stores `int(round(dem))`,
+  and a disagreement past `MAX_DEM_DISAGREEMENT_M` (100, the generator's own gate) marks the card.
+  Where the elevation request fails, nothing may be chosen and the screen says why. Measured
+  2026-09-23 on the phone: ITIROL25 claims 182 m against ground at 608, ITIROL23 179 against 603,
+  ITIROL26 669 against 659. `MAX_PLAUSIBLE_SLOPE_M_PER_KM` is **gone** — it existed because the app
+  had no DEM and could only catch a claim that was impossible rather than merely untrue, and its own
+  doc said only the generator could know.
 - **The nearest station is not the closest one.** Height is part of the distance: `generate-places.py`
   costs a hundred metres of it like a kilometre of ground and refuses a station more than 400 m above
   or below the place. Picking by ground distance alone gave Hafling (1290 m) the thermometer at
@@ -1034,6 +1061,27 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   Open-Meteo models returned overcast or drizzle, the three publishing visibility said 12 to 29 km,
   and SIAG KMOS, which has codes for Hochnebel and Talnebel, returned "Bedeckt, mäßiger Regen". The
   station read 100 %. That is the case this exists for.
+- **The stations screen is where a station is chosen, and it has a way out.** `ui/stations/` is one
+  card per instrument with what each is reading, the province's own under its own heading and
+  selectable like the rest, and a top bar with a back arrow and `statusBarsPadding` — it drew under
+  the status bar and had no way out but the system gesture. The station **code** is under the name
+  because two of the stations round Dorf Tirol are both called "Tirol". Sorted by distance and the
+  chosen card is not hoisted: where a station stands is the point of the list. A dash where a
+  station publishes nothing, never a zero — ITIROL16 has no pyranometer and ITIROL26 does, and that
+  difference decides whether `StationSun` has anything to work with. **`Format.metres` must not be
+  used for these heights**: it rounds to the nearest 50 m, which is right for a freezing level and
+  would print 634 and 639 identically, which is the whole point of the line.
+- **The key says whether it works** (`data/WuKeyVerdict.kt`, the line under the key field). Six
+  states, and **three of them are failures on purpose**: refused (401/403) wants re-typing, over
+  quota (429) wants waiting, and no connection wants nothing at all — one "funktioniert nicht" would
+  name none of them, and a 500 must not accuse the key. Written by two things: an explicit
+  `WuKeyChecker` when the key changes, debounced by `KEY_CHECK_DELAY_MS` because `setWuApiKey` runs
+  on every keystroke and a typed 32-character key would otherwise spend 32 requests proving the
+  first thirty-one prefixes wrong; and every ordinary `fetchAmateur`, which is what keeps the line
+  honest between checks. A new key is `UNCHECKED` whatever the old one's verdict was. `WuKeyReporter`
+  is an interface for the reason `WuKeySource` is one — the repository knows nothing about settings.
+  **Setting a key changes nothing visible until something refreshes**, because the thirty-minute
+  staleness rule holds; that is the confusion the verdict exists to end.
 - Every bottom sheet whose content scrolls needs a **cross**. `ModalBottomSheet` with
   `skipPartiallyExpanded` hands a downward drag to the inner scroll first, so once the reader has
   scrolled, dragging the sheet down scrolls the content back instead of dismissing, and bounces at

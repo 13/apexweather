@@ -115,10 +115,7 @@
     <string name="setting_wu_key">Weather-Underground-Schlüssel</string>
     <string name="setting_wu_key_note">Kostenlos für Betreiber einer eigenen Station. Ohne Schlüssel liest die App nur das Landesmessnetz.</string>
     <string name="stations_title">Stationen in der Nähe</string>
-    <string name="stations_chosen">gewählt</string>
-    <string name="stations_provincial">Landesmessnetz</string>
     <string name="stations_quiet">keine Meldung</string>
-    <string name="stations_altitude_unverified">Höhenangabe unplausibel</string>
     <string name="stations_no_key">Kein Weather-Underground-Schlüssel hinterlegt.</string>
     <string name="stations_open">Stationen in der Nähe</string>
     <string name="refresh_now">Jetzt aktualisieren</string>
@@ -424,4 +421,18 @@
     <string name="share_range_today">Heute</string>
     <string name="share_range_3">3 Tage</string>
     <string name="share_range_7">7 Tage</string>
+    <string name="stations_choose">Wählen</string>
+    <string name="stations_in_use">benutzt</string>
+    <string name="stations_code">Kennung %1$s</string>
+    <string name="stations_private_heading">Private Stationen</string>
+    <string name="stations_official_heading">Landesmessnetz</string>
+    <string name="stations_height_disputed">Höhenangabe weicht deutlich vom Gelände ab</string>
+    <string name="stations_height_both">%1$s → %2$s</string>
+    <string name="stations_heights_unknown">Geländehöhen nicht abrufbar — es lässt sich gerade keine Station wählen.</string>
+    <string name="stations_no_horizon">Kein Horizontprofil: Sonnenauf- und -untergang ohne Berge gerechnet.</string>
+    <string name="wu_key_checking">wird geprüft …</string>
+    <string name="wu_key_good">gültig · zuletzt geprüft %1$s</string>
+    <string name="wu_key_refused">abgelehnt — Schlüssel prüfen</string>
+    <string name="wu_key_over_quota">Tageskontingent erschöpft</string>
+    <string name="wu_key_offline">keine Verbindung — nicht geprüft</string>
 </resources>

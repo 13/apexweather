@@ -59,6 +59,20 @@ interface OpenMeteoApi {
         @Query("hourly") hourly: String = OpenMeteoStationMapper.STATION_HOURLY,
     ): OpenMeteoStationResponse
 
+    /**
+     * The ground under a list of coordinates, in metres, in the order they were given.
+     *
+     * Both parameters are comma-joined lists and the response is one array:
+     * `?latitude=46.693,46.695&longitude=11.155,11.154` → `{"elevation":[639.0, 659.0]}`.
+     * One request for a screenful of stations, which is what makes checking every claimed height
+     * affordable — see [it.apexweather.domain.StationHeight].
+     */
+    @GET("v1/elevation")
+    suspend fun elevation(
+        @Query("latitude") latitude: String,
+        @Query("longitude") longitude: String,
+    ): ElevationResponse
+
     companion object { const val BASE_URL = "https://api.open-meteo.com/" }
 }
 
@@ -327,3 +341,6 @@ object OpenMeteoStationMapper {
         )
     }
 }
+
+@Serializable
+data class ElevationResponse(val elevation: List<Double> = emptyList())

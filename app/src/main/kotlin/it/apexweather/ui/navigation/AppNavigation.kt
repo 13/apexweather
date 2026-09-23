@@ -261,7 +261,9 @@ fun ApexApp() {
                     CompareScreen(onOpenStats = dropUnlessResumed { nav.navigate(StatsRoute) }, viewModel = compareVm)
                 }
                 composable<NearbyStationsRoute> {
-                    NearbyStationsScreen()
+                    // Dropped unless resumed, so a double tap on the arrow pops once — the same
+                    // guard the statistics screen uses.
+                    NearbyStationsScreen(onBack = dropUnlessResumed { nav.popBackStack() })
                 }
                 composable<StatsRoute> {
                     StatsScreen(

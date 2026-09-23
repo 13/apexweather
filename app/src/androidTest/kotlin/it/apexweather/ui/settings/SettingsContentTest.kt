@@ -18,6 +18,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import it.apexweather.R
+import it.apexweather.data.WuKeyVerdict
+import androidx.test.platform.app.InstrumentationRegistry
 
 class SettingsContentTest {
     @get:Rule val rule = createComposeRule()
@@ -140,6 +143,68 @@ class SettingsContentTest {
         rule.onNodeWithTag("setting_wu_key").performTextInput("cd")
         assertEquals("abcd", sent.last())
         rule.onNodeWithTag("setting_wu_key").assertTextContains("abcd")
+    }
+
+    /** Nothing is claimed about a key nothing has tried. */
+    @Test
+    fun anUncheckedKeySaysNothing() {
+        show(AppSettings(amateurStations = true, wuApiKey = "k", wuKeyVerdict = WuKeyVerdict.UNCHECKED))
+        rule.onNodeWithTag("wu_key_verdict").assertDoesNotExist()
+    }
+
+    @Test
+    fun aRefusedKeySaysSo() {
+        show(AppSettings(amateurStations = true, wuApiKey = "k", wuKeyVerdict = WuKeyVerdict.REFUSED))
+        rule.onNodeWithTag("wu_key_verdict").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun anExhaustedQuotaSaysSo() {
+        show(AppSettings(amateurStations = true, wuApiKey = "k", wuKeyVerdict = WuKeyVerdict.OVER_QUOTA))
+        rule.onNodeWithTag("wu_key_verdict").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun aConnectionFailureSaysSo() {
+        show(AppSettings(amateurStations = true, wuApiKey = "k", wuKeyVerdict = WuKeyVerdict.OFFLINE))
+        rule.onNodeWithTag("wu_key_verdict").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun aGoodKeySaysSo() {
+        show(
+            AppSettings(
+                amateurStations = true, wuApiKey = "k",
+                wuKeyVerdict = WuKeyVerdict.GOOD, wuKeyCheckedAtMs = 1790146074000L,
+            ),
+        )
+        rule.onNodeWithTag("wu_key_verdict").performScrollTo().assertIsDisplayed()
+    }
+
+    /** With the feature off there is no key field and therefore no verdict under it. */
+    @Test
+    fun noVerdictIsShownWhilePrivateStationsAreOff() {
+        show(AppSettings(amateurStations = false, wuApiKey = "k", wuKeyVerdict = WuKeyVerdict.GOOD))
+        rule.onNodeWithTag("wu_key_verdict").assertDoesNotExist()
+    }
+
+    /**
+     * Every state but UNCHECKED needs its own sentence. A reader whose quota is gone must not be
+     * sent off to re-type a key that is perfectly good, which is what one shared "funktioniert
+     * nicht" would do. This renders nothing; it fails the day a seventh verdict is added and left
+     * reading like another one.
+     */
+    @Test
+    fun everyVerdictButUncheckedHasItsOwnWording() {
+        val shown = WuKeyVerdict.entries.filterNot { it == WuKeyVerdict.UNCHECKED }
+        val strings = listOf(
+            R.string.wu_key_checking, R.string.wu_key_good, R.string.wu_key_refused,
+            R.string.wu_key_over_quota, R.string.wu_key_offline,
+        )
+        assertEquals(shown.size, strings.size)
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val texts = strings.map { context.getString(it, "08:47") }
+        assertEquals("two verdicts read the same: $texts", texts.size, texts.toSet().size)
     }
 
     @Test

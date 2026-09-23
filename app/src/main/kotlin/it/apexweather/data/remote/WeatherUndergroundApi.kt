@@ -12,13 +12,14 @@ import java.time.Instant
 /**
  * Weather Underground's PWS contributor API — one endpoint, the current observation of one station.
  *
- * The `near` and `history` endpoints are deliberately absent from the app. Choosing a station is
- * `tools/generate-places.py`'s job, done once against a DEM and reviewed by a human: a phone
- * choosing its own thermometer would spend its quota finding stations instead of reading one, and
- * could not check a claimed altitude against anything — six of the ten stations around Dorf Tirol
- * claim a valley floor while standing on a hillside. And the rapid history is not served for every
- * station: ITIROL26 answers 204 to it while ITIROL16 returns 263 readings a day, so nothing may
- * depend on it.
+ * `near` is here for the stations screen and for the key check, and for nothing on a schedule: one
+ * open costs a `near` plus a `current` per station, around eleven requests against a cap of 1500 a
+ * day, which is fine for something a reader opens deliberately and ruinous behind a timer. Choosing
+ * a place's *default* station is still `tools/generate-places.py`'s job, done once against a DEM and
+ * reviewed by a human — six of the ten stations around Dorf Tirol claim a valley floor while
+ * standing on a hillside. The `history` endpoint remains absent: the rapid history is not served
+ * for every station — ITIROL26 answers 204 to it while ITIROL16 returns 263 readings a day — so
+ * nothing may depend on it.
  *
  * The key is personal, capped at 1500 requests a day and 30 a minute, and **not licensed for
  * redistribution** — which is why the amateur reading never reaches the share card. It is absent in
@@ -76,6 +77,9 @@ data class WuObservation(
     val stationID: String? = null,
     val obsTimeUtc: String? = null,
     val neighborhood: String? = null,
+    /** The station's own coordinates, which is where the ground under it gets asked about. */
+    val lat: Double? = null,
+    val lon: Double? = null,
     val humidity: Int? = null,
     val winddir: Int? = null,
     /**

@@ -12,6 +12,7 @@ import it.apexweather.data.FakeOdh
 import it.apexweather.data.FakeOpenMeteo
 import it.apexweather.data.FakeSiag
 import it.apexweather.data.FakeWeatherUnderground
+import it.apexweather.data.WuKeyReporter
 import it.apexweather.data.WuKeySource
 import it.apexweather.data.MutableClock
 import it.apexweather.data.SettingsRepository
@@ -41,6 +42,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 import java.util.Locale
+import it.apexweather.data.ChosenStation
+import org.junit.Assert.assertNotEquals
+import it.apexweather.data.AppSettings
 
 /**
  * Home and the sky both live for the whole session, so before this holder existed they each ran
@@ -52,6 +56,41 @@ import java.util.Locale
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class WeatherStateHolderTest {
+    /**
+     * Four settings decide which thermometer a place reads, and the reader's own choice is the
+     * fourth. Left out of this key, a station picked on the stations screen was written to
+     * DataStore and then ignored — the place flow never re-emitted, the repository went on fetching
+     * the old station, and the screen went on marking it as the one in use.
+     */
+    @Test
+    fun `the thermometer key changes when this place's station is chosen`() {
+        val base = AppSettings(placeIstat = "021101", amateurStations = true, wuApiKey = "k")
+        val chosen = base.copy(
+            chosenStations = listOf(
+                ChosenStation(
+                    istat = "021101", network = "wu", code = "ITIROL26", name = "Tirol",
+                    lat = 46.694926, lon = 11.154523, altitudeM = 659, distanceKm = 0.68,
+                ),
+            ),
+        )
+        assertNotEquals(WeatherStateHolder.thermometerKey(base), WeatherStateHolder.thermometerKey(chosen))
+    }
+
+    /** A station chosen somewhere else is a change to a place nobody is looking at. */
+    @Test
+    fun `a station chosen for another place does not disturb this one`() {
+        val base = AppSettings(placeIstat = "021101", amateurStations = true, wuApiKey = "k")
+        val elsewhere = base.copy(
+            chosenStations = listOf(
+                ChosenStation(
+                    istat = "021051", network = "wu", code = "IBOLZANO2", name = "Bozen",
+                    lat = 46.5, lon = 11.35, altitudeM = 262, distanceKm = 0.4,
+                ),
+            ),
+        )
+        assertEquals(WeatherStateHolder.thermometerKey(base), WeatherStateHolder.thermometerKey(elsewhere))
+    }
+
 
     private lateinit var db: AppDatabase
     private lateinit var history: HistoryDatabase
@@ -65,7 +104,7 @@ class WeatherStateHolderTest {
         db = AppDatabase.inMemory(context)
         history = HistoryDatabase.inMemory(context)
         repository = WeatherRepository(
-            db.weatherDao(), history.stationHistoryDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeWeatherUnderground(), WuKeySource { null }, FakeOdh(), FakeMeteoAlarm(), FakeEnsemble(),
+            db.weatherDao(), history.stationHistoryDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeWeatherUnderground(), WuKeySource { null }, WuKeyReporter {}, FakeOdh(), FakeMeteoAlarm(), FakeEnsemble(),
             Fixtures.json, MutableClock(Instant.parse("2026-09-08T14:00:00Z")),
         )
         scope = CoroutineScope(UnconfinedTestDispatcher())

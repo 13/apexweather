@@ -105,6 +105,7 @@ class WeatherRepository @Inject constructor(
      * left to fold and nothing to defend against.
      */
     private val wuKey: WuKeySource,
+    private val wuKeyReporter: WuKeyReporter,
     private val odh: OdhApi,
     private val meteoAlarm: MeteoAlarmApi,
     private val ensembleApi: EnsembleApi,
@@ -704,7 +705,16 @@ class WeatherRepository @Inject constructor(
      */
     private suspend fun fetchAmateur(station: NearbyStation): StationObservation? {
         val key = wuKey.key()?.takeIf { it.isNotBlank() } ?: return null
-        val response = wu.current(station.code, key)
+        val response = try {
+            wu.current(station.code, key)
+        } catch (e: Exception) {
+            // A verdict written from the ordinary path is what keeps the settings line honest
+            // between explicit checks: a key revoked next month, or a quota gone at four in the
+            // afternoon, stops claiming to be good without anybody re-checking by hand.
+            wuKeyReporter.report(WuKeyVerdicts.of(e))
+            throw e
+        }
+        wuKeyReporter.report(WuKeyVerdicts.of(response.code()))
         return WeatherUndergroundMapper.map(response.body().takeIf { response.isSuccessful }, station)
     }
 

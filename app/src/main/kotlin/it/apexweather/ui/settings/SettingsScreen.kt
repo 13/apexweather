@@ -58,6 +58,9 @@ import it.apexweather.data.LanguageSetting
 import it.apexweather.data.WindUnit
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
+import it.apexweather.data.WuKeyVerdict
+import it.apexweather.domain.SouthTyrol
+import java.time.Instant
 
 /**
  * Settings as a destination of its own, which is what it should always have been.
@@ -267,6 +270,34 @@ fun SettingsContent(
                     // check by eye that it arrived whole.
                     modifier = Modifier.fillMaxWidth().testTag("setting_wu_key"),
                 )
+                // What the app last saw happen to this key, rather than what the reader hopes.
+                // Three failures and not one, because a refusal wants re-typing, an exhausted quota
+                // wants waiting, and a dropped connection wants nothing at all.
+                val verdict = when (settings.wuKeyVerdict) {
+                    WuKeyVerdict.UNCHECKED -> null
+                    WuKeyVerdict.CHECKING -> stringResource(R.string.wu_key_checking)
+                    WuKeyVerdict.GOOD -> stringResource(
+                        R.string.wu_key_good,
+                        settings.wuKeyCheckedAtMs
+                            ?.let { Format.time(Instant.ofEpochMilli(it), SouthTyrol.ZONE, LocalFormats.current) }
+                            .orEmpty(),
+                    )
+                    WuKeyVerdict.REFUSED -> stringResource(R.string.wu_key_refused)
+                    WuKeyVerdict.OVER_QUOTA -> stringResource(R.string.wu_key_over_quota)
+                    WuKeyVerdict.OFFLINE -> stringResource(R.string.wu_key_offline)
+                }
+                verdict?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = when (settings.wuKeyVerdict) {
+                            WuKeyVerdict.GOOD -> MaterialTheme.colorScheme.primary
+                            WuKeyVerdict.CHECKING -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.error
+                        },
+                        modifier = Modifier.padding(start = 16.dp).testTag("wu_key_verdict"),
+                    )
+                }
             }
 
             NotificationSettings(

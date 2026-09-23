@@ -11,6 +11,7 @@ import it.apexweather.data.remote.MeteoAlarmApi
 import it.apexweather.data.remote.OdhApi
 import it.apexweather.data.remote.OdhDistrictResponse
 import it.apexweather.data.remote.OdhWeatherResponse
+import it.apexweather.data.remote.ElevationResponse
 import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.OpenMeteoResponse
 import it.apexweather.data.remote.OpenMeteoStationResponse
@@ -47,6 +48,15 @@ import kotlin.coroutines.cancellation.CancellationException
  * wrong; nothing else would notice.
  */
 internal open class FakeOpenMeteo(var fail: Boolean = false) : OpenMeteoApi {
+    /** The coordinates the ground was last asked about, and what was answered. */
+    var elevationAt: Pair<String, String>? = null
+    var elevations: List<Double> = emptyList()
+
+    override suspend fun elevation(latitude: String, longitude: String): ElevationResponse {
+        elevationAt = latitude to longitude
+        return ElevationResponse(elevations)
+    }
+
     /** How many times the forecast call was made, so a retry can be told from a single attempt. */
     var forecastCalls: Int = 0
 

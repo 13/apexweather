@@ -3,11 +3,14 @@ package it.apexweather.ui.stations
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WuKeySource
+import it.apexweather.data.remote.OpenMeteoApi
 import it.apexweather.data.remote.WeatherUndergroundApi
 import it.apexweather.data.remote.WeatherUndergroundMapper
 import it.apexweather.data.runCatchingCancellable
 import it.apexweather.domain.NearbyStation
+import it.apexweather.domain.model.StationObservation
 import it.apexweather.ui.WeatherStateHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -17,8 +20,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 /**
  * Every Weather Underground station around the chosen place, fetched once when the screen opens.
@@ -37,6 +42,8 @@ class NearbyStationsViewModel @Inject constructor(
     private val holder: WeatherStateHolder,
     private val wu: WeatherUndergroundApi,
     private val wuKey: WuKeySource,
+    private val openMeteo: OpenMeteoApi,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(NearbyStationsUiState())
@@ -46,9 +53,33 @@ class NearbyStationsViewModel @Inject constructor(
         viewModelScope.launch { load() }
     }
 
+    /**
+     * Picks this station for this place, and reloads so the screen shows the new state.
+     *
+     * A row whose ground is unknown has no record to send — see [StationRow.asChosen] — and its card
+     * offers no action, so this is a no-op rather than a guard that can be got round.
+     */
+    fun choose(row: StationRow) {
+        val place = holder.weather.value.place ?: return
+        val record = row.asChosen(place.istat) ?: return
+        viewModelScope.launch {
+            settings.setChosenStation(place.istat, record)
+            // The write goes to DataStore and comes back through the settings flow, the place flow
+            // and WeatherStateHolder before `place.readingStation` is the new one — and `load()`
+            // reads that to decide which card is marked. Rebuilding straight after the write reads
+            // the old place and draws the old answer, so this waits for the holder to catch up.
+            // Bounded, because a holder that never catches up must not leave the screen stuck on a
+            // spinner; the reload then simply shows what it can.
+            withTimeoutOrNull(CHOICE_SETTLES_MS) {
+                holder.weather.first { it.place?.readingStation?.code == record.code }
+            }
+            load()
+        }
+    }
+
     private suspend fun load() = withContext(Dispatchers.Default) {
-        // One read of the shared state: the place the reader is on and the province's own reading
-        // of it, which is already in memory and costs nothing to take.
+        // One read of the shared state: the place the reader is on and the province's own reading of
+        // it, which is already in memory and costs nothing to take.
         val weather = holder.weather.first { it.place != null }
         val place = checkNotNull(weather.place)
         val provincial = weather.snapshot.officialObservation
@@ -76,43 +107,70 @@ class NearbyStationsViewModel @Inject constructor(
         }
 
         // The catalogue's own station first, because `near` can omit it — ITIROL26 is 0,68 km from
-        // Dorf Tirol and is not among the ten this returns. A screen built to show the
-        // neighbourhood that left out the station the app is actually reading would be absurd.
+        // Dorf Tirol and is not among the ten this returns. A screen built to show the neighbourhood
+        // that left out the station the app is actually reading would be absurd.
         val codes = (listOfNotNull(place.pws?.code) + listed.map { it.first }).distinct()
         val byCode = listed.toMap()
 
-        val probes = codes.map { code ->
+        val fetched = codes.map { code ->
             async {
                 val attempt = runCatchingCancellable {
                     val response = wu.current(code, key)
                     response.body().takeIf { response.isSuccessful }
                 }
                 val body = attempt.getOrNull()
-                val observation = body?.let {
-                    WeatherUndergroundMapper.map(it, stationFor(code, place))
-                }
-                StationProbe(
+                val o = body?.observations?.firstOrNull()
+                val catalogued = place.pws?.takeIf { it.code == code }
+                Fetched(
                     code = code,
-                    name = body?.observations?.firstOrNull()?.neighborhood
-                        ?: byCode[code]?.first
-                        ?: code,
-                    distanceKm = byCode[code]?.second
-                        ?: place.pws?.takeIf { it.code == code }?.distanceKm
-                        ?: 0.0,
-                    claimedAltitudeM = body?.observations?.firstOrNull()?.metric?.elev?.toInt(),
-                    reading = observation,
-                    // A station that answered 204 has no reading and no error: it is quiet, which
-                    // is an ordinary hour and not a fault.
+                    name = o?.neighborhood ?: byCode[code]?.first ?: code,
+                    lat = o?.lat ?: catalogued?.lat,
+                    lon = o?.lon ?: catalogued?.lon,
+                    distanceKm = byCode[code]?.second ?: catalogued?.distanceKm ?: 0.0,
+                    claimedAltitudeM = o?.metric?.elev?.toInt(),
+                    reading = body?.let { WeatherUndergroundMapper.map(it, stationFor(code, place)) },
+                    // A station that answered 204 has no reading and no error: it is quiet, which is
+                    // an ordinary hour and not a fault.
                     error = attempt.exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName },
                 )
             }
         }.awaitAll()
 
+        // One request for every station on the screen. A station that did not answer has no
+        // coordinates to ask about and is left with no ground, which makes it unselectable — which
+        // is right, because nothing is known about where it stands at all.
+        val located = fetched.filter { it.lat != null && it.lon != null }
+        val points = located.map { it.lat!! to it.lon!! }
+        val elevations = if (points.isEmpty()) null else runCatchingCancellable {
+            openMeteo.elevation(joinLatitudes(points), joinLongitudes(points)).elevation
+        }.getOrNull()
+        val ground = heightsFrom(elevations, points.size)
+        val groundByCode = located.mapIndexed { i, f -> f.code to ground[i] }.toMap()
+
         _state.value = NearbyStationsStateBuilder.build(
             place = place,
-            probes = probes,
+            probes = fetched.map { it.toProbe(groundByCode[it.code]) },
             provincial = provincial,
             locale = Locale.getDefault(),
+        )
+    }
+
+    /** What one station answered, before the ground under it is known. */
+    private data class Fetched(
+        val code: String,
+        val name: String,
+        val lat: Double?,
+        val lon: Double?,
+        val distanceKm: Double,
+        val claimedAltitudeM: Int?,
+        val reading: StationObservation?,
+        val error: String?,
+    ) {
+        fun toProbe(demAltitudeM: Int?) = StationProbe(
+            code = code, name = name, distanceKm = distanceKm,
+            lat = lat ?: 0.0, lon = lon ?: 0.0,
+            claimedAltitudeM = claimedAltitudeM, demAltitudeM = demAltitudeM,
+            reading = reading, error = error,
         )
     }
 
@@ -123,5 +181,23 @@ class NearbyStationsViewModel @Inject constructor(
 
     companion object {
         const val NO_KEY = "no-key"
+
+        /** Long enough for a DataStore write to come back through three flows, short enough to notice. */
+        const val CHOICE_SETTLES_MS = 2_000L
+
+        fun joinLatitudes(points: List<Pair<Double, Double>>): String = points.joinToString(",") { it.first.toString() }
+
+        fun joinLongitudes(points: List<Pair<Double, Double>>): String = points.joinToString(",") { it.second.toString() }
+
+        /**
+         * The ground under each station, or nulls throughout.
+         *
+         * An answer of the wrong length cannot be matched to the stations that were asked about, and
+         * pairing them off by index anyway would put one station's ground under another's name —
+         * which is the mistake this whole check exists to prevent, one level up.
+         */
+        fun heightsFrom(elevations: List<Double>?, stations: Int): List<Int?> =
+            if (elevations == null || elevations.size != stations) List(stations) { null }
+            else elevations.map { it.roundToInt() }
     }
 }
