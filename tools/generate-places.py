@@ -87,6 +87,25 @@ WU_CURRENT = "https://api.weather.com/v2/pws/observations/current?stationId={id}
 # tens of metres here: Dorf Tirol's own catalogue altitude of 594 m sits 23 m from the DEM under it.
 PWS_MAX_DEM_DISAGREEMENT_M = 100
 
+# Stations the `near` endpoint does not return but which are worth considering anyway, by ISTAT.
+#
+# ITIROL26 sits 0,68 km from Dorf Tirol and answers `current` perfectly well; the endpoint returns
+# ten stations for that place, stopping at 1,92 km, and simply does not include it. There is no
+# documented reason, so the only way to consider it is to name it.
+#
+# Anything here is a *candidate and nothing more*. It goes through the same DEM gate and the same
+# stability measure as a station the endpoint did offer, and is dropped by them as readily.
+#
+# ITIROL26 was dropped until 2026-09-23, and the reason is worth keeping: WU reported its elevation
+# as 204 m against a DEM of 654, because its station form is in **feet** and 669 had been entered
+# there — 669 ft is 203,9 m, which is exactly what the metric API returned, while AWEKAS had the
+# same instrument at 669 m. Re-entered as 2195 ft it reports 669 m and passes at 15 m. Altitude is
+# what StationDownscale carries a reading up by, so the gate was right to refuse the first and right
+# to accept the second.
+PWS_EXTRA = {
+    "021101": ["ITIROL26"],  # Dorf Tirol
+}
+
 # The model the stations are judged against, and how much of its past to judge them on. ICON-D2 runs
 # at about 2 km, which is the coarsest resolution at which two points five kilometres apart in
 # different valleys are still different places. Open-Meteo keeps roughly eight weeks of it, which is
@@ -258,7 +277,7 @@ def wu_fetch(url):
         return None
 
 
-def pws_candidates(lat, lon, altitude):
+def pws_candidates(lat, lon, altitude, istat=None):
     """Amateur stations near a place that are worth putting to the stability test.
 
     Three gates before a candidate is even measured, and each one earns its place:
@@ -284,10 +303,14 @@ def pws_candidates(lat, lon, altitude):
     if not WU_KEY:
         return []
     near = wu_fetch(WU_NEAR.format(lat=lat, lon=lon, key=WU_KEY))
-    if not near or "location" not in near:
+    offered = (near or {}).get("location", {}).get("stationId", []) or []
+    # Named stations first, then whatever the endpoint offered, de-duplicated. Order only decides
+    # which duplicate is dropped; the gates below decide everything that matters.
+    codes = list(dict.fromkeys(PWS_EXTRA.get(istat, []) + list(offered)))
+    if not codes:
         return []
     out = []
-    for code in near["location"].get("stationId", []):
+    for code in codes:
         body = wu_fetch(WU_CURRENT.format(id=code, key=WU_KEY))
         observations = (body or {}).get("observations") or []
         if not observations:
@@ -375,7 +398,7 @@ def pws_check(names):
     for place in wanted:
         lat, lon, altitude = place["lat"], place["lon"], place["altitudeM"]
         print(f"\n{place['nameDe']} ({altitude} m, DEM {horizons.ground(lat, lon):.0f} m)", file=sys.stderr)
-        for cost, record, d, dz in pws_candidates(lat, lon, altitude):
+        for cost, record, d, dz in pws_candidates(lat, lon, altitude, place['istat']):
             print(f"  kept    {record['code']:12s} DEM {record['altitude']:4d} m  "
                   f"{d:5.2f} km  dz {dz:4.0f} m  qc {record['qcStatus']}  cost {cost:.2f}",
                   file=sys.stderr)
@@ -387,9 +410,120 @@ def pws_check(names):
     print("\n--pws-check: nothing written", file=sys.stderr)
 
 
+def beats_provincial(place_altitude, station, chosen, chosen_km, score):
+    """Whether the amateur station should displace the provincial one.
+
+    Two conditions, and the second was added after the first picked twelve places badly.
+
+    **Steadier**, by `pick_by_stability` — which is the measure the provincial station was itself
+    chosen on, so this is a like-for-like comparison. An unmeasured amateur never displaces a
+    measured provincial one; a measured amateur does displace an unmeasured provincial one, because
+    evidence beats none.
+
+    **And not worse sited**, by the same `km + dz/100` this file orders candidates with. Stability
+    alone put Terenten on a station 5,6 km away and 389 m up — just inside STATION_MAX_DZ_M, which
+    is the limit because four hundred metres is about four degrees of dry adiabat — in exchange for
+    0,26 K of steadiness, abandoning a thermometer standing in the village. And it moved Laurein
+    from a station 8 m from its own height to one 190 m away purely because the provincial had no
+    score. Both are the kind of trade the height cost exists to refuse, and a steadier reading of
+    the wrong air is still the wrong air.
+    """
+    if station is None:
+        return True
+    provincial_sd = station.get("stabilityK")
+    if score is None:
+        return False
+    if provincial_sd is not None and score >= provincial_sd:
+        return False
+    amateur_cost = chosen_km + abs(place_altitude - int(chosen["altitude"])) * HEIGHT_COST_KM_PER_M
+    provincial_cost = (
+        siag_float(station["distanceKm"])
+        + abs(place_altitude - int(station["altitudeM"])) * HEIGHT_COST_KM_PER_M
+    )
+    return amateur_cost <= provincial_cost
+
+
+def pws_fill():
+    """Add a `pws` to the committed catalogue and touch nothing else.
+
+    The counterpart of `horizons.py`, which backfills only `horizon` fields on a catalogue it
+    otherwise leaves alone, and for the same reason. A full run re-queries KMOS and SIAG for all 116
+    and re-measures every provincial station against eight fresh weeks of ICON-D2, so the amateur
+    stations would land in one commit together with whatever drifted upstream since the last run —
+    and no reviewer could tell the two apart. This keeps the diff to the thing being decided.
+
+        APEX_WU_API_KEY=... python3 tools/generate-places.py --pws-fill
+    """
+    if not WU_KEY:
+        print("APEX_WU_API_KEY is not set; nothing to fill", file=sys.stderr)
+        return
+    places = json.loads(PLACES.read_text(encoding="utf-8"))
+    gained, lost, kept = [], [], 0
+    for n, place in enumerate(places, start=1):
+        istat = place["istat"]
+        lat, lon, altitude = place["lat"], place["lon"], place["altitudeM"]
+        station = place.get("station")
+        before = (place.get("pws") or {}).get("code")
+        print(f"{n:>3}/{len(places)} {place['nameDe']}", file=sys.stderr)
+
+        pws = None
+        candidates = pws_candidates(lat, lon, altitude, istat)
+        if candidates:
+            chosen, chosen_km, score = pick_by_stability((lat, lon, altitude), candidates)
+            time.sleep(STABILITY_PACE_S)
+            provincial_sd = (station or {}).get("stabilityK")
+            better = beats_provincial(altitude, station, chosen, chosen_km, score)
+            if better:
+                pws = {
+                    "network": "wu",
+                    "code": chosen["code"],
+                    "name": chosen["name"],
+                    "lat": round(chosen["latitude"], 6),
+                    "lon": round(chosen["longitude"], 6),
+                    "altitudeM": int(chosen["altitude"]),
+                    "distanceKm": round(chosen_km, 2),
+                    "stabilityK": None if score is None else round(score, 2),
+                }
+                print(f"    {chosen['code']} (sd {score}) beats "
+                      f"{(station or {}).get('code')} (sd {provincial_sd})", file=sys.stderr)
+            else:
+                print(f"    {chosen['code']} (sd {score}) does not beat "
+                      f"{(station or {}).get('code')} (sd {provincial_sd})", file=sys.stderr)
+
+        after = (pws or {}).get("code")
+        if after and not before:
+            gained.append((place["nameDe"], after))
+        elif before and not after:
+            lost.append((place["nameDe"], before))
+        elif after:
+            kept += 1
+        # Written even when None, so a place that lost its station loses the field rather than
+        # keeping a stale one.
+        if pws is None:
+            place.pop("pws", None)
+        else:
+            place["pws"] = pws
+
+    # A new pws needs its own skyline, exactly as a full run gives it one: StationSun asks its
+    # question at the pyranometer, and a thermometer on a different shoulder has a different ridge.
+    horizons.fill(places)
+
+    # indent=1, matching what the full run writes. indent=2 would reformat all 116 records and
+    # bury the one change this pass exists to make.
+    PLACES.write_text(json.dumps(places, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(f"\n{len(gained)} gained, {len(lost)} lost, {kept} unchanged", file=sys.stderr)
+    for name, code in gained:
+        print(f"  + {name}: {code}", file=sys.stderr)
+    for name, code in lost:
+        print(f"  - {name}: {code}", file=sys.stderr)
+
+
 def main():
     if "--pws-check" in sys.argv:
         pws_check([a for a in sys.argv[1:] if not a.startswith("--")])
+        return
+    if "--pws-fill" in sys.argv:
+        pws_fill()
         return
     municipalities = fetch(ODH_MUNICIPALITIES)
     region_names = {r["Id"]: (r.get("Detail") or {}).get("de", {}).get("Title") for r in fetch(ODH_REGIONS)}
@@ -460,22 +594,12 @@ def main():
         # order the candidates; what decides is which thermometer stands in the same air. It is kept
         # only where it wins, so most of the 116 keep the station they have and should.
         pws = None
-        pws_here = pws_candidates(lat, lon, altitude)
+        pws_here = pws_candidates(lat, lon, altitude, istat)
         if pws_here:
             chosen_p, chosen_p_km, score_p = pick_by_stability((lat, lon, altitude), pws_here)
             time.sleep(STABILITY_PACE_S)
             provincial_sd = (station or {}).get("stabilityK")
-            # An unmeasured candidate does not get to displace a measured provincial station: with
-            # no score there is no evidence it stands in the same air, and the provincial one is the
-            # instrument somebody maintains.
-            if station is None:
-                better = True
-            elif score_p is None:
-                better = False
-            elif provincial_sd is None:
-                better = True
-            else:
-                better = score_p < provincial_sd
+            better = beats_provincial(altitude, station, chosen_p, chosen_p_km, score_p)
             if better:
                 pws = {
                     "network": "wu",
