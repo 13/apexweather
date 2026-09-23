@@ -512,11 +512,14 @@ Beside `PWS_MAX_DEM_DISAGREEMENT_M`:
 # documented reason, so the only way to consider it is to name it.
 #
 # Anything here is a *candidate and nothing more*. It goes through the same DEM gate and the same
-# stability measure as a station the endpoint did offer, and is dropped by them as readily — which
-# ITIROL26 currently is: WU records its elevation as 204 m, AWEKAS records the same instrument as
-# 669, and the ground under its coordinates is 654. Altitude is what StationDownscale carries a
-# reading up by, so a 450 m error in it is not something to wave through; the fix is in the
-# station's own WU settings.
+# stability measure as a station the endpoint did offer, and is dropped by them as readily.
+#
+# ITIROL26 was dropped until 2026-09-23, and the reason is worth keeping: WU recorded its elevation
+# as 204 m against a DEM of 654, because its station form is in **feet** and 669 had been entered
+# there — 669 ft is 203,9 m, which is exactly what the metric API returned. The same instrument
+# reads 669 m on AWEKAS, which is metric. Corrected to 2195 ft it reports 669 m and passes at
+# Δ15 m. Altitude is what StationDownscale carries a reading up by, so the gate was right to refuse
+# it and right to accept it once the metadata was true.
 PWS_EXTRA = {
     "021101": ["ITIROL26"],  # Dorf Tirol
 }
@@ -531,8 +534,10 @@ In `pws_candidates`, take the ISTAT code as an argument and merge its extras int
 APEX_WU_API_KEY=<key> python3 tools/generate-places.py --pws-check
 ```
 
-Expected: `ITIROL26` now appears in the output and is **dropped** on the DEM gate, printed beside
-`ITIROL25`, `ITIROL23` and the others, with its claimed 204 m against the DEM's 654.
+Expected: `ITIROL26` now appears in the output and is **kept** — claims 669 m against a DEM of
+654, Δ15 m — beside `ITIROL16` (586 claimed, DEM 634, Δ48). `ITIROL25`, `ITIROL23` and `ITIROL24`
+are still dropped on their impossible altitudes. Which of the two Dorf Tirol candidates wins is
+then `pick_by_stability`'s to decide, not the cost ordering's.
 
 - [ ] **Step 3: Add `--pws-fill`**
 

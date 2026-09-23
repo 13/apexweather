@@ -109,13 +109,15 @@ PWS_EXTRA = {
 }
 ```
 
-**And it will be dropped today, correctly.** Measured 2026-09-23: WU records `ITIROL26`'s elevation
-as **204 m**, AWEKAS records the same instrument as **669 m**, and the SRTM ground under its
-coordinates is **654 m**. The DEM gate refuses a 450 m disagreement, and it should: altitude is what
-`StationDownscale` carries a reading up by, so a station whose own altitude record is wrong by 450 m
-would poison the one number the hero is built from. The station is fine; its WU metadata is not, and
-the fix is in the station's WU settings rather than in this code. The override exists so that it
-becomes a candidate once that is corrected.
+**It was dropped until its metadata was corrected, and that story is the gate earning its keep.**
+Measured 2026-09-23: WU reported `ITIROL26` at **204 m** against a DEM of **654 m**, while AWEKAS
+had the same instrument at **669 m**. The cause was a unit mismatch rather than a bad station — WU's
+station form is in feet, `669` had been entered there, and 669 ft is 203,9 m, which is exactly what
+the metric API returned. Re-entered as 2195 ft it reports 669 m and passes at **Δ15 m**.
+
+Altitude is what `StationDownscale` carries a reading up by, so the gate was right to refuse a 450 m
+disagreement and right to accept a 15 m one. It caught a real error in data nobody else was checking,
+which is the argument for having it.
 
 ## Filling the catalogue
 
