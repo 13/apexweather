@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -122,6 +123,23 @@ class SettingsContentTest {
     fun theKeyFieldIsHiddenWhenPrivateStationsAreOff() {
         show(AppSettings(amateurStations = false))
         rule.onNodeWithTag("setting_wu_key").assertDoesNotExist()
+    }
+
+    /**
+     * The failure this pins is not "the callback is wrong" but "the field forgot the last
+     * character". One `performTextInput` is a single commit and passes either way; two in a row,
+     * against a state that has not come back yet, is what the store's round trip actually looks
+     * like on a phone, and against a field reading `settings.wuApiKey` the second input is
+     * committed onto an empty value and the first two characters are simply gone.
+     */
+    @Test
+    fun theFieldKeepsWhatWasTypedWhileTheStoreIsStillCatchingUp() {
+        val sent = mutableListOf<String>()
+        show(AppSettings(amateurStations = true), onWuApiKey = { sent += it })
+        rule.onNodeWithTag("setting_wu_key").performTextInput("ab")
+        rule.onNodeWithTag("setting_wu_key").performTextInput("cd")
+        assertEquals("abcd", sent.last())
+        rule.onNodeWithTag("setting_wu_key").assertTextContains("abcd")
     }
 
     @Test

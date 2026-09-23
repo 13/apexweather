@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -234,9 +235,30 @@ fun SettingsContent(
             // Only while the feature is on: a key field under a switch that is off is a question
             // about something that is not happening.
             if (settings.amateurStations) {
+                // The field keeps its own text and never reads back what it just wrote. Driving
+                // `value` from `settings.wuApiKey` meant every keystroke went out to DataStore and
+                // came back a recomposition later, so the next character was committed against a
+                // stale value and a stale cursor: measured on the phone on 2026-09-23, the same
+                // 32-character key typed one character at a time (450 ms apart, which is not fast)
+                // arrived as "b2dfb3ef31f40bcadf8ef31f30bc603" — reordered, one short, three times
+                // out of three, while the place picker's search box, which holds its own state,
+                // took the identical input exactly. A key is the one string in this app nobody can
+                // proof-read, so a character out of place is silent and the app simply reads no
+                // station. Pasting hid it, because a paste is a single commit.
+                var typed by rememberSaveable { mutableStateOf(settings.wuApiKey.orEmpty()) }
+                // A change this field did not make — the store's first emission, or a key cleared
+                // somewhere else — is still adopted; an echo of our own write is not.
+                var sent by rememberSaveable { mutableStateOf(typed) }
+                LaunchedEffect(settings.wuApiKey) {
+                    val stored = settings.wuApiKey.orEmpty()
+                    if (stored != sent) {
+                        typed = stored
+                        sent = stored
+                    }
+                }
                 OutlinedTextField(
-                    value = settings.wuApiKey.orEmpty(),
-                    onValueChange = onWuApiKey,
+                    value = typed,
+                    onValueChange = { typed = it; sent = it; onWuApiKey(it) },
                     singleLine = true,
                     label = { Text(stringResource(R.string.setting_wu_key)) },
                     supportingText = { Text(stringResource(R.string.setting_wu_key_note)) },
