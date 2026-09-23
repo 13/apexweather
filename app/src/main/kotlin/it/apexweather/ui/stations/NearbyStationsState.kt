@@ -1,34 +1,10 @@
 package it.apexweather.ui.stations
 
 import it.apexweather.data.ChosenStation
+import it.apexweather.data.StationProbe
 import it.apexweather.domain.Place
 import it.apexweather.domain.StationHeight
 import it.apexweather.domain.model.StationObservation
-
-/**
- * One station as the network answered for it.
- *
- * [reading] is null where the station answered but had nothing recent — Weather Underground returns
- * HTTP 204 for a live station that has not reported within the hour, and going quiet for an hour is
- * not the same thing as failing. [error] is for the second case.
- *
- * [claimedAltitudeM] is the station's *own* record of where it stands and [demAltitudeM] the ground
- * under its coordinates, from Open-Meteo's elevation endpoint. Both, because the difference is the
- * information: WU's elevation form is in feet, and ITIROL26 stood in its records at 204 m against
- * real ground at 654.
- */
-data class StationProbe(
-    val code: String,
-    val name: String,
-    val distanceKm: Double,
-    /** The station's own coordinates, which is where the ground under it was asked about. */
-    val lat: Double,
-    val lon: Double,
-    val claimedAltitudeM: Int?,
-    val demAltitudeM: Int?,
-    val reading: StationObservation?,
-    val error: String? = null,
-)
 
 data class StationRow(
     val code: String,

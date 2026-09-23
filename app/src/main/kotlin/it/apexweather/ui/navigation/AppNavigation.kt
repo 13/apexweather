@@ -268,7 +268,14 @@ fun ApexApp() {
                     val compareVm: CompareViewModel = hiltViewModel()
                     // The statistics screen hands a source back on this entry's handle.
                     ReceiveSourceHandoff(entry, compareVm::openSource)
-                    CompareScreen(onOpenStats = dropUnlessResumed { nav.navigate(StatsRoute) }, viewModel = compareVm)
+                    CompareScreen(
+                        onOpenStats = dropUnlessResumed { nav.navigate(StatsRoute) },
+                        // The card is a way in as well as a read-out. Pushed onto the comparison
+                        // tab's own stack, so back returns here — and selectTab now brings any tab
+                        // back from a detail like this one.
+                        onOpenStations = dropUnlessResumed { nav.navigate(NearbyStationsRoute) },
+                        viewModel = compareVm,
+                    )
                 }
                 composable<NearbyStationsRoute> {
                     // Dropped unless resumed, so a double tap on the arrow pops once — the same

@@ -1,5 +1,6 @@
 package it.apexweather.ui.stations
 
+import it.apexweather.data.StationProbe
 import it.apexweather.domain.NearbyStation
 import it.apexweather.domain.Place
 import org.junit.Assert.assertEquals

@@ -42,6 +42,10 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
+import it.apexweather.data.NearbyStationsRepository
+import it.apexweather.data.runCatchingCancellable
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 
 /**
  * Which slice of time the chart plots. Days are held as an offset from today rather than as a
@@ -183,11 +187,12 @@ object CompareStateBuilder {
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class CompareViewModel @Inject constructor(
-    holder: WeatherStateHolder,
+    private val holder: WeatherStateHolder,
     private val settingsRepository: SettingsRepository,
     private val savedState: SavedStateHandle,
     private val metaRepository: SourceMetaRepository,
     private val repository: WeatherRepository,
+    private val stations: NearbyStationsRepository,
 ) : ViewModel() {
     /**
      * Which day the chart shows. This is view state rather than a preference, so it lives here and
@@ -206,6 +211,37 @@ class CompareViewModel @Inject constructor(
         .distinctUntilChanged()
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CompareUiState())
+
+    /**
+     * The neighbourhood's thermometers, for the card under the day table.
+     *
+     * Its own flow rather than part of [state], because it is fetched over the network and the rest
+     * of the screen must not wait for it — and because [NearbyStationsRepository] holds the answer
+     * for ten minutes, so coming back to this tab inside that window spends nothing.
+     */
+    private val _stationsNow = MutableStateFlow(StationsNowUiState())
+    val stationsNow: StateFlow<StationsNowUiState> = _stationsNow
+
+    init {
+        viewModelScope.launch { loadStations() }
+    }
+
+    private suspend fun loadStations() = withContext(Dispatchers.Default) {
+        val weather = holder.weather.first { it.place != null }
+        val place = checkNotNull(weather.place).forSettings(weather.settings)
+        // No key, no neighbourhood, and nothing worth drawing: the province's own station is
+        // already on the home screen.
+        val found = runCatchingCancellable { stations.neighbourhood(place) }.getOrNull() ?: return@withContext
+        _stationsNow.value = StationsNowStateBuilder.build(
+            place = place,
+            probes = found.stations,
+            provincial = weather.snapshot.officialObservation,
+            // The models' own number at the place for the hour that is running, which is the only
+            // anchor this card carries — never the hero. See StationsNowUiState.
+            modelsTempC = weather.consensus.hourly
+                .firstOrNull { !it.time.isBefore(weather.now.truncatedTo(ChronoUnit.HOURS)) }?.tempC,
+        )
+    }
 
     /** Which source's sheet is open, by name, so it survives process death like the day does. */
     private val openSourceName: StateFlow<String?> = savedState.getStateFlow<String?>(SOURCE_KEY, null)
