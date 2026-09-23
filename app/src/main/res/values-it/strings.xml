@@ -106,9 +106,9 @@
     <string name="map_up_to">fino a %1$s mm/h</string>
     <string name="map_legend_moderate">moderata</string>
     <string name="settings">Impostazioni</string>
-    <string name="setting_language">LINGUA</string>
+    <string name="setting_language">Lingua</string>
     <string name="lang_system">Sistema</string>
-    <string name="setting_wind">UNITÀ VENTO</string>
+    <string name="setting_wind">Unità del vento</string>
     <string name="setting_animations">Anima il cielo</string>
     <string name="setting_amateur_stations">Stazioni private</string>
     <string name="setting_amateur_stations_note">Più vicine o alla quota del paese, ma non sottoposte a manutenzione. Spento: solo la rete provinciale.</string>
@@ -253,7 +253,7 @@
     <string name="notif_rain_title">%1$s dalle %2$s</string>
     <string name="notif_rain_text">%1$d %% di probabilità · %2$s previsti</string>
     <string name="notif_warning_text">%1$s · %2$s</string>
-    <string name="setting_notifications">NOTIFICHE</string>
+    <string name="setting_notifications">Notifiche</string>
     <string name="setting_notif_summary">Riepilogo del mattino</string>
     <string name="setting_notif_summary_time">Alle %1$s</string>
     <string name="setting_notif_rain">Sta per piovere</string>
@@ -277,7 +277,7 @@
     <string name="place_row_desc">%1$s, %2$s, distretto %3$s</string>
     <string name="place_selected">Attualmente scelto</string>
     <string name="change_place">Cambia comune</string>
-    <string name="setting_place">COMUNE</string>
+    <string name="setting_place">Comune</string>
     <string name="back">Indietro</string>
     <string name="district_1">Bolzano, Oltradige e Bassa Atesina</string>
     <string name="district_2">Burgraviato</string>

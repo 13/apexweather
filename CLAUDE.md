@@ -760,6 +760,30 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   `SettingsRoute` + `SettingsScreen` (wiring) + `SettingsContent(state, callbacks)` follow the
   convention every other screen uses. It is also why the bottom-sheet scroll rule below no longer
   applies to it.
+- **And it is five `GlassCard` groups over the shared sky, like every other screen.** It used to
+  paint `Surface(colorScheme.surface)` over the gradient `AppNavigation` draws once behind all
+  destinations — an opaque slab in a colour belonging to no part of the app and not changing with
+  the weather — while Heute, Karte, Vergleich, Bericht and the stations screen were all white text
+  on glass. Safe as well as consistent: `SkyContrast` holds every palette to 4,5:1 against white and
+  `GlassCard` paints **black**, so a card can only darken a sky already held to the floor. No pinned
+  top bar, because no screen here has one. The groups are Ort und Sprache, Anzeige, Stationen,
+  Mitteilungen, App, each with its heading **above** its card — the old flat 16 dp column put a
+  heading exactly as far from its own control as from the unrelated one before it.
+- **A new setting is a row, not a fresh layout.** `SettingsRows.kt` holds the primitives —
+  `SettingsGroup`, `SettingRow`, `SwitchRow`, `NavRow`, `SettingLabel` — and `SettingsContent.kt`
+  describes content and nothing else. The whole switch row toggles, because a switch is about 52 dp
+  at the right edge of a 360 dp row and the label is the obvious thing to press; the switch keeps
+  its own test tag. Icons are **decorative** (`contentDescription = null`): each sits beside a label
+  that says the same thing, and a screen reader announcing "Ort-Symbol, Ort" is worse than silence.
+  `SettingLabel` exists because a `SettingRow` with an empty trailing slot still pays `RowMinHeight`
+  for a row with nothing on its right.
+- **Wind sits beside its label and language does not, and past `MAX_FONT_SCALE` neither does.** Two
+  options fit next to a label and four do not — worth about 110 dp. But the label gets the row's
+  leftover width, and at a 2x font scale on the phone "Windeinheit" broke mid-word into
+  "Windeinh / eit"; no layout fixes that, the same way none fixes a fifth of 384 dp in the
+  navigation bar, so above 1,2 the pair stacks under its label as the language row always does.
+  The row labels are **sentence case** (`Ort`, `Sprache`, `Windeinheit`): they were written as
+  all-caps section headings for the old flat layout and shouted once they became labels.
 - **A place can be pinned, and the pin is a cache decision as much as a list.** The star in the
   picker writes `AppSettings.favouritePlaces`; `keptPlaces` is what both evicting callers read, so a
   pinned place stays cached and opens with no signal. Pinned places head the list **only while the

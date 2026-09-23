@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,6 +49,7 @@ import it.apexweather.data.WindUnit
 import it.apexweather.data.WuKeyVerdict
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.ui.common.CompactLabel
+import it.apexweather.ui.common.MAX_FONT_SCALE
 import it.apexweather.ui.common.Format
 import it.apexweather.ui.common.LocalFormats
 import java.time.Instant
@@ -160,9 +162,15 @@ fun SettingsContent(
         }
 
         SettingsGroup(stringResource(R.string.settings_group_display), Modifier.testTag("group_display")) {
-            SettingRow(Icons.Rounded.Air, stringResource(R.string.setting_wind)) {
-                // Two options fit beside their label; four do not. Worth about 110 dp.
-                SingleChoiceSegmentedButtonRow {
+            // Two options fit beside their label and four do not, so wind is inline where
+            // language is not — worth about 110 dp. **Except at a large text size**: the label has
+            // the row's leftover width, and at 2x on the phone "Windeinheit" broke mid-word into
+            // "Windeinh / eit". No layout fixes that, the same way none fixes a fifth of 384 dp in
+            // the navigation bar, so past CompactLabel's own ceiling the pair stacks under its
+            // label exactly as the language row does.
+            val windFitsBesideItsLabel = LocalDensity.current.fontScale <= MAX_FONT_SCALE
+            val windSegments: @Composable () -> Unit = {
+                SingleChoiceSegmentedButtonRow(if (windFitsBesideItsLabel) Modifier else Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
                     WindUnit.entries.forEachIndexed { i, u ->
                         SegmentedButton(
                             selected = settings.windUnit == u,
@@ -172,6 +180,12 @@ fun SettingsContent(
                         ) { CompactLabel { Text(if (u == WindUnit.KMH) "km/h" else "m/s", maxLines = 1) } }
                     }
                 }
+            }
+            if (windFitsBesideItsLabel) {
+                SettingRow(Icons.Rounded.Air, stringResource(R.string.setting_wind)) { windSegments() }
+            } else {
+                SettingLabel(Icons.Rounded.Air, stringResource(R.string.setting_wind))
+                windSegments()
             }
             SwitchRow(
                 Icons.Rounded.AutoAwesome, stringResource(R.string.setting_animations), null,
