@@ -89,16 +89,37 @@ class WeatherRepository @Inject constructor(
     private val openMeteo: OpenMeteoApi,
     private val geoSphere: GeoSphereApi,
     private val siag: SiagApi,
-    private val wu: WeatherUndergroundApi,
+    /**
+     * Nullable for the same reason [wuApiKey] is, and it is the same bug twice.
+     *
+     * With no key, `fetchAmateur` returns before it ever touches this, so R8 can prove the field
+     * unused and drops the argument — while Kotlin's non-null check on the parameter stays. Making
+     * the key nullable alone did not fix the crash; the null had simply moved to this parameter.
+     *
+     * R8 is not wrong about any of it: with no key configured the whole amateur path *is* dead
+     * code, and both of these collaborators are genuinely absent. Declaring that is the fix, and
+     * fighting the optimiser would not have been.
+     */
+    private val wu: WeatherUndergroundApi?,
     /**
      * Weather Underground's contributor key, injected rather than read from `BuildConfig` here.
      *
      * Every other checkout and CI have none, and a repository that reached for the constant
      * directly would make its own tests pass or fail depending on whether the person running them
      * happens to have a key in `local.properties` — which is the kind of test that proves nothing
-     * anywhere. Empty means the amateur path is switched off entirely: no request is made at all.
+     * anywhere. Absent means the amateur path is switched off entirely: no request is made at all.
+     *
+     * **Nullable, and that is load-bearing.** It was a non-null `String` and the minified build
+     * crashed on launch for every checkout without a key: R8 can see that the provider returns the
+     * constant `""`, proves the parameter is never meaningfully read, drops the argument — and
+     * Kotlin's null check on the parameter is still there, so `WeatherRepository`'s constructor
+     * threw an NPE inside `ApexApplication.onCreate`. Debug builds were fine, because none of that
+     * happens without R8; `tools/release-smoke.sh` is what caught it.
+     *
+     * Declaring it nullable makes R8's answer the true one: a key it optimised away and a key that
+     * was never set mean the same thing here, and both are handled by the same branch.
      */
-    @WuApiKey private val wuApiKey: String,
+    @WuApiKey private val wuApiKey: String?,
     private val odh: OdhApi,
     private val meteoAlarm: MeteoAlarmApi,
     private val ensembleApi: EnsembleApi,
@@ -697,8 +718,10 @@ class WeatherRepository @Inject constructor(
      * "nothing observed in the last 60 minutes", which a live station produces intermittently.
      */
     private suspend fun fetchAmateur(station: NearbyStation): StationObservation? {
-        if (wuApiKey.isEmpty()) return null
-        val response = wu.current(station.code, wuApiKey)
+        val key = wuApiKey
+        val api = wu
+        if (key.isNullOrEmpty() || api == null) return null
+        val response = api.current(station.code, key)
         return WeatherUndergroundMapper.map(response.body().takeIf { response.isSuccessful }, station)
     }
 

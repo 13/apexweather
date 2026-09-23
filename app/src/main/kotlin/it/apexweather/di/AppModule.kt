@@ -86,8 +86,14 @@ object AppModule {
     @Provides @Singleton fun siag(c: OkHttpClient, j: Json): SiagApi = retrofit(SiagApi.BASE_URL, c, j).create(SiagApi::class.java)
     @Provides @Singleton fun odh(c: OkHttpClient, j: Json): OdhApi = retrofit(OdhApi.BASE_URL, c, j).create(OdhApi::class.java)
     @Provides @Singleton fun weatherUnderground(c: OkHttpClient, j: Json): WeatherUndergroundApi = retrofit(WeatherUndergroundApi.BASE_URL, c, j).create(WeatherUndergroundApi::class.java)
-    /** Empty in every checkout but the author's, and in CI — see [WuApiKey]. */
-    @Provides @WuApiKey fun wuApiKey(): String = it.apexweather.BuildConfig.WU_API_KEY
+    /**
+     * Empty in every checkout but the author's, and in CI — see [WuApiKey].
+     *
+     * Nullable because an empty constant is exactly what R8 is free to optimise away; the consumer
+     * treats null and empty alike. See WeatherRepository's `wuApiKey` for what happened when it did
+     * not.
+     */
+    @Provides @WuApiKey fun wuApiKey(): String? = it.apexweather.BuildConfig.WU_API_KEY.ifEmpty { null }
     // Returns the Atom feed as a raw body: Retrofit hands ResponseBody back without a converter,
     // and MeteoAlarmMapper does the XML parsing.
     @Provides @Singleton fun ensemble(c: OkHttpClient, j: Json): EnsembleApi = retrofit(EnsembleApi.BASE_URL, c, j).create(EnsembleApi::class.java)
