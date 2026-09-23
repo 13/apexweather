@@ -3,6 +3,7 @@ package it.apexweather.di
 import android.content.Context
 import dagger.Module
 import dagger.Provides
+import kotlinx.coroutines.flow.first
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
@@ -87,13 +88,13 @@ object AppModule {
     @Provides @Singleton fun odh(c: OkHttpClient, j: Json): OdhApi = retrofit(OdhApi.BASE_URL, c, j).create(OdhApi::class.java)
     @Provides @Singleton fun weatherUnderground(c: OkHttpClient, j: Json): WeatherUndergroundApi = retrofit(WeatherUndergroundApi.BASE_URL, c, j).create(WeatherUndergroundApi::class.java)
     /**
-     * Empty in every checkout but the author's, and in CI — see [WuApiKey].
+     * The reader's key, read from settings at the moment it is used rather than bound as a value.
      *
-     * Nullable because an empty constant is exactly what R8 is free to optimise away; the consumer
-     * treats null and empty alike. See WeatherRepository's `wuApiKey` for what happened when it did
-     * not.
+     * See `WeatherRepository.wuKey`: a value here would be a compile-time constant again, which is
+     * what R8 folded away in v0.29.0 and what stopped the app starting.
      */
-    @Provides @WuApiKey fun wuApiKey(): String? = it.apexweather.BuildConfig.WU_API_KEY.ifEmpty { null }
+    @Provides fun wuKey(settings: it.apexweather.data.SettingsRepository): it.apexweather.data.WuKeySource =
+        it.apexweather.data.WuKeySource { settings.settings.first().wuApiKey }
     // Returns the Atom feed as a raw body: Retrofit hands ResponseBody back without a converter,
     // and MeteoAlarmMapper does the XML parsing.
     @Provides @Singleton fun ensemble(c: OkHttpClient, j: Json): EnsembleApi = retrofit(EnsembleApi.BASE_URL, c, j).create(EnsembleApi::class.java)
@@ -124,16 +125,3 @@ object AppModule {
     fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     @Provides @Singleton fun blender(): ConsensusBlender = ConsensusBlender(SouthTyrol.ZONE)
 }
-
-/**
- * Weather Underground's PWS contributor key.
- *
- * A qualifier rather than a bare String because Hilt cannot tell two Strings apart, and because the
- * thing being injected is a credential: naming it makes every injection site say so.
- */
-@javax.inject.Qualifier
-// RUNTIME, which is what javax.inject.Qualifier itself is declared with and what JSR-330 requires.
-// BINARY compiles and injects correctly in a debug build — the graph is generated at compile time —
-// and is a different proposition once R8 has been over it.
-@Retention(AnnotationRetention.RUNTIME)
-annotation class WuApiKey
