@@ -17,6 +17,8 @@ import it.apexweather.data.remote.OpenMeteoStationResponse
 import it.apexweather.data.remote.SiagApi
 import it.apexweather.data.remote.SiagStationsResponse
 import it.apexweather.data.remote.WeatherUndergroundApi
+import it.apexweather.data.remote.WuNearLocation
+import it.apexweather.data.remote.WuNearResponse
 import it.apexweather.data.remote.WuResponse
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody
@@ -213,6 +215,24 @@ internal class FakeWeatherUnderground(
     val asked: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
     val askedKeys: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
     val askedFor: String? get() = asked.lastOrNull()
+
+    /** Stations this fake will claim are nearby, with their distances. */
+    var nearby: List<Pair<String, Double>> = listOf("ITIROL16" to 0.49, "IMERAN3" to 1.42)
+    val askedNear: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+
+    override suspend fun near(geocode: String, apiKey: String): WuNearResponse {
+        // Recorded for the same reason `asked` is: a fake that ignores where it was asked about
+        // cannot fail when the caller asks about the wrong place.
+        askedNear += geocode
+        if (fail) throw IOException("wu down")
+        return WuNearResponse(
+            WuNearLocation(
+                stationId = nearby.map { it.first },
+                stationName = nearby.map { it.first },
+                distanceKm = nearby.map { it.second },
+            ),
+        )
+    }
 
     override suspend fun current(stationId: String, apiKey: String): Response<WuResponse> {
         asked += stationId

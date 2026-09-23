@@ -1,5 +1,6 @@
 package it.apexweather.ui.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,6 +46,8 @@ fun StationSection(
     currentHour: ConsensusHour?,
     windUnit: WindUnit,
     now: Instant,
+    /** Null where there is nothing to open — no key, so no neighbourhood to list. */
+    onOpenNearby: (() -> Unit)? = null,
 ) {
     if (station == null) return
     val formats = LocalFormats.current
@@ -98,6 +101,21 @@ fun StationSection(
                 freezingLevelText(it, formats),
                 style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.75f),
                 modifier = Modifier.testTag("freezing_level"),
+            )
+        }
+        // The way to "what do the other instruments round here say", asked where it arises: this
+        // card is what names the station and says when it was read.
+        onOpenNearby?.let { open ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.stations_open),
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = open)
+                    .padding(vertical = 6.dp)
+                    .testTag("open_nearby_stations"),
             )
         }
     }
