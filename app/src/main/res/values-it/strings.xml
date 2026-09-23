@@ -112,6 +112,15 @@
     <string name="setting_animations">Anima il cielo</string>
     <string name="setting_amateur_stations">Stazioni private</string>
     <string name="setting_amateur_stations_note">Più vicine o alla quota del paese, ma non sottoposte a manutenzione. Spento: solo la rete provinciale.</string>
+    <string name="setting_wu_key">Chiave Weather Underground</string>
+    <string name="setting_wu_key_note">Gratuita per chi gestisce una propria stazione. Senza chiave l\'app legge solo la rete provinciale.</string>
+    <string name="stations_title">Stazioni nelle vicinanze</string>
+    <string name="stations_chosen">scelta</string>
+    <string name="stations_provincial">Rete provinciale</string>
+    <string name="stations_quiet">nessun dato</string>
+    <string name="stations_altitude_unverified">Quota non plausibile</string>
+    <string name="stations_no_key">Nessuna chiave Weather Underground impostata.</string>
+    <string name="stations_open">Stazioni nelle vicinanze</string>
     <string name="refresh_now">Aggiorna ora</string>
     <string name="about">Apex Weather %1$s · Alto Adige · consenso di 10 modelli meteo</string>
     <string name="widget_description">Temperatura attuale e prossime ore per il luogo scelto · ingrandito mostra anche i prossimi giorni</string>

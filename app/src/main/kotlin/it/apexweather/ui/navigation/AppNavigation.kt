@@ -69,6 +69,7 @@ import it.apexweather.update.UpdateSection
 import it.apexweather.ui.settings.SettingsViewModel
 import it.apexweather.ui.sky.SkyBackground
 import it.apexweather.ui.sky.SkyViewModel
+import it.apexweather.ui.stations.NearbyStationsScreen
 import it.apexweather.ui.stats.StatsScreen
 import kotlinx.serialization.Serializable
 
@@ -148,6 +149,9 @@ internal fun ReceiveSourceHandoff(entry: NavBackStackEntry, onSource: (Source) -
  * place picker: it is opened and left again, and the comparison tab stays selected while it shows.
  */
 @Serializable object StatsRoute
+
+/** Every private station around the chosen place, opened from the station card. */
+@Serializable object NearbyStationsRoute
 
 /**
  * Settings, which used to be a sheet. Making it a destination is what lets its bar item be
@@ -241,6 +245,9 @@ fun ApexApp() {
                 composable<HomeRoute> {
                     HomeScreen(
                         onOpenBulletin = { nav.openTopLevel(BulletinRoute) },
+                        // Not a top-level destination: it is a detail of the station card, and the
+                        // back button should return to the home screen rather than switch tabs.
+                        onOpenStations = dropUnlessResumed { nav.navigate(NearbyStationsRoute) },
                         onOpenPlaces = { nav.navigate(PlacePickerRoute) },
                         viewModel = homeVm,
                     )
@@ -252,6 +259,9 @@ fun ApexApp() {
                     // The statistics screen hands a source back on this entry's handle.
                     ReceiveSourceHandoff(entry, compareVm::openSource)
                     CompareScreen(onOpenStats = dropUnlessResumed { nav.navigate(StatsRoute) }, viewModel = compareVm)
+                }
+                composable<NearbyStationsRoute> {
+                    NearbyStationsScreen()
                 }
                 composable<StatsRoute> {
                     StatsScreen(

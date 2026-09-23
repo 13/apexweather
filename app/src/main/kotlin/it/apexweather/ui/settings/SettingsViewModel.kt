@@ -25,6 +25,7 @@ class SettingsViewModel @Inject constructor(private val repo: SettingsRepository
     fun setWindUnit(u: WindUnit) = viewModelScope.launch { repo.setWindUnit(u) }
     fun setAnimations(b: Boolean) = viewModelScope.launch { repo.setAnimations(b) }
     fun setAmateurStations(b: Boolean) = viewModelScope.launch { repo.setAmateurStations(b) }
+    fun setWuApiKey(v: String) = viewModelScope.launch { repo.setWuApiKey(v) }
     fun setNotifySummary(b: Boolean) = viewModelScope.launch { repo.setNotifySummary(b) }
     fun setNotifySummaryHour(h: Int) = viewModelScope.launch { repo.setNotifySummaryHour(h) }
     fun setNotifyRain(b: Boolean) = viewModelScope.launch { repo.setNotifyRain(b) }

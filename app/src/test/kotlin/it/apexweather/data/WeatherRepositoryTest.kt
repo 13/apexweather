@@ -72,11 +72,11 @@ class WeatherRepositoryTest {
     private val wu = FakeWeatherUnderground()
 
     /**
-     * A stand-in for the contributor key. It is a constructor argument rather than BuildConfig so
-     * these tests behave the same on a machine that has a real key and on one that does not — CI
-     * has none, and a test whose outcome depends on that proves nothing anywhere.
+     * A stand-in for the contributor key, mutable because the repository now reads it per fetch:
+     * a key typed while the app is open has to work on the next refresh without anything being
+     * rebuilt, and that is only testable if the test can change it between calls.
      */
-    private val WU_KEY = "test-key"
+    private var key: String? = "test-key"
     private val odh = FakeOdh()
     private val meteoAlarm = FakeMeteoAlarm()
     private val ensemble = FakeEnsemble()
@@ -86,7 +86,7 @@ class WeatherRepositoryTest {
     @Before fun setUp() {
         db = AppDatabase.inMemory(ApplicationProvider.getApplicationContext())
         history = HistoryDatabase.inMemory(ApplicationProvider.getApplicationContext())
-        repo = WeatherRepository(db.weatherDao(), history.stationHistoryDao(), openMeteo, geoSphere, siag, wu, WU_KEY, odh, meteoAlarm, ensemble, Fixtures.json, clock)
+        repo = WeatherRepository(db.weatherDao(), history.stationHistoryDao(), openMeteo, geoSphere, siag, wu, WuKeySource { key }, odh, meteoAlarm, ensemble, Fixtures.json, clock)
     }
 
     @After fun tearDown() {
@@ -292,7 +292,7 @@ class WeatherRepositoryTest {
     fun `a store failure is isolated and the refresh still records its meta`() = runTest {
         val failing = WeatherRepository(
             FailingStoreDao(db.weatherDao(), Source.GEOSPHERE_AROME.name), history.stationHistoryDao(),
-            openMeteo, geoSphere, siag, wu, WU_KEY, odh, meteoAlarm, ensemble, Fixtures.json, clock,
+            openMeteo, geoSphere, siag, wu, WuKeySource { key }, odh, meteoAlarm, ensemble, Fixtures.json, clock,
         )
         val result = failing.refresh(DORF_TIROL, "de")
         assertEquals("store: disk full", result.failed["GEOSPHERE_AROME"])
@@ -751,7 +751,7 @@ class WeatherRepositoryTest {
     fun `the amateur station is asked for by its own id, with the key`() = runTest {
         repo.refresh(DORF_TIROL_WITH_PWS, "de")
         assertEquals("ITIROL16", wu.askedFor)
-        assertEquals(WU_KEY, wu.askedKeys.last())
+        assertEquals("test-key", wu.askedKeys.last())
     }
 
     /** No amateur station in the catalogue means no request at all, not a request that fails. */
@@ -768,8 +768,8 @@ class WeatherRepositoryTest {
     @Test
     fun `with no key the amateur station is never requested`() = runTest {
         val keyless = WeatherRepository(
-            db.weatherDao(), history.stationHistoryDao(), openMeteo, geoSphere, siag, wu, "",
-            odh, meteoAlarm, ensemble, Fixtures.json, clock,
+            db.weatherDao(), history.stationHistoryDao(), openMeteo, geoSphere, siag, wu,
+            WuKeySource { null }, odh, meteoAlarm, ensemble, Fixtures.json, clock,
         )
         keyless.refresh(DORF_TIROL_WITH_PWS, "de")
         assertTrue(wu.asked.isEmpty())
@@ -836,5 +836,33 @@ class WeatherRepositoryTest {
         repo.refresh(DORF_TIROL_WITH_PWS, "de")
         assertNotNull(db.weatherDao().observationOnce(DORF_TIROL_WITH_PWS.istat, "siag"))
         assertNotNull(db.weatherDao().observationOnce(DORF_TIROL_WITH_PWS.istat, "wu"))
+    }
+
+    /**
+     * Read per fetch, not captured once: a key typed while the app is open has to work on the next
+     * refresh, without the repository being rebuilt or the process restarted.
+     */
+    @Test
+    fun `the key is read at each fetch`() = runTest {
+        key = null
+        repo.refresh(DORF_TIROL_WITH_PWS, "de")
+        assertTrue(wu.asked.isEmpty())
+
+        key = "typed-later"
+        // Past COALESCE_WITHIN, or the second call is handed the first one's result and nothing is
+        // fetched at all — which would make this test pass for a reason that has nothing to do with
+        // the key.
+        clock.now = clock.now.plusSeconds(600)
+        repo.refresh(DORF_TIROL_WITH_PWS, "de")
+        assertEquals("ITIROL16", wu.askedFor)
+        assertEquals("typed-later", wu.askedKeys.last())
+    }
+
+    /** Blank is how a text field says "I have taken my key back", and it must not be sent. */
+    @Test
+    fun `a blank key makes no request`() = runTest {
+        key = "   "
+        repo.refresh(DORF_TIROL_WITH_PWS, "de")
+        assertTrue(wu.asked.isEmpty())
     }
 }

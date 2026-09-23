@@ -46,7 +46,7 @@ class RefreshWorker @AssistedInject constructor(
         // say so when they are returned to, which is what this app already does for a failed source.
         val place = (catalogue.byIstat(appSettings.placeIstat)
             ?: checkNotNull(catalogue.byIstat(SouthTyrol.DEFAULT_ISTAT)))
-            .withAmateurStation(appSettings.amateurStations)
+            .forSettings(appSettings)
         val result = try {
             repository.refresh(place, language)
         } catch (e: CancellationException) {
@@ -111,7 +111,7 @@ class RefreshWorker @AssistedInject constructor(
         // No connectivity service to ask is not a licence to spend somebody's data.
         val metered = connectivity?.isActiveNetworkMetered ?: true
         pinsToRefresh(current, except, metered).forEach { istat ->
-            val pinned = (catalogue.byIstat(istat) ?: return@forEach).withAmateurStation(current.amateurStations)
+            val pinned = (catalogue.byIstat(istat) ?: return@forEach).forSettings(current)
             try {
                 repository.refresh(pinned, language)
             } catch (e: CancellationException) {

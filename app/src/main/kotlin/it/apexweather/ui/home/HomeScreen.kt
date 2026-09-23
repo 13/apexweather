@@ -61,12 +61,13 @@ import java.time.Instant
 import java.time.LocalDate
 
 @Composable
-fun HomeScreen(onOpenBulletin: () -> Unit, onOpenPlaces: () -> Unit, viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeScreen(onOpenBulletin: () -> Unit, onOpenPlaces: () -> Unit, onOpenStations: () -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     HomeContent(
         state = state,
         onRefresh = viewModel::refresh,
         onOpenBulletin = onOpenBulletin,
+        onOpenStations = onOpenStations,
         onOpenPlaces = onOpenPlaces,
         onDismissWarning = viewModel::dismissWarning,
         onRestoreWarning = viewModel::restoreWarning,
@@ -81,6 +82,7 @@ fun HomeContent(
     onRefresh: () -> Unit,
     onOpenBulletin: () -> Unit,
     onOpenPlaces: () -> Unit = {},
+    onOpenStations: () -> Unit = {},
     onDismissWarning: (it.apexweather.domain.model.Warning) -> Unit = {},
     onRestoreWarning: (it.apexweather.domain.model.Warning) -> Unit = {},
     onShareRange: (ShareRange) -> Unit = {},
@@ -141,7 +143,12 @@ fun HomeContent(
                 // shows came from the station.
                 item {
                     AnimatedVisibility(appeared, enter = fadeIn(tween(700, 250)) + slideInVertically(tween(700, 250)) { it / 4 }) {
-                        StationSection(state.station, state.currentHour, state.settings.windUnit, state.now)
+                        StationSection(
+                            state.station, state.currentHour, state.settings.windUnit, state.now,
+                            // Only where there is a neighbourhood to show: without a key every row
+                            // would be an error about a missing key, which settings says once already.
+                            onOpenNearby = onOpenStations.takeIf { state.settings.wuApiKey != null },
+                        )
                     }
                 }
                 item { AttributionFooter() }

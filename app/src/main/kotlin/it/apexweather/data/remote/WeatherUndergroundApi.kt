@@ -39,8 +39,34 @@ interface WeatherUndergroundApi {
         @Query("apiKey") apiKey: String,
     ): Response<WuResponse>
 
+    /**
+     * The stations around a point, nearest first — ten of them, and no more however many exist.
+     *
+     * It omits some that answer perfectly well: ITIROL26 sits 0,68 km from Dorf Tirol and is not in
+     * the ten this returns, which is why `tools/generate-places.py` carries an override list.
+     */
+    @GET("v3/location/near?product=pws&format=json")
+    suspend fun near(
+        @Query("geocode") geocode: String,
+        @Query("apiKey") apiKey: String,
+    ): WuNearResponse
+
     companion object { const val BASE_URL = "https://api.weather.com/" }
 }
+
+/**
+ * Parallel arrays, which is how this endpoint answers: `stationId[i]` belongs with `distanceKm[i]`.
+ * Zipped at the point of use rather than trusted to stay aligned any further in.
+ */
+@Serializable
+data class WuNearResponse(val location: WuNearLocation = WuNearLocation())
+
+@Serializable
+data class WuNearLocation(
+    val stationId: List<String> = emptyList(),
+    val stationName: List<String?> = emptyList(),
+    val distanceKm: List<Double> = emptyList(),
+)
 
 @Serializable
 data class WuResponse(val observations: List<WuObservation> = emptyList())

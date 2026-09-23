@@ -21,6 +21,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
@@ -99,6 +100,7 @@ fun SettingsScreen(
         onWindUnit = viewModel::setWindUnit,
         onAnimations = viewModel::setAnimations,
         onAmateurStations = viewModel::setAmateurStations,
+        onWuApiKey = viewModel::setWuApiKey,
         onRefresh = onRefresh,
         placeName = placeName,
         onOpenPlaces = onOpenPlaces,
@@ -128,6 +130,7 @@ fun SettingsContent(
     onWindUnit: (WindUnit) -> Unit,
     onAnimations: (Boolean) -> Unit,
     onAmateurStations: (Boolean) -> Unit,
+    onWuApiKey: (String) -> Unit,
     onRefresh: () -> Unit,
     /** The chosen place, and the way to a different one. Empty until the catalogue has been read. */
     placeName: String = "",
@@ -225,6 +228,22 @@ fun SettingsContent(
                     checked = settings.amateurStations,
                     onCheckedChange = onAmateurStations,
                     modifier = Modifier.testTag("setting_amateur_stations"),
+                )
+            }
+
+            // Only while the feature is on: a key field under a switch that is off is a question
+            // about something that is not happening.
+            if (settings.amateurStations) {
+                OutlinedTextField(
+                    value = settings.wuApiKey.orEmpty(),
+                    onValueChange = onWuApiKey,
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.setting_wu_key)) },
+                    supportingText = { Text(stringResource(R.string.setting_wu_key_note)) },
+                    // Shown as typed rather than masked. It is a quota key for a free weather API
+                    // and not a password, and the one thing a reader does with it is paste it and
+                    // check by eye that it arrived whole.
+                    modifier = Modifier.fillMaxWidth().testTag("setting_wu_key"),
                 )
             }
 
