@@ -93,16 +93,26 @@ internal fun NavHostController.openTopLevel(route: Any) {
 internal const val COMPARE_SOURCE_KEY = "compare_source"
 
 /**
- * What a tab in the bar does. The comparison tab stays selected while the statistics show, and
- * [openTopLevel] would save and restore that same two-entry stack, so tapping it did nothing;
- * from there it pops back to the comparison instead.
+ * What a tab in the bar does.
+ *
+ * **A detail screen pushed on top of a tab keeps that tab selected**, and [openTopLevel] would
+ * then save and restore the very stack it is standing in — so the tab does nothing. From there the
+ * tab has to pop back to itself instead.
+ *
+ * This was written for one pair, the statistics sitting on the comparison tab, and naming that pair
+ * in an `if` was the mistake: the rule is about *any* detail screen on *any* tab. The stations
+ * screen sits on the home tab the same way, and since v0.32.0 on the settings tab as well, so
+ * tapping "Heute" while looking at it did nothing at all — reported from the phone on 2026-09-23.
+ *
+ * [popBackStack] returns whether it popped anything, which is exactly the question "is this tab
+ * already underneath me", so no list of pairs has to be kept anywhere. `NavDestination.hierarchy`
+ * is the wrong question and was tried first: it walks parent *graphs*, not the back stack, so from
+ * the statistics screen it does not contain the comparison route and the check was simply false.
  */
 internal fun NavHostController.selectTab(route: Any) {
-    if (route == CompareRoute && currentDestination?.hasRoute(StatsRoute::class) == true) {
-        popBackStack(CompareRoute, inclusive = false)
-    } else {
-        openTopLevel(route)
-    }
+    // Standing on it already: nothing to pop back to, and openTopLevel is what re-selects it.
+    if (currentDestination?.hasRoute(route::class) != true && popBackStack(route, inclusive = false)) return
+    openTopLevel(route)
 }
 
 /**
@@ -258,7 +268,14 @@ fun ApexApp() {
                     val compareVm: CompareViewModel = hiltViewModel()
                     // The statistics screen hands a source back on this entry's handle.
                     ReceiveSourceHandoff(entry, compareVm::openSource)
-                    CompareScreen(onOpenStats = dropUnlessResumed { nav.navigate(StatsRoute) }, viewModel = compareVm)
+                    CompareScreen(
+                        onOpenStats = dropUnlessResumed { nav.navigate(StatsRoute) },
+                        // The card is a way in as well as a read-out. Pushed onto the comparison
+                        // tab's own stack, so back returns here — and selectTab now brings any tab
+                        // back from a detail like this one.
+                        onOpenStations = dropUnlessResumed { nav.navigate(NearbyStationsRoute) },
+                        viewModel = compareVm,
+                    )
                 }
                 composable<NearbyStationsRoute> {
                     // Dropped unless resumed, so a double tap on the arrow pops once — the same

@@ -439,4 +439,11 @@
     <string name="settings_group_display">Anzeige</string>
     <string name="settings_group_stations">Stationen</string>
     <string name="settings_group_app">App</string>
+    <string name="compare_stations_now">Stationen jetzt</string>
+    <string name="compare_stations_temp">Temperatur °</string>
+    <string name="compare_stations_humidity">Feuchte %</string>
+    <string name="compare_stations_rain">Regen heute mm</string>
+    <string name="compare_stations_radiation">Strahlung W/m²</string>
+    <string name="compare_stations_read">gelesen</string>
+    <string name="compare_stations_models">Modelle hier</string>
 </resources>

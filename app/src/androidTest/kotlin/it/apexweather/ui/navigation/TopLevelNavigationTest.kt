@@ -47,6 +47,7 @@ class TopLevelNavigationTest {
             composable<StatsRoute> { Text("stats", Modifier.testTag("screen_stats")) }
             composable<BulletinRoute> { Text("bulletin", Modifier.testTag("screen_bulletin")) }
             composable<SettingsRoute> { Text("settings", Modifier.testTag("screen_settings")) }
+            composable<NearbyStationsRoute> { Text("stations", Modifier.testTag("screen_stations")) }
         }
     }
 
@@ -137,5 +138,45 @@ class TopLevelNavigationTest {
         rule.onNodeWithTag("screen_stats").assertIsDisplayed()
         rule.runOnIdle { nav.selectTab(CompareRoute) }
         rule.onNodeWithTag("screen_compare").assertIsDisplayed()
+    }
+
+    /**
+     * The stations screen is pushed onto whichever tab opened it, which keeps that tab selected —
+     * and `openTopLevel` then saves and restores the same two-entry stack, so the tab did nothing.
+     *
+     * Exactly the failure `selectTab` already documented for the statistics screen sitting on the
+     * comparison tab. Naming that one pair in an `if` was the mistake: the rule is about any detail
+     * screen pushed on top of a tab, and since v0.32.0 the stations screen can sit on two of them.
+     * Reported from the phone on 2026-09-23.
+     */
+    @Test
+    fun theHomeTabReturnsFromTheStationsScreen() {
+        show()
+        rule.runOnIdle { nav.navigate(NearbyStationsRoute) }
+        rule.onNodeWithTag("screen_stations").assertIsDisplayed()
+        rule.runOnIdle { nav.selectTab(HomeRoute) }
+        rule.onNodeWithTag("screen_home").assertIsDisplayed()
+    }
+
+    /** The same screen, opened from settings, and the same tab has to work. */
+    @Test
+    fun theHomeTabReturnsFromTheStationsScreenOpenedFromSettings() {
+        show()
+        open(SettingsRoute)
+        rule.runOnIdle { nav.navigate(NearbyStationsRoute) }
+        rule.onNodeWithTag("screen_stations").assertIsDisplayed()
+        rule.runOnIdle { nav.selectTab(HomeRoute) }
+        rule.onNodeWithTag("screen_home").assertIsDisplayed()
+    }
+
+    /** And the tab the detail was opened from still pops back to itself, as it always did. */
+    @Test
+    fun theSettingsTabReturnsFromTheStationsScreenItOpened() {
+        show()
+        open(SettingsRoute)
+        rule.runOnIdle { nav.navigate(NearbyStationsRoute) }
+        rule.onNodeWithTag("screen_stations").assertIsDisplayed()
+        rule.runOnIdle { nav.selectTab(SettingsRoute) }
+        rule.onNodeWithTag("screen_settings").assertIsDisplayed()
     }
 }

@@ -73,15 +73,21 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
-fun CompareScreen(onOpenStats: () -> Unit = {}, viewModel: CompareViewModel = hiltViewModel()) {
+fun CompareScreen(
+    onOpenStats: () -> Unit = {},
+    onOpenStations: () -> Unit = {},
+    viewModel: CompareViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val detail by viewModel.detail.collectAsStateWithLifecycle()
     val meta by viewModel.meta.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
+    val stationsNow by viewModel.stationsNow.collectAsStateWithLifecycle()
     CompareContent(
         state, viewModel::toggleSource, viewModel::setVariable, viewModel::setDay,
         onOpenSource = viewModel::openSource, detail = detail, meta = meta, onCloseSource = viewModel::closeSource,
         stats = stats, onOpenStats = onOpenStats,
+        stationsNow = stationsNow, onOpenStations = onOpenStations,
     )
 }
 
@@ -98,6 +104,8 @@ fun CompareContent(
     onCloseSource: () -> Unit = {},
     stats: CompareStats = CompareStats(),
     onOpenStats: () -> Unit = {},
+    stationsNow: StationsNowUiState = StationsNowUiState(),
+    onOpenStations: () -> Unit = {},
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val locale = LocalConfiguration.current.locales[0]
@@ -196,6 +204,16 @@ fun CompareContent(
                     }
                 }
             }
+        }
+        item {
+            // After the models have had their say and before the scoring: "and here is what the
+            // ground actually reports", which is the question the day table leaves a reader with.
+            StationsNowCard(
+                stationsNow,
+                onOpenStations = onOpenStations,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                now = state.now,
+            )
         }
         item {
             StatsCard(stats.card, state.settings.windUnit, onOpenStats, Modifier.fillMaxWidth().padding(horizontal = 16.dp))

@@ -56,6 +56,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.IOException
 import java.time.Instant
+import it.apexweather.data.NearbyStationsRepository
 
 /**
  * `openSource`/`closeSource` and the meta fetch they drive — untested until now, unlike the state
@@ -130,6 +131,11 @@ class CompareViewModelTest {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T = CompareViewModel(
                     holder, settings, handle, metaRepository, weatherRepository,
+                    // No key in these tests, so the neighbourhood is null and the card stays empty:
+                    // this ViewModel's other flows must not wait on a network that is not there.
+                    NearbyStationsRepository(
+                        FakeWeatherUnderground(), WuKeySource { null }, FakeOpenMeteo(), MutableClock(Instant.EPOCH),
+                    ),
                 ) as T
             },
         )[CompareViewModel::class.java]

@@ -430,4 +430,11 @@
     <string name="settings_group_display">Display</string>
     <string name="settings_group_stations">Stations</string>
     <string name="settings_group_app">App</string>
+    <string name="compare_stations_now">Stations now</string>
+    <string name="compare_stations_temp">Temperature °</string>
+    <string name="compare_stations_humidity">Humidity %</string>
+    <string name="compare_stations_rain">Rain today mm</string>
+    <string name="compare_stations_radiation">Radiation W/m²</string>
+    <string name="compare_stations_read">read</string>
+    <string name="compare_stations_models">Models here</string>
 </resources>
