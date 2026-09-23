@@ -435,4 +435,8 @@
     <string name="wu_key_refused">abgelehnt — Schlüssel prüfen</string>
     <string name="wu_key_over_quota">Tageskontingent erschöpft</string>
     <string name="wu_key_offline">keine Verbindung — nicht geprüft</string>
+    <string name="settings_group_place">Ort und Sprache</string>
+    <string name="settings_group_display">Anzeige</string>
+    <string name="settings_group_stations">Stationen</string>
+    <string name="settings_group_app">App</string>
 </resources>

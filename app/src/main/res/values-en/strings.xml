@@ -426,4 +426,8 @@
     <string name="wu_key_refused">refused — check the key</string>
     <string name="wu_key_over_quota">daily quota used up</string>
     <string name="wu_key_offline">no connection — not checked</string>
+    <string name="settings_group_place">Place and language</string>
+    <string name="settings_group_display">Display</string>
+    <string name="settings_group_stations">Stations</string>
+    <string name="settings_group_app">App</string>
 </resources>

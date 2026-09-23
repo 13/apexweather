@@ -441,4 +441,8 @@
     <string name="wu_key_refused">rifiutata — controlla la chiave</string>
     <string name="wu_key_over_quota">quota giornaliera esaurita</string>
     <string name="wu_key_offline">nessuna connessione — non verificata</string>
+    <string name="settings_group_place">Luogo e lingua</string>
+    <string name="settings_group_display">Visualizzazione</string>
+    <string name="settings_group_stations">Stazioni</string>
+    <string name="settings_group_app">App</string>
 </resources>

@@ -286,6 +286,11 @@ fun ApexApp() {
                             )
                         },
                         placeName = homeState.place?.name(LocalConfiguration.current.locales[0]).orEmpty(),
+                        // The same gate as the home screen's entrance, read from the same place:
+                        // no key, no neighbourhood to list. A detail pushed onto the Settings back
+                        // stack rather than a top-level destination, so back returns here.
+                        onOpenStations = dropUnlessResumed { nav.navigate(NearbyStationsRoute) }
+                            .takeIf { homeState.settings.wuApiKey != null },
                         viewModel = settingsVm,
                         updateSection = { UpdateSection() },
                     )

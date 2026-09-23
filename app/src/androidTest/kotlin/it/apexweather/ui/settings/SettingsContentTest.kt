@@ -31,12 +31,15 @@ class SettingsContentTest {
         onNotifySummary: (Boolean) -> Unit = {},
         onNotifySummaryHour: (Int) -> Unit = {},
         onWuApiKey: (String) -> Unit = {},
+        onRefresh: () -> Unit = {},
+        onOpenStations: (() -> Unit)? = {},
     ) = rule.setContent {
         ApexTheme {
             SettingsContent(
                 settings = settings,
                 onLanguage = {}, onWindUnit = {}, onAnimations = {}, onAmateurStations = {},
-                onWuApiKey = onWuApiKey, onRefresh = {},
+                onWuApiKey = onWuApiKey, onRefresh = onRefresh,
+                onOpenStations = onOpenStations,
                 notificationsAllowed = notificationsAllowed,
                 onNotifySummary = onNotifySummary,
                 onNotifySummaryHour = onNotifySummaryHour,
@@ -213,5 +216,41 @@ class SettingsContentTest {
         show(AppSettings(amateurStations = true), onWuApiKey = { typed = it })
         rule.onNodeWithTag("setting_wu_key").performTextInput("abc123")
         assertEquals("abc123", typed)
+    }
+
+    /** Five groups, and the reader should be able to see which is which. */
+    @Test
+    fun theGroupHeadingsAreOnScreen() {
+        show()
+        listOf("group_place", "group_display", "group_stations", "notification_settings", "group_app")
+            .forEach { rule.onNodeWithTag(it).performScrollTo().assertIsDisplayed() }
+    }
+
+    /**
+     * The way to the stations screen, where somebody goes looking for it. It is otherwise reachable
+     * only from the station card four scrolls down the home screen.
+     */
+    @Test
+    fun theStationsRowIsOfferedWhenThereIsSomewhereToGo() {
+        var opened = false
+        show(AppSettings(amateurStations = true, wuApiKey = "k"), onOpenStations = { opened = true })
+        rule.onNodeWithTag("settings_nearby_stations").performScrollTo().performClick()
+        assertTrue("the stations row did not report", opened)
+    }
+
+    /** No key, no neighbourhood to list, so no row promising one. */
+    @Test
+    fun theStationsRowIsAbsentWithoutSomewhereToGo() {
+        show(AppSettings(amateurStations = true, wuApiKey = "k"), onOpenStations = null)
+        rule.onNodeWithTag("settings_nearby_stations").assertDoesNotExist()
+    }
+
+    /** Refreshing is a row in the App group now, not a filled button in the middle of the page. */
+    @Test
+    fun refreshingIsStillReachable() {
+        var refreshed = false
+        show(onRefresh = { refreshed = true })
+        rule.onNodeWithTag("refresh_now").performScrollTo().performClick()
+        assertTrue("the refresh row did not report", refreshed)
     }
 }
