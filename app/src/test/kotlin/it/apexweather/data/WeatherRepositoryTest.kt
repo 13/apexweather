@@ -83,10 +83,13 @@ class WeatherRepositoryTest {
     private val clock = MutableClock(Instant.parse("2026-09-08T14:00:00Z"))
     private lateinit var repo: WeatherRepository
 
+    /** What the repository reported about the key, in order. */
+    private val verdicts = mutableListOf<WuKeyVerdict>()
+
     @Before fun setUp() {
         db = AppDatabase.inMemory(ApplicationProvider.getApplicationContext())
         history = HistoryDatabase.inMemory(ApplicationProvider.getApplicationContext())
-        repo = WeatherRepository(db.weatherDao(), history.stationHistoryDao(), openMeteo, geoSphere, siag, wu, WuKeySource { key }, odh, meteoAlarm, ensemble, Fixtures.json, clock)
+        repo = WeatherRepository(db.weatherDao(), history.stationHistoryDao(), openMeteo, geoSphere, siag, wu, WuKeySource { key }, WuKeyReporter { verdicts += it }, odh, meteoAlarm, ensemble, Fixtures.json, clock)
     }
 
     @After fun tearDown() {
@@ -292,7 +295,7 @@ class WeatherRepositoryTest {
     fun `a store failure is isolated and the refresh still records its meta`() = runTest {
         val failing = WeatherRepository(
             FailingStoreDao(db.weatherDao(), Source.GEOSPHERE_AROME.name), history.stationHistoryDao(),
-            openMeteo, geoSphere, siag, wu, WuKeySource { key }, odh, meteoAlarm, ensemble, Fixtures.json, clock,
+            openMeteo, geoSphere, siag, wu, WuKeySource { key }, WuKeyReporter { verdicts += it }, odh, meteoAlarm, ensemble, Fixtures.json, clock,
         )
         val result = failing.refresh(DORF_TIROL, "de")
         assertEquals("store: disk full", result.failed["GEOSPHERE_AROME"])
@@ -754,6 +757,30 @@ class WeatherRepositoryTest {
         assertEquals("test-key", wu.askedKeys.last())
     }
 
+    /**
+     * The ordinary fetch is what keeps the settings line honest between explicit checks.
+     *
+     * A key is checked once, when it is typed, and then works for months — until it is revoked, or
+     * the day's 1500 requests run out at four in the afternoon. Neither of those re-checks itself,
+     * so the path that uses the key every hour is the one that has to report what it saw.
+     */
+    @Test
+    fun `an answered amateur fetch reports that the key is good`() = runTest {
+        repo.refresh(DORF_TIROL_WITH_PWS, "de")
+        assertEquals(listOf(WuKeyVerdict.GOOD), verdicts)
+    }
+
+    /** No key, no request, and therefore nothing observed about a key that does not exist. */
+    @Test
+    fun `a place with no key reports nothing about it`() = runTest {
+        val keyless = WeatherRepository(
+            db.weatherDao(), history.stationHistoryDao(), openMeteo, geoSphere, siag, wu,
+            WuKeySource { null }, WuKeyReporter { verdicts += it }, odh, meteoAlarm, ensemble, Fixtures.json, clock,
+        )
+        keyless.refresh(DORF_TIROL_WITH_PWS, "de")
+        assertTrue(verdicts.isEmpty())
+    }
+
     /** No amateur station in the catalogue means no request at all, not a request that fails. */
     @Test
     fun `a place with no amateur station never asks`() = runTest {
@@ -769,7 +796,7 @@ class WeatherRepositoryTest {
     fun `with no key the amateur station is never requested`() = runTest {
         val keyless = WeatherRepository(
             db.weatherDao(), history.stationHistoryDao(), openMeteo, geoSphere, siag, wu,
-            WuKeySource { null }, odh, meteoAlarm, ensemble, Fixtures.json, clock,
+            WuKeySource { null }, WuKeyReporter { verdicts += it }, odh, meteoAlarm, ensemble, Fixtures.json, clock,
         )
         keyless.refresh(DORF_TIROL_WITH_PWS, "de")
         assertTrue(wu.asked.isEmpty())

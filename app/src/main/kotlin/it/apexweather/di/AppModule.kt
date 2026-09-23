@@ -95,6 +95,16 @@ object AppModule {
      */
     @Provides fun wuKey(settings: it.apexweather.data.SettingsRepository): it.apexweather.data.WuKeySource =
         it.apexweather.data.WuKeySource { settings.settings.first().wuApiKey }
+
+    @Provides @Singleton
+    fun wuKeyReporter(settings: it.apexweather.data.SettingsRepository): it.apexweather.data.WuKeyReporter =
+        it.apexweather.data.WuKeyReporter { verdict ->
+            // CHECKING is transient and carries no time; the rest stamp the moment they were reached.
+            settings.setWuKeyVerdict(
+                verdict,
+                if (verdict == it.apexweather.data.WuKeyVerdict.CHECKING) null else System.currentTimeMillis(),
+            )
+        }
     // Returns the Atom feed as a raw body: Retrofit hands ResponseBody back without a converter,
     // and MeteoAlarmMapper does the XML parsing.
     @Provides @Singleton fun ensemble(c: OkHttpClient, j: Json): EnsembleApi = retrofit(EnsembleApi.BASE_URL, c, j).create(EnsembleApi::class.java)

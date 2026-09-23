@@ -197,7 +197,7 @@ class BiasAccumulationTest {
         repo = WeatherRepository(
             db.weatherDao(), history.stationHistoryDao(), Models(), NoGeoSphere(), Station(),
             // No amateur station in this test's catalogue, so this is never called.
-            FakeWeatherUnderground(), WuKeySource { null }, NoOdh(), NoMeteoAlarm(), NoEnsemble(), Fixtures.json, clock,
+            FakeWeatherUnderground(), WuKeySource { null }, WuKeyReporter {}, NoOdh(), NoMeteoAlarm(), NoEnsemble(), Fixtures.json, clock,
         )
     }
 

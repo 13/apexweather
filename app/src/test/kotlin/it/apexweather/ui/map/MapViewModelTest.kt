@@ -12,6 +12,7 @@ import it.apexweather.data.FakeOdh
 import it.apexweather.data.FakeOpenMeteo
 import it.apexweather.data.FakeSiag
 import it.apexweather.data.FakeWeatherUnderground
+import it.apexweather.data.WuKeyReporter
 import it.apexweather.data.WuKeySource
 import it.apexweather.data.MutableClock
 import it.apexweather.data.NowcastRepository
@@ -178,7 +179,7 @@ class MapViewModelTest {
         val scope = CoroutineScope(UnconfinedTestDispatcher())
         val holder = WeatherStateHolder(
             WeatherRepository(
-                db.weatherDao(), history.stationHistoryDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeWeatherUnderground(), WuKeySource { null }, FakeOdh(),
+                db.weatherDao(), history.stationHistoryDao(), FakeOpenMeteo(), FakeGeoSphere(), FakeSiag(), FakeWeatherUnderground(), WuKeySource { null }, WuKeyReporter {}, FakeOdh(),
                 FakeMeteoAlarm(), FakeEnsemble(), Fixtures.json, clock,
             ),
             settings, PlaceCatalogue(context), WarningDismissals(context),
