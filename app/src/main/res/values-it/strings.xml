@@ -115,10 +115,7 @@
     <string name="setting_wu_key">Chiave Weather Underground</string>
     <string name="setting_wu_key_note">Gratuita per chi gestisce una propria stazione. Senza chiave l\'app legge solo la rete provinciale.</string>
     <string name="stations_title">Stazioni nelle vicinanze</string>
-    <string name="stations_chosen">scelta</string>
-    <string name="stations_provincial">Rete provinciale</string>
     <string name="stations_quiet">nessun dato</string>
-    <string name="stations_altitude_unverified">Quota non plausibile</string>
     <string name="stations_no_key">Nessuna chiave Weather Underground impostata.</string>
     <string name="stations_open">Stazioni nelle vicinanze</string>
     <string name="refresh_now">Aggiorna ora</string>
@@ -430,4 +427,18 @@
     <string name="share_range_today">Oggi</string>
     <string name="share_range_3">3 giorni</string>
     <string name="share_range_7">7 giorni</string>
+    <string name="stations_choose">Scegli</string>
+    <string name="stations_in_use">in uso</string>
+    <string name="stations_code">Codice %1$s</string>
+    <string name="stations_private_heading">Stazioni private</string>
+    <string name="stations_official_heading">Rete provinciale</string>
+    <string name="stations_height_disputed">Quota dichiarata molto diversa dal terreno</string>
+    <string name="stations_height_both">%1$s → %2$s</string>
+    <string name="stations_heights_unknown">Quote del terreno non disponibili: per ora non si può scegliere una stazione.</string>
+    <string name="stations_no_horizon">Nessun profilo dell\'orizzonte: alba e tramonto calcolati senza montagne.</string>
+    <string name="wu_key_checking">verifica in corso …</string>
+    <string name="wu_key_good">valida · verificata alle %1$s</string>
+    <string name="wu_key_refused">rifiutata — controlla la chiave</string>
+    <string name="wu_key_over_quota">quota giornaliera esaurita</string>
+    <string name="wu_key_offline">nessuna connessione — non verificata</string>
 </resources>
