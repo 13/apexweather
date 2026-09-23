@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -29,6 +30,8 @@ class SettingsRepositoryTest {
         repo.setLanguage(LanguageSetting.SYSTEM)
         repo.setWindUnit(WindUnit.KMH)
         repo.setAnimations(true)
+        repo.setAmateurStations(true)
+        repo.setWuApiKey("")
         repo.setCompareSources(Source.entries.toSet())
         repo.setCompareVariable(CompareVariable.TEMPERATURE)
         // Pins are a list on the same shared file, so they leak between methods exactly as the rest
@@ -244,5 +247,27 @@ class SettingsRepositoryTest {
 
         repo.setShareRange(it.apexweather.ui.share.ShareRange.SEVEN_DAYS)
         assertEquals(it.apexweather.ui.share.ShareRange.SEVEN_DAYS, repo.settings.first().shareRange)
+    }
+
+    @Test
+    fun `the weather underground key round-trips`() = runTest {
+        repo.setWuApiKey("abc123")
+        assertEquals("abc123", repo.settings.first().wuApiKey)
+    }
+
+    /**
+     * Blank reads back as absent, so every consumer has one condition to check rather than two. A
+     * reader who clears the field has removed their key, and "" is how a text field says that.
+     */
+    @Test
+    fun `a blank key reads back as absent`() = runTest {
+        repo.setWuApiKey("abc123")
+        repo.setWuApiKey("   ")
+        assertNull(repo.settings.first().wuApiKey)
+    }
+
+    @Test
+    fun `no key by default`() = runTest {
+        assertNull(repo.settings.first().wuApiKey)
     }
 }

@@ -51,6 +51,22 @@ data class AppSettings(
      * how they say so. With it off the app reads the provincial network exactly as it always did.
      */
     val amateurStations: Boolean = true,
+    /**
+     * The reader's Weather Underground contributor key, or null where they have given none.
+     *
+     * Free to anyone who runs their own station and uploads to it, capped at 1500 requests a day.
+     * Without it the amateur path is off and every place reads the provincial network, which is
+     * what the app did before this existed.
+     *
+     * Stored in DataStore like every other preference, which means **plaintext in the app's own
+     * storage**. Said here rather than left implied: it is a credential, it is readable by anything
+     * with root or a copy of the data directory, and encrypting this one preference while the rest
+     * sit beside it in the clear would be a gesture rather than a defence.
+     *
+     * Null rather than empty when unset *or blank*, so every consumer has one condition and not
+     * two — and clearing the field is how a reader says they have taken their key back.
+     */
+    val wuApiKey: String? = null,
     val compareSources: Set<Source> = Source.entries.toSet(),
     val compareVariable: CompareVariable = CompareVariable.TEMPERATURE,
     /**
@@ -122,6 +138,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val windUnit = stringPreferencesKey("wind_unit")
         val animations = booleanPreferencesKey("animations")
         val amateurStations = booleanPreferencesKey("amateur_stations")
+        val wuApiKey = stringPreferencesKey("wu_api_key")
         // The sources the reader has switched **off**, not the ones left on.
         //
         // Storing the visible set froze the list at whatever existed when they last touched it: add
@@ -154,6 +171,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             windUnit = p[Keys.windUnit]?.let { runCatching { WindUnit.valueOf(it) }.getOrNull() } ?: WindUnit.KMH,
             animations = p[Keys.animations] ?: true,
             amateurStations = p[Keys.amateurStations] ?: true,
+            wuApiKey = p[Keys.wuApiKey]?.takeIf { it.isNotBlank() },
             compareSources = visibleSources(p[Keys.hiddenCompareSources]),
             compareVariable = p[Keys.compareVariable]?.let { runCatching { CompareVariable.valueOf(it) }.getOrNull() }
                 ?: CompareVariable.TEMPERATURE,
@@ -175,6 +193,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     suspend fun setWindUnit(v: WindUnit) = context.settingsStore.edit { it[Keys.windUnit] = v.name }
     suspend fun setAnimations(v: Boolean) = context.settingsStore.edit { it[Keys.animations] = v }
     suspend fun setAmateurStations(v: Boolean) = context.settingsStore.edit { it[Keys.amateurStations] = v }
+    suspend fun setWuApiKey(v: String) = context.settingsStore.edit { it[Keys.wuApiKey] = v }
     suspend fun setCompareSources(v: Set<Source>) = context.settingsStore.edit {
         it[Keys.hiddenCompareSources] = (Source.entries.toSet() - v).map { s -> s.name }.toSet()
     }
