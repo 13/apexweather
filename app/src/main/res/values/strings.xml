@@ -106,9 +106,9 @@
     <string name="map_up_to">bis %1$s mm/h</string>
     <string name="map_legend_moderate">mäßig</string>
     <string name="settings">Einstellungen</string>
-    <string name="setting_language">SPRACHE</string>
+    <string name="setting_language">Sprache</string>
     <string name="lang_system">System</string>
-    <string name="setting_wind">WINDEINHEIT</string>
+    <string name="setting_wind">Windeinheit</string>
     <string name="setting_animations">Himmel animieren</string>
     <string name="setting_amateur_stations">Private Wetterstationen</string>
     <string name="setting_amateur_stations_note">Näher oder auf der Höhe des Ortes, aber von niemandem gewartet. Aus: nur das Landesmessnetz.</string>
@@ -250,7 +250,7 @@
     <string name="notif_rain_title">%1$s ab %2$s</string>
     <string name="notif_rain_text">%1$d %% Wahrscheinlichkeit · %2$s erwartet</string>
     <string name="notif_warning_text">%1$s · %2$s</string>
-    <string name="setting_notifications">MITTEILUNGEN</string>
+    <string name="setting_notifications">Mitteilungen</string>
     <string name="setting_notif_summary">Morgenübersicht</string>
     <string name="setting_notif_summary_time">Um %1$s</string>
     <string name="setting_notif_rain">Regen zieht auf</string>
@@ -274,7 +274,7 @@
     <string name="place_row_desc">%1$s, %2$s, Bezirk %3$s</string>
     <string name="place_selected">Aktuell gewählt</string>
     <string name="change_place">Ort wechseln</string>
-    <string name="setting_place">ORT</string>
+    <string name="setting_place">Ort</string>
     <string name="back">Zurück</string>
     <string name="district_1">Bozen, Überetsch und Unterland</string>
     <string name="district_2">Burggrafenamt</string>
@@ -435,4 +435,8 @@
     <string name="wu_key_refused">abgelehnt — Schlüssel prüfen</string>
     <string name="wu_key_over_quota">Tageskontingent erschöpft</string>
     <string name="wu_key_offline">keine Verbindung — nicht geprüft</string>
+    <string name="settings_group_place">Ort und Sprache</string>
+    <string name="settings_group_display">Anzeige</string>
+    <string name="settings_group_stations">Stationen</string>
+    <string name="settings_group_app">App</string>
 </resources>

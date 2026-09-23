@@ -1,66 +1,20 @@
 package it.apexweather.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.runtime.Composable
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
-import it.apexweather.BuildConfig
-import it.apexweather.R
-import it.apexweather.ui.common.CompactLabel
-import it.apexweather.data.AppSettings
 import it.apexweather.data.LanguageSetting
-import it.apexweather.data.WindUnit
-import it.apexweather.ui.common.Format
-import it.apexweather.ui.common.LocalFormats
-import it.apexweather.data.WuKeyVerdict
-import it.apexweather.domain.SouthTyrol
-import java.time.Instant
 
 /**
  * Settings as a destination of its own, which is what it should always have been.
@@ -68,8 +22,10 @@ import java.time.Instant
  * It was a `ModalBottomSheet` opened from the bottom bar — an action rather than a place, so its
  * bar item could never be *selected*, the back button dismissed it instead of going anywhere, and
  * `ApexApp` carried forty lines of notification-permission plumbing that belong to this screen and
- * to nothing else. Being a destination also ends the sheet's own quarrel with its scroll, described
- * in [SettingsContent].
+ * to nothing else.
+ *
+ * What is left here is the wiring and that permission. The page itself is [SettingsContent], the
+ * rows it is built from are in `SettingsRows.kt`, and the notification group is its own file.
  *
  * The permission is asked for from here and re-read afterwards: Android answers in its own dialog,
  * and on a refusal the hint has to come back rather than the screen claiming the switch took
@@ -83,6 +39,8 @@ fun SettingsScreen(
     /** Applying a language is the caller's business: it restarts the activity's locale list. */
     onLanguage: (LanguageSetting) -> Unit,
     placeName: String,
+    /** Null where there is nothing to open — no key, so no neighbourhood to list. */
+    onOpenStations: (() -> Unit)? = null,
     viewModel: SettingsViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
     updateSection: @Composable () -> Unit = {},
 ) {
@@ -108,6 +66,7 @@ fun SettingsScreen(
         onRefresh = onRefresh,
         placeName = placeName,
         onOpenPlaces = onOpenPlaces,
+        onOpenStations = onOpenStations,
         notificationsAllowed = notificationsAllowed,
         onRequestNotifications = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -124,284 +83,4 @@ fun SettingsScreen(
         onNotifyWarnings = viewModel::setNotifyWarnings,
         updateSection = updateSection,
     )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SettingsContent(
-    settings: AppSettings,
-    onLanguage: (LanguageSetting) -> Unit,
-    onWindUnit: (WindUnit) -> Unit,
-    onAnimations: (Boolean) -> Unit,
-    onAmateurStations: (Boolean) -> Unit,
-    onWuApiKey: (String) -> Unit,
-    onRefresh: () -> Unit,
-    /** The chosen place, and the way to a different one. Empty until the catalogue has been read. */
-    placeName: String = "",
-    onOpenPlaces: () -> Unit = {},
-    /**
-     * Notifications. Defaulted so a test, or any caller that does not care, can leave them out; the
-     * switches then still render and simply lead nowhere.
-     */
-    notificationsAllowed: Boolean = true,
-    onRequestNotifications: () -> Unit = {},
-    onNotifySummary: (Boolean) -> Unit = {},
-    onNotifySummaryHour: (Int) -> Unit = {},
-    onNotifyRain: (Boolean) -> Unit = {},
-    onNotifyWarnings: (Boolean) -> Unit = {},
-    /**
-     * The in-app update row, passed in as a slot so this file imports nothing from the update
-     * package. That keeps the feature removable in one piece, which matters because the permission
-     * it needs is restricted on the Play Store.
-     */
-    updateSection: @Composable () -> Unit = {},
-) {
-    Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize().testTag("settings_screen")) {
-        // Language, wind, animations, three notification switches and their hour, the update row and
-        // the build lines run past a phone screen in landscape or at a large font scale, so the
-        // column scrolls. It did as a sheet too, where it had to: ModalBottomSheet handed a downward
-        // drag to the inner scroll first, so once the reader had scrolled, dragging the sheet down
-        // scrolled the content back instead of dismissing. A destination has no such argument with
-        // itself, which is half of why this stopped being a sheet.
-        Column(
-            Modifier.verticalScroll(rememberScrollState())
-                .navigationBarsPadding().padding(horizontal = 24.dp).padding(top = 24.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineMedium)
-
-            // First, because it is the setting that changes everything else on the screen.
-            Text(stringResource(R.string.setting_place), style = MaterialTheme.typography.labelSmall)
-            Row(
-                Modifier.fillMaxWidth()
-                    .clickable(onClickLabel = stringResource(R.string.change_place), onClick = onOpenPlaces)
-                    .padding(vertical = 8.dp)
-                    .testTag("settings_place"),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(placeName, style = MaterialTheme.typography.bodyLarge)
-                Icon(Icons.Filled.ChevronRight, contentDescription = null)
-            }
-
-            Text(stringResource(R.string.setting_language), style = MaterialTheme.typography.labelSmall)
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                LanguageSetting.entries.forEachIndexed { i, l ->
-                    // icon = {} for the reason given on the comparison screen's row: the reserved
-                    // tick costs every segment about 24 dp, and the fill already says which is on.
-                    SegmentedButton(selected = settings.language == l, onClick = { onLanguage(l) }, shape = SegmentedButtonDefaults.itemShape(i, LanguageSetting.entries.size), icon = {}) {
-                        // "System" beside three two-letter codes; see CompactLabel.
-                        CompactLabel {
-                            Text(
-                                when (l) { LanguageSetting.SYSTEM -> stringResource(R.string.lang_system); LanguageSetting.DE -> "DE"; LanguageSetting.IT -> "IT"; LanguageSetting.EN -> "EN" },
-                                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-
-            Text(stringResource(R.string.setting_wind), style = MaterialTheme.typography.labelSmall)
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                WindUnit.entries.forEachIndexed { i, u ->
-                    SegmentedButton(selected = settings.windUnit == u, onClick = { onWindUnit(u) }, shape = SegmentedButtonDefaults.itemShape(i, WindUnit.entries.size), icon = {}) {
-                        CompactLabel { Text(if (u == WindUnit.KMH) "km/h" else "m/s", maxLines = 1) }
-                    }
-                }
-            }
-
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.setting_animations), style = MaterialTheme.typography.bodyLarge)
-                Switch(checked = settings.animations, onCheckedChange = onAnimations)
-            }
-
-            // The label alone would not say what the switch costs. A private station is usually the
-            // better thermometer — it is only in the catalogue at all because it beat the province's
-            // on eight weeks of measured stability — but it is one nobody maintains, and the second
-            // line is what lets a reader who can see out of the window make that call.
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                    Text(stringResource(R.string.setting_amateur_stations), style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        stringResource(R.string.setting_amateur_stations_note),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = settings.amateurStations,
-                    onCheckedChange = onAmateurStations,
-                    modifier = Modifier.testTag("setting_amateur_stations"),
-                )
-            }
-
-            // Only while the feature is on: a key field under a switch that is off is a question
-            // about something that is not happening.
-            if (settings.amateurStations) {
-                // The field keeps its own text and never reads back what it just wrote. Driving
-                // `value` from `settings.wuApiKey` meant every keystroke went out to DataStore and
-                // came back a recomposition later, so the next character was committed against a
-                // stale value and a stale cursor: measured on the phone on 2026-09-23, the same
-                // 32-character key typed one character at a time (450 ms apart, which is not fast)
-                // arrived as "b2dfb3ef31f40bcadf8ef31f30bc603" — reordered, one short, three times
-                // out of three, while the place picker's search box, which holds its own state,
-                // took the identical input exactly. A key is the one string in this app nobody can
-                // proof-read, so a character out of place is silent and the app simply reads no
-                // station. Pasting hid it, because a paste is a single commit.
-                var typed by rememberSaveable { mutableStateOf(settings.wuApiKey.orEmpty()) }
-                // A change this field did not make — the store's first emission, or a key cleared
-                // somewhere else — is still adopted; an echo of our own write is not.
-                var sent by rememberSaveable { mutableStateOf(typed) }
-                LaunchedEffect(settings.wuApiKey) {
-                    val stored = settings.wuApiKey.orEmpty()
-                    if (stored != sent) {
-                        typed = stored
-                        sent = stored
-                    }
-                }
-                OutlinedTextField(
-                    value = typed,
-                    onValueChange = { typed = it; sent = it; onWuApiKey(it) },
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.setting_wu_key)) },
-                    supportingText = { Text(stringResource(R.string.setting_wu_key_note)) },
-                    // Shown as typed rather than masked. It is a quota key for a free weather API
-                    // and not a password, and the one thing a reader does with it is paste it and
-                    // check by eye that it arrived whole.
-                    modifier = Modifier.fillMaxWidth().testTag("setting_wu_key"),
-                )
-                // What the app last saw happen to this key, rather than what the reader hopes.
-                // Three failures and not one, because a refusal wants re-typing, an exhausted quota
-                // wants waiting, and a dropped connection wants nothing at all.
-                val verdict = when (settings.wuKeyVerdict) {
-                    WuKeyVerdict.UNCHECKED -> null
-                    WuKeyVerdict.CHECKING -> stringResource(R.string.wu_key_checking)
-                    WuKeyVerdict.GOOD -> stringResource(
-                        R.string.wu_key_good,
-                        settings.wuKeyCheckedAtMs
-                            ?.let { Format.time(Instant.ofEpochMilli(it), SouthTyrol.ZONE, LocalFormats.current) }
-                            .orEmpty(),
-                    )
-                    WuKeyVerdict.REFUSED -> stringResource(R.string.wu_key_refused)
-                    WuKeyVerdict.OVER_QUOTA -> stringResource(R.string.wu_key_over_quota)
-                    WuKeyVerdict.OFFLINE -> stringResource(R.string.wu_key_offline)
-                }
-                verdict?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = when (settings.wuKeyVerdict) {
-                            WuKeyVerdict.GOOD -> MaterialTheme.colorScheme.primary
-                            WuKeyVerdict.CHECKING -> MaterialTheme.colorScheme.onSurfaceVariant
-                            else -> MaterialTheme.colorScheme.error
-                        },
-                        modifier = Modifier.padding(start = 16.dp).testTag("wu_key_verdict"),
-                    )
-                }
-            }
-
-            NotificationSettings(
-                settings = settings,
-                allowed = notificationsAllowed,
-                onRequestPermission = onRequestNotifications,
-                onSummary = onNotifySummary,
-                onSummaryHour = onNotifySummaryHour,
-                onRain = onNotifyRain,
-                onWarnings = onNotifyWarnings,
-            )
-
-            // It used to close the sheet on the way, because a refresh behind a sheet is a refresh
-            // the reader cannot see. A destination does not need to get out of its own way.
-            Button(onClick = onRefresh, modifier = Modifier.fillMaxWidth().testTag("refresh_now")) {
-                Text(stringResource(R.string.refresh_now))
-            }
-
-            updateSection()
-
-            Spacer(Modifier.height(4.dp))
-            Text(stringResource(R.string.about, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyMedium)
-            // Selectable so the exact build can be copied into a bug report.
-            SelectionContainer {
-                Column(Modifier.testTag("about_build")) {
-                    Text(
-                        stringResource(R.string.about_build, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE, BuildConfig.BUILD_TYPE),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                    Text(
-                        stringResource(R.string.about_commit, BuildConfig.GIT_HASH, BuildConfig.GIT_DATE),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-            }
-            Text(stringResource(R.string.attribution), style = MaterialTheme.typography.labelSmall)
-        }
-    }
-}
-
-/**
- * The three notification switches.
- *
- * Android's permission is asked for only once something has been switched on: a settings sheet that
- * demands permission before the reader has expressed any interest is the pattern this avoids.
- */
-@Composable
-private fun NotificationSettings(
-    settings: AppSettings,
-    allowed: Boolean,
-    onRequestPermission: () -> Unit,
-    onSummary: (Boolean) -> Unit,
-    onSummaryHour: (Int) -> Unit,
-    onRain: (Boolean) -> Unit,
-    onWarnings: (Boolean) -> Unit,
-) {
-    val formats = LocalFormats.current
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("notification_settings")) {
-        Text(stringResource(R.string.setting_notifications), style = MaterialTheme.typography.labelSmall)
-
-        SwitchRow(stringResource(R.string.setting_notif_summary), settings.notifySummary, "notify_summary", onSummary)
-        if (settings.notifySummary) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.setting_notif_summary_time, Format.hourOfDay(settings.notifySummaryHour, formats)),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.testTag("notify_summary_hour"),
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Wrapping rather than clamping: 0 is the hour before 23, and a reader stepping
-                    // down from midnight means late evening, not "stay at midnight".
-                    FilledTonalIconButton(onClick = { onSummaryHour((settings.notifySummaryHour + 23) % 24) }, modifier = Modifier.testTag("notify_hour_down")) {
-                        Icon(Icons.Filled.Remove, contentDescription = null)
-                    }
-                    FilledTonalIconButton(onClick = { onSummaryHour((settings.notifySummaryHour + 1) % 24) }, modifier = Modifier.testTag("notify_hour_up")) {
-                        Icon(Icons.Filled.Add, contentDescription = null)
-                    }
-                }
-            }
-        }
-
-        SwitchRow(stringResource(R.string.setting_notif_rain), settings.notifyRain, "notify_rain", onRain)
-        SwitchRow(stringResource(R.string.setting_notif_warning), settings.notifyWarnings, "notify_warning", onWarnings)
-
-        // Only worth saying once something is switched on and Android is still in the way.
-        if (settings.anyNotification && !allowed) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.setting_notif_permission),
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.weight(1f).testTag("notify_permission_hint"),
-                )
-                Button(onClick = onRequestPermission, modifier = Modifier.testTag("notify_grant")) {
-                    Text(stringResource(R.string.setting_notif_grant))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SwitchRow(label: String, checked: Boolean, tag: String, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = checked, onCheckedChange = onChange, modifier = Modifier.testTag(tag))
-    }
 }
