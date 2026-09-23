@@ -117,6 +117,24 @@ data class Place(
     fun withAmateurStation(allowed: Boolean): Place =
         if (allowed || pws == null) this else copy(pws = null)
 
+    /**
+     * This place as these settings have it — the policy, where [withAmateurStation] is the
+     * mechanism.
+     *
+     * Two conditions, in one function, because three callers apply it: the app's place flow, the
+     * hourly worker and the widget. A rule spelled out in three places is one that will eventually
+     * be spelled out differently in one of them.
+     *
+     * The key half is not a convenience. [readingStation] is `pws ?: station`, and the Open-Meteo
+     * *station reference* — the models' own view of the thermometer, which [StationDownscale]
+     * subtracts from the village — is fetched at its coordinates. A place that kept its `pws` with
+     * no key to fetch it would have the models asked about a point whose thermometer is never read,
+     * while the hero fell back to the provincial reading, and the offset between them would be two
+     * different places subtracted from each other.
+     */
+    fun forSettings(settings: it.apexweather.data.AppSettings): Place =
+        withAmateurStation(settings.amateurStations && !settings.wuApiKey.isNullOrBlank())
+
     /** The name in the reader's language, never in the JVM's default. */
     fun name(locale: Locale): String = when (locale.language) {
         "it" -> nameIt

@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -83,17 +84,24 @@ class WeatherStateHolder @Inject constructor(
      * an app with no place at all has nothing to show, and a code can outlive a municipal merger.
      */
     private val place: Flow<Place> = settings
-        .map { it.placeIstat to it.amateurStations }
-        .distinctUntilChanged()
-        .map { (istat, amateur) ->
-            val found = catalogue.byIstat(istat) ?: checkNotNull(catalogue.byIstat(SouthTyrol.DEFAULT_ISTAT)) {
-                "the catalogue is missing its own default place"
-            }
-            // Switching amateur stations off is a change of *place* as far as everything downstream
-            // is concerned — a different thermometer, a different station reference, a different
-            // row in station_history — so it belongs in this flow rather than beside the animations
-            // switch, and it re-subscribes the repository exactly as choosing a new place does.
-            found.withAmateurStation(amateur)
+        // The place, the switch and the key: the three settings that decide *which thermometer*
+        // this place reads. `distinctUntilChangedBy` rather than a mapped triple so the whole
+        // AppSettings survives to the next step and the rule can stay in one function — see
+        // Place.forSettings. Everything else about settings is deliberately not in this key:
+        // flipping the animations switch must not re-blend seven models.
+        .distinctUntilChangedBy { Triple(it.placeIstat, it.amateurStations, it.wuApiKey) }
+        .map { current ->
+            val found = catalogue.byIstat(current.placeIstat)
+                ?: checkNotNull(catalogue.byIstat(SouthTyrol.DEFAULT_ISTAT)) {
+                    "the catalogue is missing its own default place"
+                }
+            // Switching amateur stations off, or clearing the key, is a change of *place* as far as
+            // everything downstream is concerned — a different thermometer, a different station
+            // reference, a different row in station_history — so it belongs in this flow rather
+            // than beside the animations switch, and it re-subscribes the repository exactly as
+            // choosing a new place does. A key typed while the app is open therefore takes effect
+            // without a restart.
+            found.forSettings(current)
         }
 
     /**
