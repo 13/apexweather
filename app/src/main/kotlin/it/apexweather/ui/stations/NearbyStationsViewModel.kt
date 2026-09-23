@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import javax.inject.Inject
 import kotlin.math.roundToInt
@@ -63,6 +64,15 @@ class NearbyStationsViewModel @Inject constructor(
         val record = row.asChosen(place.istat) ?: return
         viewModelScope.launch {
             settings.setChosenStation(place.istat, record)
+            // The write goes to DataStore and comes back through the settings flow, the place flow
+            // and WeatherStateHolder before `place.readingStation` is the new one — and `load()`
+            // reads that to decide which card is marked. Rebuilding straight after the write reads
+            // the old place and draws the old answer, so this waits for the holder to catch up.
+            // Bounded, because a holder that never catches up must not leave the screen stuck on a
+            // spinner; the reload then simply shows what it can.
+            withTimeoutOrNull(CHOICE_SETTLES_MS) {
+                holder.weather.first { it.place?.readingStation?.code == record.code }
+            }
             load()
         }
     }
@@ -171,6 +181,9 @@ class NearbyStationsViewModel @Inject constructor(
 
     companion object {
         const val NO_KEY = "no-key"
+
+        /** Long enough for a DataStore write to come back through three flows, short enough to notice. */
+        const val CHOICE_SETTLES_MS = 2_000L
 
         fun joinLatitudes(points: List<Pair<Double, Double>>): String = points.joinToString(",") { it.first.toString() }
 
