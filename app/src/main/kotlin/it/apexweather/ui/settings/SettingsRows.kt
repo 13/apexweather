@@ -67,8 +67,9 @@ private val IconSize = 20.dp
 fun SettingRow(
     icon: ImageVector,
     label: String,
-    supporting: String? = null,
+    // Before `supporting`, because lint requires the modifier to be the first optional parameter.
     modifier: Modifier = Modifier,
+    supporting: String? = null,
     trailing: @Composable () -> Unit,
 ) {
     Row(
@@ -142,5 +143,28 @@ fun NavRow(
             }
             Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.7f))
         }
+    }
+}
+
+/**
+ * The icon and label of a setting whose control is too wide to sit beside them.
+ *
+ * Not a [SettingRow] with an empty trailing slot: that pays [RowMinHeight] for a row with nothing
+ * on its right, and at a 2x font scale the wasted 48 dp pushed the key field below the fold.
+ */
+@Composable
+fun SettingLabel(icon: ImageVector, label: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.75f),
+            modifier = Modifier.size(IconSize),
+        )
+        Spacer(Modifier.size(IconColumn - IconSize))
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = Color.White)
     }
 }

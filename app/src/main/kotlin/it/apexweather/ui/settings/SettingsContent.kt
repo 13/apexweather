@@ -128,7 +128,7 @@ fun SettingsContent(
                 onClickLabel = stringResource(R.string.change_place),
                 modifier = Modifier.testTag("settings_place"),
             )
-            SettingRow(Icons.Rounded.Language, stringResource(R.string.setting_language)) {}
+            SettingLabel(Icons.Rounded.Language, stringResource(R.string.setting_language))
             // Full width under its label rather than beside it: four options worth reading do not
             // fit next to a label, and squeezing them hits CompactLabel's ceiling at a 2x font
             // scale, which is the exact failure that rule exists for.

@@ -118,10 +118,16 @@ class SettingsContentTest {
         rule.onNodeWithTag("notify_grant").performScrollTo().assertIsDisplayed()
     }
 
+    /**
+     * Scrolled to, like every other assertion on this screen. At a 2x font scale the key field is
+     * below the fold — it was before this screen was rebuilt too, checked against the old layout
+     * on 2026-09-23 — and an `assertIsDisplayed` that has never been run at a large text size is
+     * a test that only happens to pass.
+     */
     @Test
     fun theKeyFieldIsShownWhenPrivateStationsAreOn() {
         show(AppSettings(amateurStations = true))
-        rule.onNodeWithTag("setting_wu_key").assertIsDisplayed()
+        rule.onNodeWithTag("setting_wu_key").performScrollTo().assertIsDisplayed()
     }
 
     /** With the feature off the field is noise: there is nothing for a key to do. */
