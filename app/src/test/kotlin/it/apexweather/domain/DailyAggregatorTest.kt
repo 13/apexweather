@@ -34,4 +34,30 @@ class DailyAggregatorTest {
         val day = DailyAggregator.aggregate(hours, ROME).first { it.date == LocalDate.of(2026, 9, 8) }
         assertEquals(Condition.RAIN, day.condition)
     }
+
+    @Test
+    fun `a dry day takes its median sky, not its cloudiest hour`() {
+        // Dorf Tirol, Saturday 2026-09-26 as the phone showed it on the 24th: sun from 06 to 18,
+        // cloud from 19 to 21, after a 19:05 sunset. The worst hour made the day "Bedeckt".
+        val hours = (6 until 22).map { h ->
+            h to if (h >= 19) Condition.CLOUDY else Condition.CLEAR
+        }
+        assertEquals(Condition.CLEAR, DailyAggregator.worstCondition(hours))
+    }
+
+    @Test
+    fun `a dry day that is mostly overcast stays overcast`() {
+        val hours = (6 until 22).map { h ->
+            h to if (h < 9) Condition.PARTLY_CLOUDY else Condition.CLOUDY
+        }
+        assertEquals(Condition.CLOUDY, DailyAggregator.worstCondition(hours))
+    }
+
+    @Test
+    fun `one wet hour still decides a dry day`() {
+        val hours = (6 until 22).map { h ->
+            h to if (h == 15) Condition.RAIN else Condition.CLEAR
+        }
+        assertEquals(Condition.RAIN, DailyAggregator.worstCondition(hours))
+    }
 }
