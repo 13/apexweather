@@ -14,7 +14,8 @@ seventeen files contain, and refuses anything else rather than guessing:
     always have been
   * fill-rule="evenodd"
   * transform="translate(x, y)" on a path, which becomes a <group>
-  * <clipPath>, dropped where it covers the whole canvas (all seventeen do) and emitted as a
+  * <clipPath>, dropped where it covers the whole canvas (every Meteocons file has one that does;
+    the two composed mostly-clear files have none) and emitted as a
     <clip-path> otherwise
   * <mask style="mask-type:alpha"> holding exactly one shape, which becomes a <clip-path>
 
@@ -446,10 +447,12 @@ class Converter:
 ICONS = {
     "clear-day": "ic_wx_sun",
     "clear-night": "ic_wx_moon",
+    # Composed by tools/compose-mostly-clear.py from clear-* and partly-cloudy-day: Meteocons has
+    # no mostly-sunny drawing, and "Heiter" drawn as partly-cloudy-day read as mostly cloud.
+    "mostly-clear-day": "ic_wx_sun_small_cloud",
+    "mostly-clear-night": "ic_wx_moon_small_cloud",
     "partly-cloudy-day": "ic_wx_sun_cloud",
     "partly-cloudy-night": "ic_wx_moon_cloud",
-    "overcast-day": "ic_wx_cloud_sun",
-    "overcast-night": "ic_wx_cloud_moon",
     "cloudy": "ic_wx_cloud",
     "fog-day": "ic_wx_fog",
     "fog-night": "ic_wx_fog_night",

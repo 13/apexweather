@@ -24,8 +24,12 @@ fun Condition.iconRes(phase: SunPhase = SunPhase.DAY): Int {
     val night = phase == SunPhase.NIGHT
     return when (this) {
         Condition.CLEAR -> if (night) R.drawable.ic_wx_moon else R.drawable.ic_wx_sun
-        Condition.MOSTLY_CLEAR -> if (night) R.drawable.ic_wx_moon_cloud else R.drawable.ic_wx_sun_cloud
-        Condition.PARTLY_CLOUDY -> if (night) R.drawable.ic_wx_cloud_moon else R.drawable.ic_wx_cloud_sun
+        // The sky's four steps: the sun, the sun with a small cloud, the sun behind a cloud, cloud.
+        // "Heiter" was partly-cloudy-day until v0.35.0 — a small sun behind a big cloud, which read
+        // as mostly cloud — and "teilweise bewölkt" was overcast-day, two clouds and a glimpse of
+        // sun. Meteocons has no mostly-sunny drawing; tools/compose-mostly-clear.py makes one.
+        Condition.MOSTLY_CLEAR -> if (night) R.drawable.ic_wx_moon_small_cloud else R.drawable.ic_wx_sun_small_cloud
+        Condition.PARTLY_CLOUDY -> if (night) R.drawable.ic_wx_moon_cloud else R.drawable.ic_wx_sun_cloud
         Condition.CLOUDY -> R.drawable.ic_wx_cloud
         Condition.FOG -> if (night) R.drawable.ic_wx_fog_night else R.drawable.ic_wx_fog
         Condition.DRIZZLE -> R.drawable.ic_wx_drizzle
