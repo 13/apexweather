@@ -1,6 +1,6 @@
 package it.apexweather.data
 
-import android.util.Log
+import it.apexweather.diagnostics.AppLog
 import it.apexweather.data.local.BulletinEntity
 import it.apexweather.data.local.ObservationEntity
 import it.apexweather.domain.StationDry
@@ -294,7 +294,7 @@ class WeatherRepository @Inject constructor(
         try {
             json.decodeFromString(serializer, text)
         } catch (e: Exception) {
-            Log.w("WeatherRepository", "cannot decode cached $what", e)
+            AppLog.w(TAG, "cannot decode cached $what", e)
             null
         }
 
@@ -372,10 +372,12 @@ class WeatherRepository @Inject constructor(
                     throw e
                 } catch (e: Exception) {
                     if (attemptsLeft > 0 && e is IOException) {
+                        AppLog.w(TAG, "$name: ${e.javaClass.simpleName}: ${e.message}, retrying")
                         delay(RETRY_DELAY_MS)
                         continue
                     }
                     failed[name] = e.message ?: e.javaClass.simpleName
+                    AppLog.w(TAG, "$name failed", e)
                     return null
                 }
             }
@@ -390,6 +392,7 @@ class WeatherRepository @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 failed[name] = "store: ${e.message ?: e.javaClass.simpleName}"
+                AppLog.e(TAG, "$name could not be stored", e)
             }
         }
 
@@ -547,6 +550,11 @@ class WeatherRepository @Inject constructor(
         recordStationHour(place, now)
 
         val result = RefreshResult(succeeded.toList(), LinkedHashMap(failed))
+        AppLog.i(
+            TAG,
+            "refresh ${place.istat}: ${succeeded.size} ok in ${Duration.between(now, clock.instant()).toMillis()} ms" +
+                if (failed.isEmpty()) "" else ", failed ${failed.keys.joinToString()}",
+        )
         dao.upsertMeta(
             RefreshMetaEntity(
                 place = place.istat,
@@ -831,6 +839,8 @@ class WeatherRepository @Inject constructor(
     }
 
     companion object {
+        private const val TAG = "Refresh"
+
         /**
          * How long a just-finished refresh answers for the next caller asking the same thing.
          *

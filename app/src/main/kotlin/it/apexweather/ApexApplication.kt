@@ -6,6 +6,10 @@ import android.os.Bundle
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import it.apexweather.diagnostics.AppLog
+import it.apexweather.diagnostics.CrashHandler
+import it.apexweather.diagnostics.DiagnosticsExport
+import it.apexweather.diagnostics.ExitReasons
 import it.apexweather.notify.WeatherNotifier
 import it.apexweather.ui.StaleRefresher
 import it.apexweather.work.RefreshScheduler
@@ -22,7 +26,15 @@ class ApexApplication : Application(), Configuration.Provider {
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
     override fun onCreate() {
+        // Before super.onCreate, which is where Hilt builds the graph: a crash assembling it is
+        // exactly the kind nobody would otherwise ever see.
+        AppLog.install(this)
+        CrashHandler.install(AppLog.directory(this), DiagnosticsExport::appInfo)
         super.onCreate()
+        AppLog.i("App", "start ${BuildConfig.VERSION_NAME} (${BuildConfig.BUILD_TYPE})")
+        // What happened to the process before this one — an ANR, a native crash, a kill for memory.
+        // Off the main thread: an ANR's trace can be tens of kilobytes.
+        Thread({ runCatching { ExitReasons.collect(this) } }, "ExitReasons").start()
         RefreshScheduler.ensureScheduled(this)
         // Channels have to exist before anything is posted, and the reader can only find them in
         // Android's settings once they do — so they are created whether or not anything is switched on.

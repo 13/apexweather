@@ -437,4 +437,10 @@
     <string name="compare_stations_radiation">Radiation W/m²</string>
     <string name="compare_stations_read">read</string>
     <string name="compare_stations_models">Models here</string>
+    <string name="diagnostics_share">Share diagnostics</string>
+    <string name="diagnostics_subject">Apex Weather diagnostics</string>
+    <plurals name="diagnostics_failures">
+        <item quantity="one">%1$d crash since %2$s</item>
+        <item quantity="other">%1$d crashes since %2$s</item>
+    </plurals>
 </resources>

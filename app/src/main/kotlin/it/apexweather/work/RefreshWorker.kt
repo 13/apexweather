@@ -8,6 +8,7 @@ import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import it.apexweather.data.RefreshResult
+import it.apexweather.diagnostics.AppLog
 import it.apexweather.data.PlaceCatalogue
 import it.apexweather.data.SettingsRepository
 import it.apexweather.data.WeatherRepository
@@ -52,6 +53,7 @@ class RefreshWorker @AssistedInject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            AppLog.e(TAG, "refresh of ${place.istat} threw", e)
             null
         }
         try {
@@ -65,6 +67,7 @@ class RefreshWorker @AssistedInject constructor(
             throw e
         } catch (e: Exception) {
             // A cache left slightly too large is not worth failing the refresh over.
+            AppLog.w(TAG, "pins or eviction failed", e)
         }
         try {
             ApexWidget().updateAll(applicationContext)
@@ -72,6 +75,7 @@ class RefreshWorker @AssistedInject constructor(
             throw e
         } catch (e: Exception) {
             // widget update failure must not affect the refresh outcome
+            AppLog.w(TAG, "widget update failed", e)
         }
         try {
             notify(place, appSettings, language)
@@ -79,8 +83,11 @@ class RefreshWorker @AssistedInject constructor(
             throw e
         } catch (e: Exception) {
             // Nor must a notification: the data is already stored and the widget already updated.
+            AppLog.w(TAG, "notifications failed", e)
         }
-        return outcome(result, runAttemptCount)
+        return outcome(result, runAttemptCount).also {
+            AppLog.i(TAG, "run ${runAttemptCount + 1} for ${place.istat}: ${it.javaClass.simpleName}")
+        }
     }
 
     /**
@@ -119,6 +126,7 @@ class RefreshWorker @AssistedInject constructor(
             } catch (e: Exception) {
                 // A pin that could not be reached keeps whatever it had, and says how old it is
                 // when it is opened. That is the same bargain every source in this app makes.
+                AppLog.w(TAG, "pin $istat not refreshed", e)
             }
         }
     }
@@ -141,6 +149,9 @@ class RefreshWorker @AssistedInject constructor(
         val formats = Formats(locale, android.text.format.DateFormat.is24HourFormat(applicationContext))
         val decided = NotificationDecider.decide(home, appSettings, memory, now, SouthTyrol.ZONE, place.name(locale))
         val posted = notifier.post(decided, formats, now)
+        if (decided.isNotEmpty()) {
+            AppLog.i(TAG, "notifications: ${decided.size} decided, ${posted.map { it.javaClass.simpleName }} posted")
+        }
         // Only what actually reached the reader is remembered, so a notification Android dropped is
         // tried again on the next refresh rather than silently counted as delivered.
         if (posted.isNotEmpty()) {
@@ -149,6 +160,8 @@ class RefreshWorker @AssistedInject constructor(
     }
 
     companion object {
+        private const val TAG = "Worker"
+
         /**
          * Which pinned places to refresh in the background this wake.
          *

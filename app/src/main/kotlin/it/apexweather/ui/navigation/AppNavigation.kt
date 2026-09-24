@@ -65,6 +65,7 @@ import it.apexweather.ui.home.HomeViewModel
 import it.apexweather.ui.map.MapScreen
 import it.apexweather.ui.place.PlacePickerScreen
 import it.apexweather.ui.settings.SettingsScreen
+import it.apexweather.diagnostics.DiagnosticsSection
 import it.apexweather.update.UpdateSection
 import it.apexweather.ui.settings.SettingsViewModel
 import it.apexweather.ui.sky.SkyBackground
@@ -310,6 +311,7 @@ fun ApexApp() {
                             .takeIf { homeState.settings.wuApiKey != null },
                         viewModel = settingsVm,
                         updateSection = { UpdateSection() },
+                        diagnosticsSection = { DiagnosticsSection() },
                     )
                 }
             }

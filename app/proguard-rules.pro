@@ -8,6 +8,11 @@
 -keepclasseswithmembers class it.apexweather.** { kotlinx.serialization.KSerializer serializer(...); }
 # Retrofit
 -keepattributes Signature, Exceptions
+# Line numbers in release stack traces. The crash files in filesDir/diagnostics are retraced
+# against the mapping.txt each GitHub release carries; without these a retraced frame names the
+# method and not the line. The source file name is collapsed to one string to keep it small.
+-keepattributes SourceFile, LineNumberTable
+-renamesourcefileattribute SourceFile
 -keep,allowobfuscation,allowshrinking interface retrofit2.Call
 -keep,allowobfuscation,allowshrinking class retrofit2.Response
 -keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation

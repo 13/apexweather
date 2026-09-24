@@ -43,6 +43,7 @@ fun SettingsScreen(
     onOpenStations: (() -> Unit)? = null,
     viewModel: SettingsViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
     updateSection: @Composable () -> Unit = {},
+    diagnosticsSection: @Composable () -> Unit = {},
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -82,5 +83,6 @@ fun SettingsScreen(
         onNotifyRain = viewModel::setNotifyRain,
         onNotifyWarnings = viewModel::setNotifyWarnings,
         updateSection = updateSection,
+        diagnosticsSection = diagnosticsSection,
     )
 }

@@ -446,4 +446,10 @@
     <string name="compare_stations_radiation">Strahlung W/m²</string>
     <string name="compare_stations_read">gelesen</string>
     <string name="compare_stations_models">Modelle hier</string>
+    <string name="diagnostics_share">Diagnosedaten teilen</string>
+    <string name="diagnostics_subject">Apex Wetter: Diagnosedaten</string>
+    <plurals name="diagnostics_failures">
+        <item quantity="one">%1$d Absturz seit %2$s</item>
+        <item quantity="other">%1$d Abstürze seit %2$s</item>
+    </plurals>
 </resources>
