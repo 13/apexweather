@@ -950,6 +950,18 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   tinted by whoever draws them — `Icon(tint = …)` in the app, and an explicit
   `ColorFilter.tint` in `ApexWidget`, because Glance's `Image` does not tint on its own and a
   black icon on the widget's near-black card is invisible. That shipped once, in v0.8.0.
+  **The sky is four steps, and one of them is not Meteocons' own drawing.** Clear is the sun,
+  *Heiter* the sun with a small cloud in its lower right, *Wolkig* the sun behind a cloud
+  (`partly-cloudy-*`), overcast the cloud. Meteocons has no mostly-sunny icon, and until v0.35.0
+  *Heiter* was drawn as `partly-cloudy-day` — a small sun almost hidden behind a big cloud, which
+  read as mostly cloud — and *Wolkig* as `overcast-day`, which is gone. `tools/compose-mostly-clear.py`
+  writes `mostly-clear-{day,night}.svg` from the clear-sky glyph and partly-cloudy-day's cloud, then
+  `svg2vector.py` converts them like any other. Only the cloud's outer edge is scaled (0,72); its ring
+  is rebuilt 4 units inside, because a scaled ring would be 2,9 units wide beside a sun stroked at 4.
+  The cut-out behind it is Meteocons' own halo scaled with the cloud: offsetting the edge outward
+  folds into loops at the notches between the cloud's lobes, which was tried. The position is by eye
+  and has one hard rule — the cloud either hides the sun's downward ray or clears it; any position
+  in between leaves a stub that reads as a speck at 24 dp.
 - **The home screen's vertical budget was measured, not estimated, and the row spacing was not
   where it was going.** On the phone at 384 x 832 dp (450 dpi, font scale 1) the hero block took
   252 dp — a third of everything above the bottom bar — to show one number, and the trough between
