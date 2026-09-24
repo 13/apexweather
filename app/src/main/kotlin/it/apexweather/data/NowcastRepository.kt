@@ -1,6 +1,6 @@
 package it.apexweather.data
 
-import android.util.Log
+import it.apexweather.diagnostics.AppLog
 import it.apexweather.data.remote.NowcastApi
 import it.apexweather.data.remote.NowcastGrid
 import it.apexweather.data.remote.NowcastKind
@@ -37,7 +37,7 @@ class GeoSphereNowcastSource @Inject constructor(private val api: NowcastApi) : 
     } catch (e: kotlinx.coroutines.CancellationException) {
         throw e
     } catch (e: Exception) {
-        Log.w(TAG, "cannot fetch the $kind grid", e)
+        AppLog.w(TAG, "cannot fetch the $kind grid", e)
         throw e
     }
 
@@ -51,8 +51,8 @@ class GeoSphereNowcastSource @Inject constructor(private val api: NowcastApi) : 
         // the first minified build shipped no forecast at all (see proguard-rules.pro).
         // A successful read is logged too, once per fetch: tools/release-smoke.sh looks for it.
         return withContext(Dispatchers.Default) {
-            NowcastGrid.map(bytes, kind) { Log.w(TAG, "cannot read the $kind grid", it) }
-                .also { if (it.steps.isNotEmpty()) Log.i(TAG, "read the $kind grid: ${it.steps.size} steps") }
+            NowcastGrid.map(bytes, kind) { AppLog.w(TAG, "cannot read the $kind grid", it) }
+                .also { if (it.steps.isNotEmpty()) AppLog.i(TAG, "read the $kind grid: ${it.steps.size} steps") }
         }
     }
 }

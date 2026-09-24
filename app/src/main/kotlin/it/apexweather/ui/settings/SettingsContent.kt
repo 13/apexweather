@@ -103,6 +103,8 @@ fun SettingsContent(
      * it needs is restricted on the Play Store.
      */
     updateSection: @Composable () -> Unit = {},
+    /** The diagnostics export, a slot for the same reason as [updateSection]. */
+    diagnosticsSection: @Composable () -> Unit = {},
 ) {
     Column(
         Modifier.fillMaxSize().testTag("settings_screen")
@@ -305,6 +307,7 @@ fun SettingsContent(
                 modifier = Modifier.clickable(onClick = onRefresh).testTag("refresh_now"),
             ) {}
             updateSection()
+            diagnosticsSection()
             Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.about, BuildConfig.VERSION_NAME),

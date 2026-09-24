@@ -71,6 +71,9 @@ object AppModule {
         .addInterceptor { chain ->
             chain.proceed(chain.request().newBuilder().header("User-Agent", "ApexWeather/${BuildConfig.VERSION_NAME} (Android)").build())
         }
+        // After the User-Agent, so it times the call as sent; before nothing else, so a cached answer
+        // is logged as one.
+        .addInterceptor(it.apexweather.diagnostics.NetworkLog())
         .apply {
             if (BuildConfig.DEBUG) addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BASIC))
         }
@@ -132,6 +135,14 @@ object AppModule {
     @Provides @Singleton fun clock(): Clock = Clock.systemUTC()
 
     @Provides @Singleton @ApplicationScope
-    fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    fun applicationScope(): CoroutineScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default +
+            // A failure in an app-scoped job would otherwise reach the thread's handler and end the
+            // process; under a SupervisorJob it ends only that job, and this is where it is written
+            // down rather than vanishing.
+            kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+                it.apexweather.diagnostics.AppLog.e("Scope", "uncaught in the application scope", e)
+            },
+    )
     @Provides @Singleton fun blender(): ConsensusBlender = ConsensusBlender(SouthTyrol.ZONE)
 }

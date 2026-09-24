@@ -697,6 +697,29 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   and with the in-app language set to English on a German phone the launcher still says "Apex
   Wetter", which is the per-app-locale divergence noted under Conventions, observed rather than
   assumed.
+- **`diagnostics/` is the app's memory of its own failures, and it never leaves the phone on its
+  own.** Before it, the app had four `Log` calls, no crash handler and no crash service; a release
+  build refuses `run-as` and logcat is gone within minutes, so every failure worth knowing about
+  was found by reading the screen. Four parts, all writing to `filesDir/diagnostics/` (not the
+  cache, which Android clears under storage pressure — exactly when the log matters):
+  `AppLog` (a 2 × 256 kB rotating text log, written on one background thread, mirrored to logcat);
+  `CrashHandler` (installed before `super.onCreate` so a crash building the Hilt graph is caught,
+  writes `crash-<ms>.txt` **synchronously** and then chains to the platform's handler, keeps ten);
+  `ExitReasons` (Android's `ApplicationExitInfo` for the processes before this one — the only way to
+  see an **ANR**, whose main-thread trace it saves, a native crash or a kill for memory; keeps
+  twenty `exit-<ms>-<reason>.txt`); and `NetworkLog`, one OkHttp interceptor on the shared client
+  that logs every call's host, path, status, time and size — **never the query string**, which is
+  where the WU key travels, and never a successful image, because the radar's 52 tiles a loop would
+  push yesterday out of the log in minutes. `redact()` runs over every line and the export header
+  anyway. The reader sends it from Settings → App → "Diagnosedaten teilen": a zip in the share
+  provider's one cache directory, with the settings described and the key replaced by `(set)`. Log
+  **events**, never per frame: refresh summaries and failed sources, worker runs and the four
+  exceptions it used to swallow in silence, place, station and key-verdict changes, the updater's
+  outcomes. The application scope now carries a `CoroutineExceptionHandler`, so a failed app-scoped
+  job is logged and ends only itself where it used to take the process down. Release traces are
+  obfuscated: `release.yml` publishes `ApexWeather-<version>-mapping.txt` beside the APK and
+  `proguard-rules.pro` keeps line numbers, so a crash file retraces with
+  `retrace ApexWeather-<version>-mapping.txt crash-….txt`.
 - `update/` is the in-app updater and is deliberately self-contained: it reads GitHub releases,
   verifies the download against the asset's sha256 and hands the APK to `PackageInstaller`. Nothing
   in the weather code imports it — the settings sheet takes it as a slot. Removing the feature means
@@ -1136,6 +1159,15 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   scrolled, dragging the sheet down scrolls the content back instead of dismissing, and bounces at
   the top. The warning sheet always had one; the day sheet did not, and that is what "flickers, does
   not close" was.
+  **The bounce at the top was a second bug, and the cross did not fix it.** When a full-height
+  sheet's content is only slightly taller than the sheet (the day sheet on the phone: 24 px), a slow
+  downward drag makes the whole sheet flick between its resting place and 24 px above it every frame
+  or two, and it never follows the finger. Measured off a 30 fps screen recording on 2026-09-24
+  (Material3 1.4.0, Android 16); 400 dp more content made it drag and dismiss normally, so the
+  trigger is the near-fit. `DayDetail`'s column is `fillMaxHeight()` for that. The emulator's
+  1080x1920 screen overflows by far more and does not show it — reproduce on the phone. Any other
+  `skipPartiallyExpanded` sheet whose content can land within a few dp of the screen height (the
+  source and statistics sheets, a warning sheet at a large font) can hit the same thing.
 - Warnings are written and coloured in `ui/common/WarningVisuals.kt`. The feed's own wording is
   English only, so it is never shown as a label; type and level are translated like everything else,
   and each has a `labelRes()` form as well as a composable one because the widget renders outside a

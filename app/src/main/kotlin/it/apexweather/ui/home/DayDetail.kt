@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -56,8 +57,16 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState, onClose: () -> Unit = {}, o
 
     // ModalBottomSheet adds no scrolling of its own, and this content runs past a phone screen in
     // landscape or at a large font scale, where the per-source rows would simply be unreachable.
+    //
+    // fillMaxHeight is the fix for a sheet that shook rather than closed. When the content is only
+    // a little taller than the sheet can show — on the phone, Saturday's thirteen rows overran it
+    // by 24 px — a slow downward drag at the top made the whole sheet flick between its resting
+    // place and 24 px above it every frame or two, and it never followed the finger (measured
+    // off a screen recording, 2026-09-24, Material3 1.4.0, Android 16). With 400 dp more content
+    // it dragged and dismissed normally, so the trigger is the near-fit, not scrolling as such.
+    // A viewport of fixed height takes the content's size out of the sheet's own measurement.
     Column(
-        Modifier.verticalScroll(rememberScrollState())
+        Modifier.fillMaxHeight().verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp).padding(bottom = 32.dp),
     ) {
         // The cross is not decoration. This content scrolls, and the sheet skips its half state, so

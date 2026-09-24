@@ -452,4 +452,11 @@
     <string name="compare_stations_radiation">Radiazione W/m²</string>
     <string name="compare_stations_read">letto</string>
     <string name="compare_stations_models">Modelli qui</string>
+    <string name="diagnostics_share">Condividi dati diagnostici</string>
+    <string name="diagnostics_subject">Apex Weather: dati diagnostici</string>
+    <plurals name="diagnostics_failures">
+        <item quantity="one">%1$d arresto anomalo dal %2$s</item>
+        <item quantity="many">%1$d arresti anomali dal %2$s</item>
+        <item quantity="other">%1$d arresti anomali dal %2$s</item>
+    </plurals>
 </resources>

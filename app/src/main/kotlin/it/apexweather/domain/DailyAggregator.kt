@@ -65,10 +65,21 @@ object DailyAggregator {
             (fc.daily.takeIf { it.isNotEmpty() } ?: aggregate(fc.hourly, zone)).associateBy { it.date }
         }
 
-    /** Worst condition between 06:00 and 22:00 local; if no hours in that window, worst of all. */
+    /**
+     * The day's condition from the hours between 06:00 and 22:00 local; if no hours fall in that
+     * window, from all of them.
+     *
+     * Fog or anything falling is decisive: the worst such hour is the day, because a shower at three
+     * is the fact a reader opens the row for. A dry day is its **median** sky, not its cloudiest
+     * hour. It used to be the maximum throughout, and on 2026-09-24 that put "Bedeckt" on Saturday
+     * the 26th in Dorf Tirol — sun from 06 to 18 in every model, cloud from 19 to 21, after a 19:05
+     * sunset. Three evening hours of sixteen outvoted the other thirteen.
+     */
     fun worstCondition(hourAndCondition: List<Pair<Int, Condition>>): Condition {
         val daytime = hourAndCondition.filter { it.first in DAY_START_HOUR until DAY_END_HOUR }
-        val pool = if (daytime.isNotEmpty()) daytime else hourAndCondition
-        return pool.maxOf { it.second }
+        val pool = (if (daytime.isNotEmpty()) daytime else hourAndCondition).map { it.second }
+        val worst = pool.max()
+        if (worst > Condition.CLOUDY) return worst
+        return pool.sorted()[pool.size / 2]
     }
 }

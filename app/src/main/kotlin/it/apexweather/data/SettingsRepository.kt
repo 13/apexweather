@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.datastore.preferences.core.emptyPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
+import it.apexweather.diagnostics.AppLog
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.model.Source
 import it.apexweather.ui.share.ShareRange
@@ -213,6 +214,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     suspend fun setWindUnit(v: WindUnit) = context.settingsStore.edit { it[Keys.windUnit] = v.name }
     suspend fun setAnimations(v: Boolean) = context.settingsStore.edit { it[Keys.animations] = v }
     suspend fun setAmateurStations(v: Boolean) = context.settingsStore.edit { it[Keys.amateurStations] = v }
+        .also { AppLog.i(TAG, "amateur stations ${if (v) "on" else "off"}") }
     /**
      * A new key has never been checked, whatever the old one's verdict was. Leaving the verdict
      * alone would show "gültig" over a key nothing had tried.
@@ -227,12 +229,12 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     suspend fun setChosenStation(istat: String, station: ChosenStation?) = context.settingsStore.edit { prefs ->
         val next = ChosenStations.with(ChosenStations.decode(prefs[Keys.chosenStations]), station, istat)
         prefs[Keys.chosenStations] = ChosenStations.encode(next)
-    }
+    }.also { AppLog.i(TAG, "station for $istat: ${station?.let { "${it.network} ${it.code}" } ?: "catalogue's"}") }
 
     suspend fun setWuKeyVerdict(v: WuKeyVerdict, checkedAtMs: Long?) = context.settingsStore.edit {
         it[Keys.wuKeyVerdict] = v.name
         if (checkedAtMs != null) it[Keys.wuKeyCheckedAt] = checkedAtMs else it.remove(Keys.wuKeyCheckedAt)
-    }
+    }.also { if (v != WuKeyVerdict.CHECKING) AppLog.i(TAG, "WU key: $v") }
     suspend fun setCompareSources(v: Set<Source>) = context.settingsStore.edit {
         it[Keys.hiddenCompareSources] = (Source.entries.toSet() - v).map { s -> s.name }.toSet()
     }
@@ -265,7 +267,9 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
      * Both in one edit, so a reader who switches place can never end up with a chosen place the
      * cache has already been told to evict.
      */
-    suspend fun setPlace(istat: String) = context.settingsStore.edit { prefs ->
+    suspend fun setPlace(istat: String) = setPlaceInStore(istat).also { AppLog.i(TAG, "place $istat") }
+
+    private suspend fun setPlaceInStore(istat: String) = context.settingsStore.edit { prefs ->
         val previous = prefs[Keys.placeIstat]?.takeIf { it.isNotBlank() } ?: SouthTyrol.DEFAULT_ISTAT
         prefs[Keys.placeIstat] = istat
         // The place being left has to enter the list here, or it is not in it when eviction reads
@@ -278,6 +282,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     }
 
     internal companion object {
+        private const val TAG = "Settings"
         /** How many places the cache keeps, and therefore how many are worth remembering. */
         const val RECENT_PLACES = 3
 

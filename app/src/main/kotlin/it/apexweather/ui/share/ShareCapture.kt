@@ -28,7 +28,8 @@ object ShareCapture {
     /** How long a written picture is worth keeping. The share sheet copies what it needs. */
     val KEEP: Duration = Duration.ofHours(1)
 
-    private const val AUTHORITY_SUFFIX = ".shares"
+    /** The share provider's authority is the package name plus this; the diagnostics export uses it too. */
+    const val AUTHORITY_SUFFIX = ".shares"
 
     /**
      * Writes [image] into the cache and returns a `content://` Uri for it.

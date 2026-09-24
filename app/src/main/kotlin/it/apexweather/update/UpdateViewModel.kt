@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import it.apexweather.diagnostics.AppLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -72,6 +73,18 @@ class UpdateViewModel @Inject constructor(
     private var work: Job? = null
 
     init {
+        // The outcomes only, never the download's progress ticks. The update package depends on
+        // diagnostics and not the other way round, so removing it removes these lines too.
+        viewModelScope.launch {
+            mutableState.collect { s ->
+                when (s) {
+                    is UpdateUiState.Failed, is UpdateUiState.InstallFailed, is UpdateUiState.Available,
+                    is UpdateUiState.Ready, UpdateUiState.UpToDate, UpdateUiState.Installing ->
+                        AppLog.i("Update", s.toString())
+                    else -> Unit
+                }
+            }
+        }
         viewModelScope.launch {
             InstallResultReceiver.results.collect { result ->
                 mutableState.value = when (result) {
