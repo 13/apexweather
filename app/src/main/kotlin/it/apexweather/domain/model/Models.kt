@@ -511,6 +511,12 @@ data class ConsensusHour(
     /** Highest gust any contributing model publishes, not the median; see ConsensusBlender. */
     val gustKmh: Double?,
     /**
+     * The weighted median gust, where at least [it.apexweather.domain.StrongWind.MIN_SOURCES]
+     * models publish one. What the strong-wind line and markers trigger on; [gustKmh] is the
+     * hour sheet's "up to", and a maximum is the wrong thing to raise an alarm on.
+     */
+    val gustMedianKmh: Double? = null,
+    /**
      * Where the wind comes from, as a circular mean over the models that publish one — and null
      * where they do not agree enough for a direction to mean anything. See
      * [ConsensusBlender.meanDirectionDeg]: an angle cannot be averaged the way a temperature can,
@@ -580,6 +586,11 @@ data class ConsensusDay(
     val ensembleHalfWidthC: Double? = null,
     /** Lowest 0 °C isotherm of the day in metres — the snow line at its lowest. Null where no model says. */
     val freezingLevelMinM: Double?,
+    /**
+     * The highest median gust of the day's daylight hours — the window the icon and the chance of
+     * rain are read in, so the row describes one day. See [ConsensusHour.gustMedianKmh].
+     */
+    val gustMaxKmh: Double? = null,
     val sunrise: Instant?,
     val sunset: Instant?,
 )

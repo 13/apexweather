@@ -459,4 +459,8 @@
         <item quantity="many">%1$d arresti anomali dal %2$s</item>
         <item quantity="other">%1$d arresti anomali dal %2$s</item>
     </plurals>
+    <string name="wind_gusts_now">Raffiche fino a %1$s</string>
+    <string name="wind_gusts_from">Raffiche fino a %1$s dalle %2$s</string>
+    <string name="wind_strong">Raffiche forti</string>
+    <string name="wind_storm">Raffiche di burrasca</string>
 </resources>

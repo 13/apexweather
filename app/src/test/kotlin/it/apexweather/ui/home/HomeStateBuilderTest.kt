@@ -98,6 +98,74 @@ class HomeStateBuilderTest {
     }
 
     /**
+     * An amateur station is chosen because it stands at the village, so it is quoted as read: no
+     * height to carry it over, and a model-shaped move would replace a village thermometer with
+     * the models' idea of one. It was also being moved by the *provincial* station's height gap,
+     * 264 m, while standing 40 m above the village.
+     */
+    @Test
+    fun `an amateur reading is shown as read, never moved`() {
+        val pws = observation(16.5).copy(stationName = "Tirolo - Tirol")
+        val official = observation(18.0)
+        val s = HomeStateBuilder.build(
+            it.apexweather.domain.DORF_TIROL_WITH_PWS,
+            snapshot.copy(observation = pws, officialObservation = official, stationReference = reference(warmerBy = 2.0)),
+            AppSettings(), consensus, now = hour(3).plusSeconds(600),
+        )
+        assertEquals(16.5, s.heroTempC!!, 1e-9)
+        assertNull(s.heroAdjustmentC)
+        assertTrue(s.observationIsPrivate)
+        assertEquals(pws, s.observation)
+        // The column labelled "Jetzt" says what the hero says.
+        assertEquals(16.5, s.upcomingHours.first().tempC, 1e-9)
+    }
+
+    /** Where the amateur station has fallen back to the provincial one, that one is still moved. */
+    @Test
+    fun `a place whose amateur station fell back to the province still carries the reading up`() {
+        val official = observation(16.5)
+        val s = HomeStateBuilder.build(
+            it.apexweather.domain.DORF_TIROL_WITH_PWS,
+            snapshot.copy(observation = official, officialObservation = official, stationReference = reference(warmerBy = 2.0)),
+            AppSettings(), consensus, now = hour(3).plusSeconds(600),
+        )
+        assertFalse(s.observationIsPrivate)
+        assertEquals(14.5, s.heroTempC!!, 1e-9)
+        assertEquals(-2.0, s.heroAdjustmentC!!, 1e-9)
+    }
+
+    private fun windy(gustAt: (Int) -> Double): Pair<WeatherSnapshot, ConsensusForecast> {
+        val f = listOf(Source.ICON_CH1, Source.ICON_CH2, Source.ICON_D2).associateWith { src ->
+            forecast(src, (0 until 48).map { point(it, 12.0, gust = gustAt(it)) })
+        }
+        return WeatherSnapshot.EMPTY.copy(forecasts = f) to blender.blend(f)
+    }
+
+    @Test
+    fun `strong gusts ahead put a line under the hero, from the hour they start`() {
+        val (snap, c) = windy { if (it in 6..8) 65.0 else 20.0 }
+        val s = HomeStateBuilder.build(DORF_TIROL, snap, AppSettings(), c, now = hour(3).plusSeconds(600))
+        assertEquals(hour(6), s.windLine!!.from)
+        assertEquals(65.0, s.windLine!!.peakKmh, 0.0)
+    }
+
+    @Test
+    fun `a calm day has no wind line`() {
+        val (snap, c) = windy { 30.0 }
+        assertNull(HomeStateBuilder.build(DORF_TIROL, snap, AppSettings(), c, now = hour(3).plusSeconds(600)).windLine)
+    }
+
+    /** The anemometer outranks the models about this minute, and the strip's first column says so. */
+    @Test
+    fun `a measured gust raises the line for now`() {
+        val (snap, c) = windy { 20.0 }
+        val obs = observation(12.0).copy(gustKmh = 58.0)
+        val s = HomeStateBuilder.build(DORF_TIROL, snap.copy(observation = obs), AppSettings(), c, now = hour(3).plusSeconds(600))
+        assertNull(s.windLine!!.from)
+        assertEquals(58.0, s.upcomingHours.first().gustMedianKmh!!, 0.0)
+    }
+
+    /**
      * The line under the hero quotes the correction, so it has to quote the one that was applied.
      * A station well away from what the models say about it is carried up only in part, and the
      * difference between the reading and the number on screen is then not the models' own gap.

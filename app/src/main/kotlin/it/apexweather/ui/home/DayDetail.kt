@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import it.apexweather.R
+import it.apexweather.domain.StrongWind
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.SunPhase
 import it.apexweather.domain.model.ConsensusDay
@@ -113,6 +114,18 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState, onClose: () -> Unit = {}, o
             stringResource(R.string.day_precip_total, Format.precip(day.precipMm, day.snowCm, day.condition, formats)),
             style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f),
         )
+        // The number the day row's wind glyph stands for: the highest daylight median gust.
+        StrongWind.levelOf(day.gustMaxKmh)?.let { level ->
+            Spacer(Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("day_wind")) {
+                WindGlyph(windColor(level), 16.dp)
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    stringResource(R.string.wind_gusts_now, Format.wind(day.gustMaxKmh!!, state.settings.windUnit, formats)),
+                    style = MaterialTheme.typography.bodyMedium, color = windColor(level),
+                )
+            }
+        }
         day.freezingLevelMinM?.let {
             Spacer(Modifier.height(2.dp))
             Text(
@@ -160,6 +173,7 @@ fun DayDetail(day: ConsensusDay, state: HomeUiState, onClose: () -> Unit = {}, o
                 phaseAt = state::phaseAt,
                 tagPrefix = "day_hour_column",
                 labelFirstAsNow = false,
+                windUnit = state.settings.windUnit,
                 modifier = Modifier.testTag("day_hour_strip"),
             )
         }

@@ -110,6 +110,8 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
                 ensembleHalfWidthC = hoursOfDay.mapNotNull { it.ensembleHalfWidthC }
                     .takeIf { it.isNotEmpty() }?.average(),
                 freezingLevelMinM = hoursOfDay.mapNotNull { it.freezingLevelM }.minOrNull(),
+                gustMaxKmh = DailyAggregator.daylight(hoursOfDay, zone) { it.time }
+                    .mapNotNull { it.gustMedianKmh }.maxOrNull(),
                 sunrise = d.sunrise, sunset = d.sunset,
             )
         }
@@ -226,6 +228,7 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
         // ConsensusHour.feelsOffsetC for why this is not `feels` minus `temps`.
         val feelsOffsets = points.mapNotNullValues { p -> p.feelsLikeC?.let { it - p.tempC } }
         val gusts = values.mapNotNull { it.gustKmh }
+        val gustsBySource = points.mapNotNullValues { it.gustKmh }
         val winds = points.mapNotNullValues { it.windKmh }
         val freezing = points.mapNotNullValues { it.freezingLevelM }
         val humidity = points.mapNotNullValues { it.humidityPct?.toDouble() }
@@ -247,6 +250,8 @@ class ConsensusBlender(private val zone: ZoneId = ZoneId.of("Europe/Rome")) {
             // the mean for the reason given above it. A decision about what "consensus" means,
             // not an oversight; change it only on purpose.
             gustKmh = gusts.maxOrNull(),
+            // The median beside it is what raises the strong-wind line: see StrongWind.
+            gustMedianKmh = gustsBySource.takeIf { it.size >= StrongWind.MIN_SOURCES }?.let(::weightedMedian),
             windDirDeg = meanDirectionDeg(values.mapNotNull { it.windDirDeg }),
             humidityPct = humidity.takeIf { it.isNotEmpty() }?.let { weightedMedian(it).roundToInt() },
             freezingLevelM = freezing.takeIf { it.isNotEmpty() }?.let(::weightedMedian),

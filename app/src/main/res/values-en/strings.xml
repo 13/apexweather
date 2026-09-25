@@ -443,4 +443,8 @@
         <item quantity="one">%1$d crash since %2$s</item>
         <item quantity="other">%1$d crashes since %2$s</item>
     </plurals>
+    <string name="wind_gusts_now">Gusts up to %1$s</string>
+    <string name="wind_gusts_from">Gusts up to %1$s from %2$s</string>
+    <string name="wind_strong">Strong gusts</string>
+    <string name="wind_storm">Storm gusts</string>
 </resources>

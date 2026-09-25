@@ -21,10 +21,10 @@ import kotlin.math.abs
  * degrees in three hours. A rule tight enough to call either of those a fault would reject the
  * feature's whole value.
  *
- * Everything downstream is already defended without this: [StationDownscale] fades a large anomaly
- * rather than carrying it, brackets the result between its two sources, and hands the screen back
- * to the models when it leaves that bracket. This is the last resort, for a reading no amount of
- * fading makes sense of.
+ * For an amateur station this is the **only** guard. [StationDownscale] fades, brackets and hands
+ * the screen back to the models, but it moves the provincial station alone: an amateur reading is
+ * quoted as read, because it was chosen for standing at the village (see `HomeStateBuilder`).
+ * A reading this rule rejects falls back to the provincial one, which still has all of that.
  */
 object StationFault {
     /**

@@ -13,6 +13,7 @@ import it.apexweather.domain.FeelsLike
 import it.apexweather.domain.Horizon
 import it.apexweather.domain.SouthTyrol
 import it.apexweather.domain.StationDownscale
+import it.apexweather.domain.StrongWind
 import it.apexweather.domain.MeasuredRain
 import it.apexweather.domain.RadarNow
 import it.apexweather.domain.StationFog
@@ -71,6 +72,11 @@ data class HomeUiState(
     val dismissedWarnings: Set<String> = emptySet(),
     /** When precipitation next begins, to the quarter-hour, or null if it is already falling. */
     val minutelyStart: Instant? = null,
+    /**
+     * Strong gusts within the next twelve hours, from the models' median gust — and the station's
+     * measured one for the current hour. Null on an ordinary day. See [StrongWind].
+     */
+    val windLine: StrongWind.Line? = null,
     /**
      * How much the station's reading had to be moved to stand for the village, in degrees. Null when
      * the hero is not a station reading, or when there was nothing to correct it with — the wording
@@ -242,8 +248,19 @@ object HomeStateBuilder {
         val isPrivate = place?.pws != null &&
             snapshot.observation != null &&
             snapshot.observation != snapshot.officialObservation
-        val heroFromStation = if (heightDifferenceM == null) null else obs?.let {
-            StationDownscale.villageTemperature(it, snapshot.stationReference, snapshot.forecastsForBlend, consensus, now, heightDifferenceM)
+        // An amateur station is quoted as read. It was chosen for standing at the village — its
+        // height checked against the DEM, or picked by the reader — so there is no hill to carry it
+        // up, and moving it would swap a village thermometer for the models' idea of one. It was
+        // also moved by the wrong gap: `heightDifferenceM` is the *provincial* station's, 264 m for
+        // Dorf Tirol, while ITIROL16 stands 40 m above the village. StationFault is what guards a
+        // broken amateur reading now; the repository then falls back to the province's, which is
+        // not private and is moved as before.
+        val heroFromStation = when {
+            isPrivate -> obs?.tempC
+            heightDifferenceM == null -> null
+            else -> obs?.let {
+                StationDownscale.villageTemperature(it, snapshot.stationReference, snapshot.forecastsForBlend, consensus, now, heightDifferenceM)
+            }
         }
         // What the screen says it moved the reading by has to be what it actually moved it by. The
         // models' own village-minus-station gap is only part of that now — a large station anomaly
@@ -251,7 +268,7 @@ object HomeStateBuilder {
         // result rather than quoted from the gap.
         // A move too small to show is not a move: "umgerechnet (0,0°)" claims a correction that did
         // not happen, and the line without it already says which station the reading came from.
-        val adjustment = heroFromStation?.let { village -> obs?.tempC?.let { village - it } }
+        val adjustment = heroFromStation?.takeUnless { isPrivate }?.let { village -> obs?.tempC?.let { village - it } }
             ?.takeIf { kotlin.math.abs(it) >= 0.05 }
         // A saturated station is the only ground truth this app has about the sky, and it applies to
         // this hour alone — which is why the hour is re-voted here rather than in the blender, where
@@ -299,7 +316,10 @@ object HomeStateBuilder {
                 // is asked, and in this province it is usually much lower and much more hemmed in.
                 place?.station?.let { st -> StationSun.corrected(voted, obs, st.lat, st.lon, now, h, st.horizon) }
             } ?: voted
-            if (revoted == h.condition && h === wet) wet else h.copy(condition = revoted)
+            val revotedHour = if (revoted == h.condition && h === wet) wet else h.copy(condition = revoted)
+            // An anemometer outranks the models about this minute the way the gauge does; see
+            // StrongWind.withMeasured. The hero's wind line and the strip's first column read it.
+            StrongWind.withMeasured(revotedHour, snapshot.observation, now)
         }
         // The hero and the strip's first column both answer to the word "Jetzt", so they have to be
         // the same weather. The re-vote above gave that hour its condition; this gives it its
@@ -357,6 +377,7 @@ object HomeStateBuilder {
             warnings = snapshot.warnings,
             dismissedWarnings = dismissedWarnings,
             minutelyStart = consensus.precipitationStartsAt(now),
+            windLine = StrongWind.line(upcoming, now),
             upcomingHours = upcoming,
             days = consensus.daily.filter { !it.date.isBefore(now.atZone(SouthTyrol.ZONE).toLocalDate()) }.take(MAX_DAYS),
             hoursByDate = consensus.hourly.groupBy { it.time.atZone(SouthTyrol.ZONE).toLocalDate() },
