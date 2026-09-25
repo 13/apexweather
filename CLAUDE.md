@@ -372,6 +372,12 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   model with itself makes both go away: the models are the same on both sides by construction, and a
   habit a model has here it has at both points, so it cancels in the subtraction. Where it cannot be computed the consensus wins, since it is already at the
   village's height; the raw reading is the last resort. A moved reading always says so on screen.
+  **An amateur reading is never moved** (2026-09-25, on request): a PWS is chosen for standing at
+  the village, so it is quoted as read and the hero line carries no "umgerechnet". It was being
+  moved by the *provincial* station's height gap — 264 m for Dorf Tirol, against ITIROL16's 40 m —
+  because `heightDifferenceM` read `place.station` while the reference stood at `readingStation`.
+  `StationFault` is then its only guard; a rejected reading falls back to the province's, which is
+  moved as before.
 - The day list runs 14 days. Only the two ECMWF runs — IFS and AIFS — reach past about day five, so
   those days carry `sourceCount == 2` and their uncertainty comes from ECMWF's ensemble rather than
   from that pair agreeing with itself. A day that really is down to one model keeps the grey
@@ -1069,6 +1075,19 @@ MeteoAlarm's region, and the ISTAT code a fresh install opens on).
   amount is their mean, and on 2026-09-16 the strip read "Leichter Regen" over 3,3 mm beside "Regen"
   over 1,8. Only where the vote is drizzle, rain or heavy rain and the hour has 0,1 mm or more;
   snow, sleet and thunder keep their word.
+- **Strong wind is raised on the median gust, never on the blender's maximum** (`domain/StrongWind.kt`,
+  2026-09-25). `ConsensusHour.gustKmh` stays the highest gust any model publishes, on purpose, for
+  the hour sheet's "up to"; an alarm triggered on it would let the single most alarmist model put
+  a line on the home screen, the mistake the chance of rain made while it was a maximum. So
+  `gustMedianKmh` sits beside it: the weighted median, present only where at least three models
+  publish a gust. Thresholds are Beaufort's as the DWD warns on them — 50 km/h (force 7, "starke
+  Böen") and 75 (force 9, "Sturmböen", drawn in the warning orange). The hero carries "Böen bis
+  N ab HH:MM" for the first windy run within twelve hours, under the rain line; the strip grows a
+  gust row **only when some hour in it is windy**, so calm days keep its height; a day row gets a
+  glyph from its highest *daylight* median gust (the icon's window) and the day sheet the number.
+  A fresh station gust (30 min) replaces the models' for the current hour, in both directions.
+  The glyph is Material's `Rounded.Air`, not a Meteocons drawing. 50 was kept knowing Föhn days in
+  the Burggrafenamt will trip it often.
 - **The station measures the sky, not only the air, and `StationSun` is where that is used.** On
   2026-09-11 at 13:00 the app led with "Bedeckt" over Dorf Tirol while the sun was out of a nearly
   clear sky — and it was not wrong about its sources: ICON-CH1, ICON-D2 and DMI HARMONIE all called
