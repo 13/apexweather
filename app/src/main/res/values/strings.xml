@@ -452,4 +452,8 @@
         <item quantity="one">%1$d Absturz seit %2$s</item>
         <item quantity="other">%1$d Abstürze seit %2$s</item>
     </plurals>
+    <string name="wind_gusts_now">Böen bis %1$s</string>
+    <string name="wind_gusts_from">Böen bis %1$s ab %2$s</string>
+    <string name="wind_strong">Starke Böen</string>
+    <string name="wind_storm">Sturmböen</string>
 </resources>

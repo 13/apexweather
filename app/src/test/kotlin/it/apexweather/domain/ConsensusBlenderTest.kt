@@ -218,6 +218,30 @@ class ConsensusBlenderTest {
         assertEquals(95.0, blender.blend(f).hourly.single().gustKmh!!, 0.0)
     }
 
+    /** The alarm is raised on the middle gust, not the worst: see StrongWind. */
+    @Test
+    fun `the median gust sits beside the maximum and needs three models`() {
+        val three = mapOf(
+            Source.ICON_CH1 to forecast(Source.ICON_CH1, listOf(point(0, 10.0, gust = 30.0))),
+            Source.ICON_CH2 to forecast(Source.ICON_CH2, listOf(point(0, 10.0, gust = 35.0))),
+            Source.ICON_D2 to forecast(Source.ICON_D2, listOf(point(0, 10.0, gust = 95.0))),
+        )
+        assertEquals(35.0, blender.blend(three).hourly.single().gustMedianKmh!!, 0.0)
+        val two = three - Source.ICON_CH2
+        assertNull(blender.blend(two).hourly.single().gustMedianKmh)
+    }
+
+    /** A gusty night is not a gusty day: the row reads the same daylight window as its icon. */
+    @Test
+    fun `the day's gust is the highest daylight median`() {
+        // T0 is 02:00 local; hour 1 is 03:00 and hour 12 is 14:00.
+        fun gustAt(i: Int) = when (i) { 1 -> 90.0; 12 -> 55.0; else -> 20.0 }
+        val f = listOf(Source.ICON_CH1, Source.ICON_CH2, Source.ICON_D2).associateWith { src ->
+            forecast(src, (0 until 20).map { point(it, 10.0, gust = gustAt(it)) })
+        }
+        assertEquals(55.0, blender.blend(f).daily.first().gustMaxKmh!!, 0.0)
+    }
+
     @Test
     fun `the freezing level is the median of the models that publish one`() {
         val f = mapOf(

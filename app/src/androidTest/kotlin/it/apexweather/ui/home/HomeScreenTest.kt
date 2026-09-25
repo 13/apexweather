@@ -6,6 +6,8 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.hasTestTag
@@ -452,5 +454,50 @@ class HomeScreenTest {
         }
         rule.onNodeWithTag("hero_feels").assertIsDisplayed()
         rule.onNodeWithTag("rain_starts_at").assertIsDisplayed()
+    }
+
+    /**
+     * Rain and wind stack on the right under the icon; at a 2x font scale both still have to be
+     * on screen. The text is resolved from resources: CI's emulators are en-US.
+     */
+    @Test
+    fun atLargeTextTheWindLineSitsUnderTheRainLine() {
+        val windy = hotState().copy(
+            minutelyStart = t0.plusSeconds(3600),
+            windLine = it.apexweather.domain.StrongWind.Line(
+                from = null, peakKmh = 62.0, level = it.apexweather.domain.StrongWind.Level.STRONG,
+            ),
+        )
+        rule.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
+                    density = androidx.compose.ui.platform.LocalDensity.current.density,
+                    fontScale = 2.0f,
+                ),
+            ) {
+                ApexTheme { HomeContent(windy, onRefresh = {}, onOpenBulletin = {}) }
+            }
+        }
+        rule.onNodeWithTag("rain_starts_at").assertIsDisplayed()
+        rule.onNodeWithTag("wind_line", useUnmergedTree = true).assertIsDisplayed()
+        val expected = context.getString(R.string.wind_gusts_now, "62 km/h")
+        rule.onNodeWithText(expected).assertIsDisplayed()
+    }
+
+    /** A calm strip has no gust row at all; one windy hour gives every column the row. */
+    @Test
+    fun onlyAWindyStripCarriesTheGustRow() {
+        rule.setContent { ApexTheme { HomeContent(state, onRefresh = {}, onOpenBulletin = {}) } }
+        rule.onAllNodesWithTag("hour_column_wind_0", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun aWindyHourIsMarkedInTheStrip() {
+        val hours = state.upcomingHours.mapIndexed { i, h -> if (i == 1) h.copy(gustMedianKmh = 80.0) else h }
+        rule.setContent { ApexTheme { HomeContent(state.copy(upcomingHours = hours), onRefresh = {}, onOpenBulletin = {}) } }
+        rule.onAllNodesWithTag("hour_column_wind_0", useUnmergedTree = true).assertCountEquals(1)
+        rule.onNodeWithTag("hour_column_1").assertContentDescriptionContains(
+            context.getString(R.string.wind_storm), substring = true,
+        )
     }
 }

@@ -27,6 +27,10 @@ import kotlin.math.abs
  *
  * The result is still an observation — a real thermometer reading, moved — and is preferred over
  * the pure forecast for exactly that reason.
+ *
+ * **The provincial station only.** An amateur station is chosen for standing at the village, so
+ * `HomeStateBuilder` quotes it as read and never calls this: there is no hill to carry it up, and
+ * the move would replace a village thermometer with the models' idea of one.
  */
 object StationDownscale {
 

@@ -122,7 +122,7 @@ fun HomeContent(
                 }
                 item {
                     AnimatedVisibility(appeared, enter = fadeIn(tween(500)) + slideInVertically(tween(500)) { it / 4 }) {
-                        HourlySection(state.upcomingHours, state::phaseAt) { selectedHour = it }
+                        HourlySection(state.upcomingHours, state::phaseAt, state.settings.windUnit) { selectedHour = it }
                     }
                 }
                 item {

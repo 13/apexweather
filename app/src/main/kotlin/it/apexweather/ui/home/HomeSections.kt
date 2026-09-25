@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Share
+import it.apexweather.data.WindUnit
+import it.apexweather.domain.StrongWind
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -185,12 +187,34 @@ fun HeroSection(
                 style = MaterialTheme.typography.headlineMedium, color = Color.White,
                 modifier = Modifier.alignByBaseline().testTag("hero_feels"),
             )
-            state.minutelyStart?.let {
-                Text(
-                    stringResource(R.string.rain_starts_at, Format.time(it, SouthTyrol.ZONE, formats)),
-                    style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f),
-                    modifier = Modifier.alignByBaseline().padding(start = 12.dp).testTag("rain_starts_at"),
-                )
+            // Rain and wind are the two lines of weather on the right, stacked in that order: rain
+            // is the likelier question and keeps the condition's baseline. See StrongWind for when
+            // the wind line appears; it costs one line, and nothing at all on a calm day.
+            val rainAt = state.minutelyStart
+            val wind = state.windLine
+            if (rainAt != null || wind != null) {
+                Column(
+                    Modifier.alignByBaseline().padding(start = 12.dp),
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    rainAt?.let {
+                        Text(
+                            stringResource(R.string.rain_starts_at, Format.time(it, SouthTyrol.ZONE, formats)),
+                            style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.testTag("rain_starts_at"),
+                        )
+                    }
+                    wind?.let {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("wind_line")) {
+                            WindGlyph(windColor(it.level), 16.dp)
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                windLineText(it, state.settings.windUnit),
+                                style = MaterialTheme.typography.bodyMedium, color = windColor(it.level),
+                            )
+                        }
+                    }
+                }
             }
         }
         Spacer(Modifier.height(6.dp))
@@ -296,7 +320,12 @@ private val HourColumnBaseWidth = 46.dp
 private fun hourColumnWidth(): Dp = HourColumnBaseWidth * maxOf(1f, LocalDensity.current.fontScale)
 
 @Composable
-fun HourlySection(hours: List<ConsensusHour>, phaseAt: (Instant) -> SunPhase, onHourClick: (Instant) -> Unit) {
+fun HourlySection(
+    hours: List<ConsensusHour>,
+    phaseAt: (Instant) -> SunPhase,
+    windUnit: WindUnit = WindUnit.KMH,
+    onHourClick: (Instant) -> Unit,
+) {
     if (hours.isEmpty()) return
     GlassCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text(stringResource(R.string.section_hourly), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
@@ -309,7 +338,7 @@ fun HourlySection(hours: List<ConsensusHour>, phaseAt: (Instant) -> SunPhase, on
             modifier = Modifier.testTag("precip_legend"),
         )
         Spacer(Modifier.height(8.dp))
-        HourStrip(hours, phaseAt, tagPrefix = "hour_column", onHourClick = onHourClick, modifier = Modifier.testTag("hourly_strip"))
+        HourStrip(hours, phaseAt, tagPrefix = "hour_column", onHourClick = onHourClick, windUnit = windUnit, modifier = Modifier.testTag("hourly_strip"))
     }
 }
 
@@ -327,8 +356,12 @@ fun HourStrip(
     modifier: Modifier = Modifier,
     onHourClick: ((Instant) -> Unit)? = null,
     labelFirstAsNow: Boolean = true,
+    windUnit: WindUnit = WindUnit.KMH,
 ) {
     if (hours.isEmpty()) return
+    // The gust row is there only when some hour in the strip needs it, so two calm days keep the
+    // strip exactly as tall as it was before strong wind was marked at all.
+    val windy = hours.any { StrongWind.levelOf(it) != null }
     val scroll = rememberScrollState()
     val formats = LocalFormats.current
     val columnWidth = hourColumnWidth()
@@ -362,6 +395,10 @@ fun HourStrip(
                     Text(Format.temp(h.tempC, formats), style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
                     PrecipBar(h.precipMm, h.snowCm, h.precipProb, h.condition)
+                    if (windy) {
+                        Spacer(Modifier.height(2.dp))
+                        WindCell(h.gustMedianKmh, windUnit, Modifier.testTag("${tagPrefix}_wind_$i"))
+                    }
                 }
             }
         }
@@ -445,7 +482,14 @@ fun DailySection(days: List<ConsensusDay>, accent: Color, onDayClick: (LocalDate
                     style = MaterialTheme.typography.bodyMedium, color = Color.White, modifier = Modifier.width(52.dp),
                 )
                 Icon(painterResource(d.condition.iconRes(SunPhase.DAY)), contentDescription = d.condition.label(), tint = Color.White, modifier = Modifier.size(28.dp))
-                Spacer(Modifier.width(8.dp))
+                // A windy day is marked, not measured: the row has no room for a number at 44 dp,
+                // and the day sheet carries it. The slot is always there so the columns line up.
+                val windLevel = StrongWind.levelOf(d.gustMaxKmh)
+                Box(Modifier.width(16.dp), contentAlignment = Alignment.Center) {
+                    windLevel?.let {
+                        WindGlyph(windColor(it), 14.dp, contentDescription = windLabel(it), modifier = Modifier.testTag("day_wind_$i"))
+                    }
+                }
                 // Amount over chance, the same two facts in the same order the hour columns put
                 // them in. The chance is what the row was missing: it had "how much" and left "will
                 // it rain on Saturday" to be guessed off the icon. See ConsensusDay.precipProb.
